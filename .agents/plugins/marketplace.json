@@ -1,0 +1,20 @@
+{
+  "name": "openlinker",
+  "interface": {
+    "displayName": "OpenLinker"
+  },
+  "plugins": [
+    {
+      "name": "openlinker",
+      "source": {
+        "source": "local",
+        "path": "./plugins/openlinker"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

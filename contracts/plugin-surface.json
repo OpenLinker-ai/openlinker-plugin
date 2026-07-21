@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "plugin_version": "0.1.0",
+  "cli": {
+    "surface_version": "openlinker.cli.v1",
+    "version_range": ">=0.2.0-rc.1 <0.3.0"
+  },
+  "operations": {
+    "search_agents": {
+      "cli_capability": "agents.search",
+      "cli_command": ["agents", "search"],
+      "mcp_tool": "search_agents",
+      "grant": "agents:read",
+      "read_only": true
+    },
+    "get_agent": {
+      "cli_capability": "agents.get",
+      "cli_command": ["agents", "get"],
+      "mcp_tool": "get_agent",
+      "grant": "agents:read",
+      "read_only": true
+    },
+    "create_task": {
+      "cli_capability": "tasks.create",
+      "cli_command": ["tasks", "create"],
+      "mcp_tool": "create_task",
+      "grant": "tasks:create",
+      "read_only": false
+    },
+    "run_agent": {
+      "cli_capability": "runs.sync",
+      "cli_command": ["run"],
+      "mcp_tool": "run_agent",
+      "grant": "agents:run",
+      "read_only": false
+    },
+    "start_agent_run": {
+      "cli_capability": "runs.async",
+      "cli_command": ["run", "--async"],
+      "mcp_tool": "start_agent_run",
+      "grant": "agents:run",
+      "read_only": false
+    },
+    "get_run": {
+      "cli_capability": "runs.get",
+      "cli_command": ["runs", "get"],
+      "mcp_tool": "get_run",
+      "grant": "runs:read",
+      "read_only": true
+    },
+    "list_run_events": {
+      "cli_capability": "runs.events",
+      "cli_command": ["runs", "events"],
+      "mcp_tool": "list_run_events",
+      "grant": "runs:read",
+      "read_only": true
+    },
+    "list_run_artifacts": {
+      "cli_capability": "runs.artifacts",
+      "cli_command": ["runs", "artifacts"],
+      "mcp_tool": "list_run_artifacts",
+      "grant": "runs:read",
+      "read_only": true
+    },
+    "cancel_run": {
+      "cli_capability": "runs.cancel",
+      "cli_command": ["runs", "cancel"],
+      "mcp_tool": "cancel_run",
+      "grant": "runs:cancel",
+      "read_only": false
+    }
+  },
+  "hosted_mcp": {
+    "public_url": "https://openlinker.ai/mcp",
+    "core_url": "https://api.openlinker.ai/api/v1/mcp",
+    "local_plugin_default": false,
+    "authenticated_app_requires_oauth_2_1": true,
+    "current_core_auth": "user_token",
+    "chatgpt_app_status": "blocked_pending_oauth",
+    "connector_id": null
+  }
+}

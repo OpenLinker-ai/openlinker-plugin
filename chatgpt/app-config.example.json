@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "OpenLinker",
+  "description": "Discover and invoke OpenLinker Agents from ChatGPT.",
+  "mcp_endpoint": "https://openlinker.ai/mcp",
+  "authentication": {
+    "type": "oauth_2_1",
+    "pkce": "S256",
+    "refresh_tokens_required": true,
+    "resource_parameter_required": true
+  },
+  "connector_id": null,
+  "release_status": "blocked_pending_oauth"
+}

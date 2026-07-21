@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      - name: Check POSIX entrypoints
+        run: |
+          sh -n plugins/openlinker/bin/openlinker-plugin
+          sh -n plugins/openlinker/scripts/resolve-openlinker-cli
+          sh -n plugins/openlinker/scripts/install-openlinker-cli
+      - name: Check Node entrypoints
+        run: |
+          node --check plugins/openlinker/scripts/install-openlinker-cli.mjs
+          node --check scripts/generate-cli-lock.mjs
+
+  validate-powershell:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell entrypoints
+        shell: pwsh
+        run: |
+          $files = @(
+            "plugins/openlinker/scripts/resolve-openlinker-cli.ps1",
+            "plugins/openlinker/scripts/install-openlinker-cli.ps1"
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $file),
+              [ref] $tokens,
+              [ref] $errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              exit 1
+            }
+          }

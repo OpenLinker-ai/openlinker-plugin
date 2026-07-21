@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openlinker.ai/schemas/openlinker-plugin-cli-lock-v1.json",
+  "title": "OpenLinker Plugin CLI Lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "version",
+    "surface_version",
+    "capabilities",
+    "repository",
+    "release_url",
+    "assets"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "version": { "type": "string", "pattern": "^v0\\.2\\.[0-9]+(?:-rc\\.[1-9][0-9]*)?$" },
+    "surface_version": { "const": "openlinker.cli.v1" },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "repository": { "const": "OpenLinker-ai/openlinker-cli" },
+    "release_url": { "type": "string", "format": "uri", "pattern": "^https://github\\.com/OpenLinker-ai/openlinker-cli/releases/tag/" },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64", "windows-amd64", "windows-arm64"],
+      "properties": {
+        "darwin-amd64": { "$ref": "#/$defs/asset" },
+        "darwin-arm64": { "$ref": "#/$defs/asset" },
+        "linux-amd64": { "$ref": "#/$defs/asset" },
+        "linux-arm64": { "$ref": "#/$defs/asset" },
+        "windows-amd64": { "$ref": "#/$defs/asset" },
+        "windows-arm64": { "$ref": "#/$defs/asset" }
+      }
+    }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["archive", "archive_url", "checksum_url", "sha256", "executable_path"],
+      "properties": {
+        "archive": { "type": "string", "minLength": 1 },
+        "archive_url": { "type": "string", "format": "uri", "pattern": "^https://github\\.com/OpenLinker-ai/openlinker-cli/releases/download/" },
+        "checksum_url": { "type": "string", "format": "uri", "pattern": "^https://github\\.com/OpenLinker-ai/openlinker-cli/releases/download/" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "executable_path": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

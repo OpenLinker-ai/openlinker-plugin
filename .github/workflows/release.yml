@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate release contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="v$(node -p "require('./package.json').version")"
+          test "${GITHUB_REF_NAME}" = "${expected}"
+          npm run release:check
+          sh -n plugins/openlinker/bin/openlinker-plugin
+          sh -n plugins/openlinker/scripts/resolve-openlinker-cli
+          sh -n plugins/openlinker/scripts/install-openlinker-cli
+
+      - name: Package plugin and standalone Skills
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          plugin_archive="openlinker-plugin-${GITHUB_REF_NAME}.tar.gz"
+          skills_archive="openlinker-skills-${GITHUB_REF_NAME}.tar.gz"
+          tar -C plugins -czf "dist/${plugin_archive}" openlinker
+          tar -czf "dist/${skills_archive}" skills
+          (
+            cd dist
+            sha256sum "${plugin_archive}" > "${plugin_archive}.sha256"
+            sha256sum "${skills_archive}" > "${skills_archive}.sha256"
+          )
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --generate-notes
+          fi
+          gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
