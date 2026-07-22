@@ -15,3 +15,5 @@ CLI release and cross-platform installation matrix pass.
 - Added explicit, checksum-verified CLI setup for six OS/architecture targets.
 - Added ChatGPT App OAuth readiness gates and a host Browser composition Skill
   without publishing a placeholder connector ID.
+- Added complete English-first, Chinese-secondary native initialization and
+  usage guides for caller and Agent modes, including configuration contracts.
