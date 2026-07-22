@@ -29,7 +29,9 @@ jobs:
             sh -n "platforms/${host}/openlinker/bin/openlinker-plugin"
             sh -n "platforms/${host}/openlinker/scripts/resolve-openlinker-cli"
             sh -n "platforms/${host}/openlinker/scripts/install-openlinker-cli"
+            node --check "platforms/${host}/openlinker/scripts/install-openlinker-cli.mjs"
           done
+          node --check scripts/generate-cli-lock.mjs
 
       - name: Package plugin and standalone Skills
         shell: bash

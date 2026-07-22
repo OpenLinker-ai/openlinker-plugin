@@ -26,7 +26,9 @@ jobs:
           done
       - name: Check Node entrypoints
         run: |
-          node --check plugins/openlinker/scripts/install-openlinker-cli.mjs
+          for host in codex claude; do
+            node --check "platforms/${host}/openlinker/scripts/install-openlinker-cli.mjs"
+          done
           node --check scripts/generate-cli-lock.mjs
 
   validate-powershell:
