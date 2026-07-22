@@ -58,7 +58,7 @@ the CLI release exists, generate the immutable six-platform lock and run the
 release gate:
 
 ```bash
-npm run lock:cli -- v0.2.0-rc.1 --write
+npm run lock:cli -- v0.2.0-rc.2 --write
 npm run release:check
 ```
 

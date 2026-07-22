@@ -1,6 +1,6 @@
 {
   "name": "openlinker",
-  "version": "0.1.0+codex.20260722044403",
+  "version": "0.1.0+codex.20260722060606",
   "description": "Discover and call OpenLinker Agents, or expose Codex as a reusable OpenLinker Runtime Agent.",
   "author": {
     "name": "OpenLinker",
