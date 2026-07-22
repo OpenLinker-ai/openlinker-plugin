@@ -1,0 +1,4 @@
+interface:
+  display_name: "Find and Run OpenLinker Agent"
+  short_description: "Discover and call OpenLinker Agents safely"
+  default_prompt: "Use $find-and-run-agent to find an OpenLinker Agent and run my task."

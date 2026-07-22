@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const json = async (path) => JSON.parse(await readFile(join(root, path), "utf8"));
 
-const surface = await json("contracts/plugin-surface.json");
+const surface = await json("shared/contracts/caller-surface.json");
 const app = await json("chatgpt/app-config.example.json");
 const skill = await readFile(join(root, "chatgpt/skills/browse-and-run-agent/SKILL.md"), "utf8");
 
@@ -25,7 +25,7 @@ assert.match(skill, /Never send raw screenshots/);
 
 let appMappingExists = true;
 try {
-  await access(join(root, "plugins/openlinker/.app.json"), constants.F_OK);
+  await access(join(root, "platforms/codex/openlinker/.app.json"), constants.F_OK);
 } catch {
   appMappingExists = false;
 }

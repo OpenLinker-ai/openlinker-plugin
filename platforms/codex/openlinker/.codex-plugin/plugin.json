@@ -1,0 +1,48 @@
+{
+  "name": "openlinker",
+  "version": "0.1.0+codex.20260722044403",
+  "description": "Discover and call OpenLinker Agents, or expose Codex as a reusable OpenLinker Runtime Agent.",
+  "author": {
+    "name": "OpenLinker",
+    "email": "support@openlinker.ai",
+    "url": "https://openlinker.ai/"
+  },
+  "homepage": "https://openlinker.ai/",
+  "repository": "https://github.com/OpenLinker-ai/openlinker-plugin",
+  "license": "Apache-2.0",
+  "keywords": [
+    "openlinker",
+    "agents",
+    "agent-marketplace",
+    "a2a",
+    "cli",
+    "runtime",
+    "session-reuse"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "OpenLinker",
+    "shortDescription": "Call Agents or serve Codex as one",
+    "longDescription": "Use a local stdio MCP bridge backed by the OpenLinker CLI and SDK to discover callable Agents, run and inspect tasks, or explicitly enable Codex as a reliable Runtime Agent with Core-owned conversation and provider-session reuse. Agent mode is disabled by default and never stores secrets in plugin configuration.",
+    "developerName": "OpenLinker",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://openlinker.ai/",
+    "privacyPolicyURL": "https://openlinker.ai/privacy",
+    "termsOfServiceURL": "https://openlinker.ai/terms",
+    "defaultPrompt": [
+      "Find an OpenLinker Agent for my task, but do not call it yet.",
+      "Run this task with the best matching OpenLinker Agent.",
+      "Configure Codex as an OpenLinker Agent, but do not enable it yet."
+    ],
+    "brandColor": "#0F766E",
+    "composerIcon": "./assets/openlinker-logo.svg",
+    "logo": "./assets/openlinker-logo-512.png",
+    "screenshots": []
+  }
+}

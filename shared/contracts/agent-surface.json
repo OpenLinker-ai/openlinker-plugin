@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "plugin_version": "0.1.0",
+  "cli": {
+    "surface_version": "openlinker.cli.v1",
+    "version_range": ">=0.2.0-rc.1 <0.3.0"
+  },
+  "capabilities": [
+    "agent.configure",
+    "agent.serve",
+    "agent.status",
+    "agent.doctor",
+    "plugin.serve"
+  ],
+  "providers": ["codex", "claude"],
+  "states": ["disabled", "starting", "ready", "draining", "stopped", "error"],
+  "tools": [
+    "configure_agent_mode",
+    "enable_agent_mode",
+    "disable_agent_mode",
+    "get_agent_mode_status",
+    "diagnose_agent_mode"
+  ],
+  "security": {
+    "runtime": "token_only",
+    "agent_mode_default": "disabled",
+    "node_id_optional_and_persisted": true,
+    "direct_and_file_secrets_mutually_exclusive": true,
+    "secrets_allowed_as_tool_arguments": false,
+    "provider_session_ids_public": false,
+    "core_owned_conversation_required": true
+  }
+}

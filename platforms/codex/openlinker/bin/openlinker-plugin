@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+plugin_root=${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}
+if [ -z "$plugin_root" ]; then
+  plugin_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+fi
+
+cli_path=$("$plugin_root/scripts/resolve-openlinker-cli" --require plugin.serve)
+exec "$cli_path" "$@"

@@ -1,19 +1,21 @@
-# OpenLinker Plugins
+# OpenLinker Plugin
 
-Official OpenLinker Skills and native plugins for Codex and Claude Code.
+Official bidirectional OpenLinker plugins for Codex and Claude Code.
 
-This repository is in Developer Preview. Local Codex and Claude Code plugins
-use the JSON-first `openlinker` CLI; they do not use Agent Node or silently
-switch to Hosted MCP. Agent Node belongs to the opposite direction, where
-OpenLinker Runtime invokes Codex or Claude Code as an Agent.
+This repository is in Developer Preview. Each host gets its own native package,
+while both packages use the same reviewed Skills, contracts, assets, and pinned
+`openlinker` CLI. The CLI-backed local MCP bridge supports both directions:
+calling OpenLinker Agents and, only after explicit enablement, serving the
+current Codex or Claude Code host as a reusable OpenLinker Runtime Agent.
 
 ## Packages
 
-- `skills/find-and-run-agent`: standalone Agent discovery and invocation Skill.
-- `skills/inspect-openlinker-run`: standalone Run inspection and cancellation Skill.
-- `plugins/openlinker`: Codex and Claude Code native Plugin package.
+- `platforms/codex/openlinker`: native Codex plugin package.
+- `platforms/claude/openlinker`: native Claude Code plugin package and slash commands.
+- `shared/skills`: canonical Skills mirrored byte-for-byte into both packages.
+- `shared/contracts`: caller, Agent Mode, and CLI release contracts.
+- `shared/assets`: shared brand assets.
 - `chatgpt`: authenticated ChatGPT App readiness contract and Browser workflow.
-- `contracts/plugin-surface.json`: shared CLI/MCP semantic operation mapping.
 
 The ChatGPT package is intentionally not installable yet. ChatGPT expects an
 authenticated MCP app that exposes user data or write tools to use OAuth 2.1;
@@ -41,8 +43,8 @@ the token.
 
 ```bash
 npm test
-python3 /path/to/plugin-creator/scripts/validate_plugin.py plugins/openlinker
-claude plugin validate ./plugins/openlinker --strict
+python3 /path/to/plugin-creator/scripts/validate_plugin.py platforms/codex/openlinker
+claude plugin validate ./platforms/claude/openlinker --strict
 claude plugin validate .
 ```
 
@@ -71,14 +73,14 @@ destinations, and replaces the previous binary atomically.
 For Codex, add this repository's marketplace only when testing the local source:
 
 ```bash
-codex plugin marketplace add /absolute/path/to/openlinker-plugins
+codex plugin marketplace add /absolute/path/to/openlinker-plugin
 codex plugin add openlinker@openlinker
 ```
 
 For Claude Code:
 
 ```bash
-claude plugin marketplace add /absolute/path/to/openlinker-plugins
+claude plugin marketplace add /absolute/path/to/openlinker-plugin
 claude plugin install openlinker@openlinker
 ```
 

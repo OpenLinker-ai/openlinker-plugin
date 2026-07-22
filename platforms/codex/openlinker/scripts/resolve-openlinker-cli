@@ -1,0 +1,137 @@
+#!/bin/sh
+set -eu
+
+required_capabilities=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --require)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+        echo "openlinker plugin: --require needs a capability" >&2
+        exit 2
+      fi
+      required_capabilities="${required_capabilities}${required_capabilities:+
+}$2"
+      shift 2
+      ;;
+    --help)
+      echo "usage: resolve-openlinker-cli [--require capability]..."
+      exit 0
+      ;;
+    *)
+      echo "openlinker plugin: unknown resolver argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+default_plugin_data=""
+if [ "$(uname -s 2>/dev/null || true)" = "Darwin" ]; then
+  default_plugin_data=${HOME:+$HOME/Library/Application Support/OpenLinker/Plugin}
+else
+  data_root=${XDG_DATA_HOME:-${HOME:+$HOME/.local/share}}
+  if [ -n "$data_root" ]; then
+    default_plugin_data=$data_root/openlinker/plugin
+  fi
+fi
+plugin_data=${OPENLINKER_PLUGIN_DATA:-${PLUGIN_DATA:-${CLAUDE_PLUGIN_DATA:-$default_plugin_data}}}
+candidate=""
+source_name=""
+
+if [ -n "${OPENLINKER_CLI_BIN:-}" ]; then
+  candidate=$OPENLINKER_CLI_BIN
+  source_name=OPENLINKER_CLI_BIN
+elif command -v openlinker >/dev/null 2>&1; then
+  candidate=$(command -v openlinker)
+  source_name=PATH
+elif [ -n "$plugin_data" ] && [ -x "$plugin_data/bin/openlinker" ]; then
+  candidate=$plugin_data/bin/openlinker
+  source_name=plugin-data
+fi
+
+if [ -z "$candidate" ]; then
+  echo "openlinker plugin: compatible CLI not found; run the setup-openlinker-cli skill" >&2
+  exit 3
+fi
+if [ ! -f "$candidate" ] || [ ! -x "$candidate" ]; then
+  echo "openlinker plugin: $source_name does not point to an executable regular file" >&2
+  exit 3
+fi
+
+check_dir=$(mktemp -d "${TMPDIR:-/tmp}/openlinker-cli-check.XXXXXX")
+cleanup() {
+  rm -rf "$check_dir"
+}
+trap cleanup EXIT HUP INT TERM
+
+if ! "$candidate" context >"$check_dir/context.json" 2>"$check_dir/context.err"; then
+  echo "openlinker plugin: CLI context check failed for $source_name" >&2
+  sed -n '1,5p' "$check_dir/context.err" >&2
+  exit 4
+fi
+
+if ! grep -E '"surface_version"[[:space:]]*:[[:space:]]*"openlinker\.cli\.v1"' "$check_dir/context.json" >/dev/null 2>&1; then
+  echo "openlinker plugin: CLI does not expose surface openlinker.cli.v1" >&2
+  exit 4
+fi
+
+cli_version=$(sed -n 's/.*"cli_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$check_dir/context.json" | head -n 1)
+compatible_version=false
+if [ "$cli_version" = "dev" ] && [ "${OPENLINKER_ALLOW_DEV_CLI:-}" = "true" ]; then
+  compatible_version=true
+else
+  normalized_version=${cli_version#v}
+  normalized_version=${normalized_version%%+*}
+  base_version=${normalized_version%%-*}
+  prerelease=""
+  if [ "$normalized_version" != "$base_version" ]; then
+    prerelease=${normalized_version#"$base_version"-}
+  fi
+  old_ifs=$IFS
+  IFS=.
+  set -- $base_version
+  IFS=$old_ifs
+  if [ "$#" -eq 3 ]; then
+    major=$1
+    minor=$2
+    patch=$3
+    case "$major.$minor.$patch" in
+      *[!0-9.]*) ;;
+      *)
+        if [ "$major" -eq 0 ] && [ "$minor" -eq 2 ]; then
+          if [ "$patch" -gt 0 ] || [ -z "$prerelease" ]; then
+            compatible_version=true
+          else
+            case "$prerelease" in
+              rc.*)
+                rc_number=${prerelease#rc.}
+                case "$rc_number" in
+                  *[!0-9]*|'') ;;
+                  *) [ "$rc_number" -ge 1 ] && compatible_version=true ;;
+                esac
+                ;;
+            esac
+          fi
+        fi
+        ;;
+    esac
+  fi
+fi
+if [ "$compatible_version" != "true" ]; then
+  echo "openlinker plugin: CLI version $cli_version is outside >=0.2.0-rc.1 <0.3.0" >&2
+  exit 4
+fi
+
+if [ -n "$required_capabilities" ]; then
+  old_ifs=$IFS
+  IFS='
+'
+  for capability in $required_capabilities; do
+    if ! grep -F "\"$capability\"" "$check_dir/context.json" >/dev/null 2>&1; then
+      echo "openlinker plugin: CLI capability missing: $capability" >&2
+      exit 5
+    fi
+  done
+  IFS=$old_ifs
+fi
+
+printf '%s\n' "$candidate"

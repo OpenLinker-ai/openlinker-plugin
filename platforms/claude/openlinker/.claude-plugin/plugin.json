@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "openlinker",
+  "displayName": "OpenLinker",
+  "version": "0.1.0",
+  "description": "Discover and call OpenLinker Agents, or expose Claude Code as a reusable OpenLinker Runtime Agent.",
+  "author": {
+    "name": "OpenLinker",
+    "email": "support@openlinker.ai",
+    "url": "https://openlinker.ai/"
+  },
+  "homepage": "https://openlinker.ai/",
+  "repository": "https://github.com/OpenLinker-ai/openlinker-plugin",
+  "license": "Apache-2.0",
+  "keywords": [
+    "openlinker",
+    "agents",
+    "agent-marketplace",
+    "a2a",
+    "cli",
+    "runtime",
+    "session-reuse"
+  ],
+  "skills": "./skills/",
+  "commands": "./commands/"
+}

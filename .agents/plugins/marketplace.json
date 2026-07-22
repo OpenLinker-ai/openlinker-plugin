@@ -8,7 +8,7 @@
       "name": "openlinker",
       "source": {
         "source": "local",
-        "path": "./plugins/openlinker"
+        "path": "./platforms/codex/openlinker"
       },
       "policy": {
         "installation": "AVAILABLE",

@@ -3,13 +3,13 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "..");
-const lockPath = join(repoRoot, "plugins", "openlinker", "cli-lock.json");
+const lockPath = join(repoRoot, "shared", "cli-lock.json");
 let lock;
 try {
   lock = JSON.parse(await readFile(lockPath, "utf8"));
 } catch (error) {
   if (error?.code === "ENOENT") {
-    throw new Error("release gate: generate plugins/openlinker/cli-lock.json from the published CLI release");
+    throw new Error("release gate: generate shared/cli-lock.json from the published CLI release");
   }
   throw error;
 }
@@ -26,5 +26,8 @@ for (const key of ["darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64",
   assert.match(asset.archive_url, /^https:\/\/github\.com\/OpenLinker-ai\/openlinker-cli\/releases\/download\//);
   assert.match(asset.checksum_url, /^https:\/\/github\.com\/OpenLinker-ai\/openlinker-cli\/releases\/download\//);
   assert.ok(asset.executable_path.endsWith(key.startsWith("windows-") ? "/openlinker.exe" : "/openlinker"));
+}
+for (const path of ["platforms/codex/openlinker/cli-lock.json", "platforms/claude/openlinker/cli-lock.json"]) {
+  assert.deepEqual(JSON.parse(await readFile(join(repoRoot, path), "utf8")), lock, `${path} differs from shared lock`);
 }
 console.log(`release lock passed: ${lock.version}`);

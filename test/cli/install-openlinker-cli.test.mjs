@@ -6,11 +6,11 @@ import { arch, platform, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { installForTest } from "../../plugins/openlinker/scripts/install-openlinker-cli.mjs";
+import { installForTest } from "../../platforms/codex/openlinker/scripts/install-openlinker-cli.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
-const installer = join(repoRoot, "plugins/openlinker/scripts/install-openlinker-cli.mjs");
-const resolver = join(repoRoot, "plugins/openlinker/scripts/resolve-openlinker-cli");
+const installer = join(repoRoot, "platforms/codex/openlinker/scripts/install-openlinker-cli.mjs");
+const resolver = join(repoRoot, "platforms/codex/openlinker/scripts/resolve-openlinker-cli");
 const testRoot = await realpath(await mkdtemp(join(tmpdir(), "openlinker-installer-test-")));
 const dataDir = join(testRoot, "data");
 const fixtureDir = join(testRoot, "fixture");

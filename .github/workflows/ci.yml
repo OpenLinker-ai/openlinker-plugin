@@ -19,9 +19,11 @@ jobs:
       - run: npm test
       - name: Check POSIX entrypoints
         run: |
-          sh -n plugins/openlinker/bin/openlinker-plugin
-          sh -n plugins/openlinker/scripts/resolve-openlinker-cli
-          sh -n plugins/openlinker/scripts/install-openlinker-cli
+          for host in codex claude; do
+            sh -n "platforms/${host}/openlinker/bin/openlinker-plugin"
+            sh -n "platforms/${host}/openlinker/scripts/resolve-openlinker-cli"
+            sh -n "platforms/${host}/openlinker/scripts/install-openlinker-cli"
+          done
       - name: Check Node entrypoints
         run: |
           node --check plugins/openlinker/scripts/install-openlinker-cli.mjs
@@ -35,8 +37,10 @@ jobs:
         shell: pwsh
         run: |
           $files = @(
-            "plugins/openlinker/scripts/resolve-openlinker-cli.ps1",
-            "plugins/openlinker/scripts/install-openlinker-cli.ps1"
+            "platforms/codex/openlinker/scripts/resolve-openlinker-cli.ps1",
+            "platforms/codex/openlinker/scripts/install-openlinker-cli.ps1",
+            "platforms/claude/openlinker/scripts/resolve-openlinker-cli.ps1",
+            "platforms/claude/openlinker/scripts/install-openlinker-cli.ps1"
           )
           foreach ($file in $files) {
             $tokens = $null

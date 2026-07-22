@@ -7,7 +7,7 @@ description: "Use a separately available ChatGPT Browser capability to collect m
 
 This is a ChatGPT Web/desktop workflow. It requires two independent host
 capabilities: the OpenLinker App and Browser. Do not substitute a local CLI,
-Agent Node, shell browser, remote automation server, or unlisted connector.
+local Runtime worker, shell browser, remote automation server, or unlisted connector.
 
 1. Verify that the authenticated OpenLinker tools and the host Browser
    capability are both callable. A manifest entry is not readiness evidence.

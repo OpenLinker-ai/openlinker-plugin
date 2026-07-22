@@ -8,7 +8,10 @@ CLI release and cross-platform installation matrix pass.
 
 - Added standalone Agent discovery/invocation and Run inspection Skills.
 - Added native Codex and Claude Code plugin manifests, marketplaces, Claude
-  slash commands, and a shared local-CLI workflow surface.
+  slash commands, and separate native packages backed by a shared local-CLI
+  workflow surface.
+- Added explicit bidirectional Agent Mode with token-only Runtime registration,
+  Core-owned conversation continuity, and private provider-session reuse.
 - Added explicit, checksum-verified CLI setup for six OS/architecture targets.
 - Added ChatGPT App OAuth readiness gates and a host Browser composition Skill
   without publishing a placeholder connector ID.

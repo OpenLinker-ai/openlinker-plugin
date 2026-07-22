@@ -33,8 +33,9 @@ if (metadata.tagName !== tag || metadata.isDraft) {
   process.exit(2);
 }
 
-const contract = JSON.parse(await readFile(join(repoRoot, "contracts", "plugin-surface.json"), "utf8"));
-const capabilities = [...new Set(Object.values(contract.operations).map((operation) => operation.cli_capability))].sort();
+const caller = JSON.parse(await readFile(join(repoRoot, "shared", "contracts", "caller-surface.json"), "utf8"));
+const agent = JSON.parse(await readFile(join(repoRoot, "shared", "contracts", "agent-surface.json"), "utf8"));
+const capabilities = [...new Set([...Object.values(caller.operations).map((operation) => operation.cli_capability), ...agent.capabilities])].sort();
 const releaseAssets = new Map(metadata.assets.map((asset) => [asset.name, asset]));
 const assets = {};
 for (const os of ["darwin", "linux", "windows"]) {
@@ -62,7 +63,7 @@ for (const os of ["darwin", "linux", "windows"]) {
 const lock = {
   schema_version: 1,
   version: tag,
-  surface_version: contract.cli.surface_version,
+  surface_version: caller.cli.surface_version,
   capabilities,
   repository,
   release_url: metadata.url,
@@ -70,9 +71,13 @@ const lock = {
 };
 const output = `${JSON.stringify(lock, null, 2)}\n`;
 if (write) {
-  const destination = join(repoRoot, "plugins", "openlinker", "cli-lock.json");
-  await writeFile(destination, output);
-  process.stdout.write(`${destination}\n`);
+  const destinations = [
+    join(repoRoot, "shared", "cli-lock.json"),
+    join(repoRoot, "platforms", "codex", "openlinker", "cli-lock.json"),
+    join(repoRoot, "platforms", "claude", "openlinker", "cli-lock.json"),
+  ];
+  for (const destination of destinations) await writeFile(destination, output);
+  process.stdout.write(`${destinations.join("\n")}\n`);
 } else {
   process.stdout.write(output);
 }

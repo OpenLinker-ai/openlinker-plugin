@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
-const resolver = join(repoRoot, "plugins/openlinker/scripts/resolve-openlinker-cli");
+const resolver = join(repoRoot, "platforms/codex/openlinker/scripts/resolve-openlinker-cli");
 
 async function fakeCLI(root, context) {
   const bin = join(root, "openlinker");

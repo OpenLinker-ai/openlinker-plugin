@@ -25,22 +25,27 @@ jobs:
           expected="v$(node -p "require('./package.json').version")"
           test "${GITHUB_REF_NAME}" = "${expected}"
           npm run release:check
-          sh -n plugins/openlinker/bin/openlinker-plugin
-          sh -n plugins/openlinker/scripts/resolve-openlinker-cli
-          sh -n plugins/openlinker/scripts/install-openlinker-cli
+          for host in codex claude; do
+            sh -n "platforms/${host}/openlinker/bin/openlinker-plugin"
+            sh -n "platforms/${host}/openlinker/scripts/resolve-openlinker-cli"
+            sh -n "platforms/${host}/openlinker/scripts/install-openlinker-cli"
+          done
 
       - name: Package plugin and standalone Skills
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          plugin_archive="openlinker-plugin-${GITHUB_REF_NAME}.tar.gz"
+          codex_archive="openlinker-codex-plugin-${GITHUB_REF_NAME}.tar.gz"
+          claude_archive="openlinker-claude-plugin-${GITHUB_REF_NAME}.tar.gz"
           skills_archive="openlinker-skills-${GITHUB_REF_NAME}.tar.gz"
-          tar -C plugins -czf "dist/${plugin_archive}" openlinker
-          tar -czf "dist/${skills_archive}" skills
+          tar -C platforms/codex -czf "dist/${codex_archive}" openlinker
+          tar -C platforms/claude -czf "dist/${claude_archive}" openlinker
+          tar -C shared -czf "dist/${skills_archive}" skills
           (
             cd dist
-            sha256sum "${plugin_archive}" > "${plugin_archive}.sha256"
+            sha256sum "${codex_archive}" > "${codex_archive}.sha256"
+            sha256sum "${claude_archive}" > "${claude_archive}.sha256"
             sha256sum "${skills_archive}" > "${skills_archive}.sha256"
           )
 

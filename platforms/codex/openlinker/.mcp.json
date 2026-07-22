@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "openlinker": {
+      "command": "./bin/openlinker-plugin",
+      "args": ["plugin", "serve", "--host", "codex"]
+    }
+  }
+}
