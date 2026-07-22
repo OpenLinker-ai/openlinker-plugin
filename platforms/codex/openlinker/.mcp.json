@@ -2,7 +2,51 @@
   "mcpServers": {
     "openlinker": {
       "command": "./bin/openlinker-plugin",
-      "args": ["plugin", "serve", "--host", "codex"]
+      "args": ["plugin", "serve", "--host", "codex"],
+      "cwd": ".",
+      "env_vars": [
+        "ALL_PROXY",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_API_KEY_FILE",
+        "CODEX_API_KEY",
+        "CODEX_API_KEY_FILE",
+        "CODEX_CA_CERTIFICATE",
+        "CODEX_HOME",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "OPENLINKER_AGENT_CAPACITY",
+        "OPENLINKER_AGENT_CONFIG",
+        "OPENLINKER_AGENT_ID",
+        "OPENLINKER_AGENT_SESSION_REUSE",
+        "OPENLINKER_AGENT_STATE_DIR",
+        "OPENLINKER_AGENT_TIMEOUT_SECONDS",
+        "OPENLINKER_AGENT_TOKEN",
+        "OPENLINKER_AGENT_TOKEN_FILE",
+        "OPENLINKER_AGENT_TRANSPORT",
+        "OPENLINKER_AGENT_WEB_SEARCH",
+        "OPENLINKER_API_BASE",
+        "OPENLINKER_CLAUDE_ALLOWED_TOOLS",
+        "OPENLINKER_CLAUDE_BIN",
+        "OPENLINKER_CLAUDE_MODEL",
+        "OPENLINKER_CLAUDE_PERMISSION",
+        "OPENLINKER_CLAUDE_WEB_SEARCH",
+        "OPENLINKER_CLI_BIN",
+        "OPENLINKER_CODEX_APPROVAL",
+        "OPENLINKER_CODEX_BASE_URL",
+        "OPENLINKER_CODEX_BIN",
+        "OPENLINKER_CODEX_MODEL",
+        "OPENLINKER_CODEX_SANDBOX",
+        "OPENLINKER_CODEX_WEB_SEARCH",
+        "OPENLINKER_NODE_ID",
+        "OPENLINKER_PLUGIN_DATA",
+        "OPENLINKER_PROVIDER",
+        "OPENLINKER_RUNTIME_BASE",
+        "OPENLINKER_URL",
+        "OPENLINKER_USER_TOKEN",
+        "OPENLINKER_WORKSPACE",
+        "SSL_CERT_FILE"
+      ]
     }
   }
 }

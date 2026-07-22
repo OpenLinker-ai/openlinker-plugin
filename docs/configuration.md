@@ -61,6 +61,7 @@ configure`.
 | `timeout_seconds` | No | `1800` | Positive provider execution timeout. |
 | `session_reuse` | No | `true` | Reuse a private provider session per Core conversation. |
 | `web_search` | No | `false` | Allow provider web search. |
+| `codex_base_url` | Codex only | Provider default | Validated OpenAI-compatible HTTP(S) Base URL; credentials, query, and fragment are forbidden. |
 | `codex_sandbox` | Codex only | `read-only` | `read-only` or `workspace-write`. |
 | `codex_approval` | Codex only | `never` | `never`, `untrusted`, or `on-request`. |
 | `claude_permission` | Claude only | `dontAsk` | `acceptEdits`, `auto`, `dontAsk`, `manual`, or `plan`. |
@@ -82,6 +83,7 @@ configure`.
   "timeout_seconds": 1800,
   "session_reuse": true,
   "web_search": false,
+  "codex_base_url": "https://router.example/v1",
   "codex_sandbox": "read-only",
   "codex_approval": "never",
   "claude_permission": "dontAsk"
@@ -155,6 +157,7 @@ Environment values override stored non-secret Agent configuration at Runtime.
 | `OPENLINKER_AGENT_SESSION_REUSE` | `session_reuse` |
 | `OPENLINKER_AGENT_WEB_SEARCH` | `web_search` fallback |
 | `OPENLINKER_CODEX_MODEL`, `OPENLINKER_CLAUDE_MODEL` | `model` for the selected provider |
+| `OPENLINKER_CODEX_BASE_URL` | `codex_base_url`; used by new and resumed Codex sessions |
 | `OPENLINKER_CODEX_WEB_SEARCH`, `OPENLINKER_CLAUDE_WEB_SEARCH` | Provider-specific `web_search` |
 | `OPENLINKER_CODEX_SANDBOX` | `codex_sandbox` |
 | `OPENLINKER_CODEX_APPROVAL` | `codex_approval` |
@@ -185,6 +188,11 @@ Set environment variables before launching `codex`, install the Plugin, and
 start a new session. Explicit native Skills use `$openlinker`,
 `$setup-openlinker-cli`, and `$serve-openlinker-agent`.
 
+The Codex package declares only the environment variable names required by the
+local bridge and passes no inline values. Its MCP process starts from the
+installed Plugin root, so the bundled launcher resolves independently of the
+user's current workspace.
+
 ### Codex desktop app
 
 Put required `KEY=value` entries in `~/.codex/.env`, protect the file, restart
@@ -200,7 +208,7 @@ enabling the Plugin, run `/reload-plugins`. Explicit native commands are
 ## Proxies and network scope
 
 The CLI and provider subprocesses honor standard `HTTP_PROXY`, `HTTPS_PROXY`,
-and `NO_PROXY` variables. The local native Plugin does not provide a hard
+`NO_PROXY`, and `ALL_PROXY` variables. The local native Plugin does not provide a hard
 network-isolation boundary. Use the production provider images and their egress
 gateway when private-address, link-local, metadata, DNS-rebinding, or proxy
 bypass protection must be enforced.

@@ -58,6 +58,7 @@ Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
 | `timeout_seconds` | 否 | `1800` | Provider 执行超时，必须为正数。 |
 | `session_reuse` | 否 | `true` | 每个 Core Conversation 私有复用 Provider Session。 |
 | `web_search` | 否 | `false` | 允许 Provider Web Search。 |
+| `codex_base_url` | 仅 Codex | Provider 默认值 | 经过校验的 OpenAI-compatible HTTP(S) Base URL；禁止包含凭据、查询参数和 fragment。 |
 | `codex_sandbox` | 仅 Codex | `read-only` | `read-only` 或 `workspace-write`。 |
 | `codex_approval` | 仅 Codex | `never` | `never`、`untrusted` 或 `on-request`。 |
 | `claude_permission` | 仅 Claude | `dontAsk` | `acceptEdits`、`auto`、`dontAsk`、`manual` 或 `plan`。 |
@@ -79,6 +80,7 @@ Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
   "timeout_seconds": 1800,
   "session_reuse": true,
   "web_search": false,
+  "codex_base_url": "https://router.example/v1",
   "codex_sandbox": "read-only",
   "codex_approval": "never",
   "claude_permission": "dontAsk"
@@ -147,6 +149,7 @@ Runtime 中的环境变量优先于已存储的非敏感 Agent 配置。
 | `OPENLINKER_AGENT_SESSION_REUSE` | `session_reuse` |
 | `OPENLINKER_AGENT_WEB_SEARCH` | `web_search` Fallback |
 | `OPENLINKER_CODEX_MODEL`、`OPENLINKER_CLAUDE_MODEL` | 所选 Provider 的 `model` |
+| `OPENLINKER_CODEX_BASE_URL` | `codex_base_url`；新建和恢复 Codex Session 都会使用 |
 | `OPENLINKER_CODEX_WEB_SEARCH`、`OPENLINKER_CLAUDE_WEB_SEARCH` | Provider 专用 `web_search` |
 | `OPENLINKER_CODEX_SANDBOX` | `codex_sandbox` |
 | `OPENLINKER_CODEX_APPROVAL` | `codex_approval` |
@@ -175,6 +178,9 @@ Runtime 中的环境变量优先于已存储的非敏感 Agent 配置。
 启动 `codex` 前设置环境变量，安装 Plugin 并新建 Session。显式原生 Skill 使用
 `$openlinker`、`$setup-openlinker-cli` 和 `$serve-openlinker-agent`。
 
+Codex 包只声明本地 Bridge 所需的环境变量名称，不内嵌任何值。MCP 进程从已安装的
+Plugin Root 启动，因此 Bundled Launcher 的解析不依赖用户当前 Workspace。
+
 ### Codex 桌面端
 
 把所需 `KEY=value` 写入 `~/.codex/.env`，保护文件权限、重启应用并新建任务。仓库中
@@ -188,7 +194,8 @@ Runtime 中的环境变量优先于已存储的非敏感 Agent 配置。
 
 ## 代理与网络范围
 
-CLI 和 Provider 子进程遵循标准 `HTTP_PROXY`、`HTTPS_PROXY` 和 `NO_PROXY`。本地原生
+CLI 和 Provider 子进程遵循标准 `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY` 和
+`ALL_PROXY`。本地原生
 Plugin 不提供硬网络隔离边界；如果必须强制拦截私网、Link-local、Metadata、DNS
 Rebinding 或代理绕过，应使用生产 Provider 镜像及其 Egress Gateway。
 
