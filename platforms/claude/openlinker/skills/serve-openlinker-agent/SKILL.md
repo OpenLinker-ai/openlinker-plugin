@@ -17,7 +17,9 @@ Collect and save only:
 - a minimal workspace directory;
 - the public OpenLinker platform URL;
 - optional state directory, model, capacity, timeout, sandbox/permission, web
-  search and session-reuse preferences.
+  search and session-reuse preferences;
+- for Codex only, an optional validated OpenAI-compatible `codex_base_url`
+  without credentials, a query, or a fragment.
 
 Use `configure_agent_mode` or `openlinker agent configure`. Never accept an
 Agent Token, Provider API key, secret file contents, or Provider session ID in
@@ -53,4 +55,3 @@ using Core-owned history.
 Local Plugin mode provides software boundaries and the host sandbox. For 24/7
 or strong network isolation, use the corresponding production image or supervise
 `openlinker agent serve --provider <provider>` with persistent private state.
-

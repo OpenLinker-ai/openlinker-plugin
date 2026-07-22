@@ -35,7 +35,54 @@ assert.equal(await exists("platforms/codex/openlinker/.claude-plugin/plugin.json
 assert.equal(await exists("platforms/claude/openlinker/.codex-plugin/plugin.json"), false);
 assert.equal(await exists("platforms/codex/openlinker/commands"), false);
 
-assert.deepEqual(codexMCP.mcpServers.openlinker.args, ["plugin", "serve", "--host", "codex"]);
+const codexServer = codexMCP.mcpServers.openlinker;
+const codexEnvironment = [
+  "ALL_PROXY",
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_API_KEY_FILE",
+  "CODEX_API_KEY",
+  "CODEX_API_KEY_FILE",
+  "CODEX_CA_CERTIFICATE",
+  "CODEX_HOME",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "OPENLINKER_AGENT_CAPACITY",
+  "OPENLINKER_AGENT_CONFIG",
+  "OPENLINKER_AGENT_ID",
+  "OPENLINKER_AGENT_SESSION_REUSE",
+  "OPENLINKER_AGENT_STATE_DIR",
+  "OPENLINKER_AGENT_TIMEOUT_SECONDS",
+  "OPENLINKER_AGENT_TOKEN",
+  "OPENLINKER_AGENT_TOKEN_FILE",
+  "OPENLINKER_AGENT_TRANSPORT",
+  "OPENLINKER_AGENT_WEB_SEARCH",
+  "OPENLINKER_API_BASE",
+  "OPENLINKER_CLAUDE_ALLOWED_TOOLS",
+  "OPENLINKER_CLAUDE_BIN",
+  "OPENLINKER_CLAUDE_MODEL",
+  "OPENLINKER_CLAUDE_PERMISSION",
+  "OPENLINKER_CLAUDE_WEB_SEARCH",
+  "OPENLINKER_CLI_BIN",
+  "OPENLINKER_CODEX_APPROVAL",
+  "OPENLINKER_CODEX_BASE_URL",
+  "OPENLINKER_CODEX_BIN",
+  "OPENLINKER_CODEX_MODEL",
+  "OPENLINKER_CODEX_SANDBOX",
+  "OPENLINKER_CODEX_WEB_SEARCH",
+  "OPENLINKER_NODE_ID",
+  "OPENLINKER_PLUGIN_DATA",
+  "OPENLINKER_PROVIDER",
+  "OPENLINKER_RUNTIME_BASE",
+  "OPENLINKER_URL",
+  "OPENLINKER_USER_TOKEN",
+  "OPENLINKER_WORKSPACE",
+  "SSL_CERT_FILE",
+];
+assert.deepEqual(codexServer.args, ["plugin", "serve", "--host", "codex"]);
+assert.equal(codexServer.cwd, ".");
+assert.deepEqual(codexServer.env_vars, codexEnvironment);
+assert.equal("env" in codexServer, false, "Codex MCP manifest must not contain inline environment values");
 assert.deepEqual(claudeMCP.mcpServers.openlinker.args, ["plugin", "serve", "--host", "claude"]);
 for (const path of ["platforms/codex/openlinker/bin/openlinker-plugin", "platforms/claude/openlinker/bin/openlinker-plugin"]) {
   assert.match(await readFile(join(root, path), "utf8"), /--require plugin\.serve/);

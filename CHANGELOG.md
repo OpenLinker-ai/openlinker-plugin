@@ -15,3 +15,8 @@ CLI release and cross-platform installation matrix pass.
 - Added explicit, checksum-verified CLI setup for six OS/architecture targets.
 - Added ChatGPT App OAuth readiness gates and a host Browser composition Skill
   without publishing a placeholder connector ID.
+- Added complete English-first, Chinese-secondary native initialization and
+  usage guides for caller and Agent modes, including configuration contracts.
+- Fixed native Codex MCP startup to use the installed Plugin root, explicitly
+  inherit only supported host variables, and support validated Codex API Base
+  URLs, non-Git workspaces, and Codex client tool metadata through the pinned CLI.
