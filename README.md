@@ -68,6 +68,25 @@ checksum and the digest pinned in `cli-lock.json`, extracts only the expected
 executable, validates its JSON capability surface, rejects symlinked
 destinations, and replaces the previous binary atomically.
 
+## Install from the public marketplace
+
+For Codex:
+
+```bash
+codex plugin marketplace add OpenLinker-ai/openlinker-plugin
+codex plugin add openlinker@openlinker
+```
+
+For Claude Code:
+
+```bash
+claude plugin marketplace add OpenLinker-ai/openlinker-plugin
+claude plugin install openlinker@openlinker
+```
+
+Release archives and checksums are also available from
+[`v0.1.0`](https://github.com/OpenLinker-ai/openlinker-plugin/releases/tag/v0.1.0).
+
 ## Local marketplace testing
 
 For Codex, add this repository's marketplace only when testing the local source:
