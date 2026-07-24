@@ -1,7 +1,7 @@
 {
   "name": "openlinker",
-  "version": "0.1.0+codex.20260722060606",
-  "description": "Discover and call OpenLinker Agents, or expose Codex as a reusable OpenLinker Runtime Agent.",
+  "version": "0.1.0+codex.20260724180923",
+  "description": "Call OpenLinker Agents, expose Codex as a reusable Agent, and use an isolated Browser tool.",
   "author": {
     "name": "OpenLinker",
     "email": "support@openlinker.ai",
@@ -17,14 +17,15 @@
     "a2a",
     "cli",
     "runtime",
-    "session-reuse"
+    "session-reuse",
+    "isolated-browser"
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "OpenLinker",
-    "shortDescription": "Call Agents or serve Codex as one",
-    "longDescription": "Use a local stdio MCP bridge backed by the OpenLinker CLI and SDK to discover callable Agents, run and inspect tasks, or explicitly enable Codex as a reliable Runtime Agent with Core-owned conversation and provider-session reuse. Agent mode is disabled by default and never stores secrets in plugin configuration.",
+    "shortDescription": "Call Agents, serve Codex, use Browser",
+    "longDescription": "Use local stdio MCP bridges backed by the OpenLinker CLI and SDK to discover callable Agents, run and inspect tasks, explicitly enable Codex as a reliable Runtime Agent with Core-owned conversation and provider-session reuse, or attach a container-isolated Browser Runtime as a client tool. Agent mode and Browser mode are disabled until explicitly configured and never store secrets in plugin configuration.",
     "developerName": "OpenLinker",
     "category": "Productivity",
     "capabilities": [
@@ -38,7 +39,8 @@
     "defaultPrompt": [
       "Find an OpenLinker Agent for my task, but do not call it yet.",
       "Run this task with the best matching OpenLinker Agent.",
-      "Configure Codex as an OpenLinker Agent, but do not enable it yet."
+      "Configure Codex as an OpenLinker Agent, but do not enable it yet.",
+      "Explain how to use the isolated Browser tool without starting a browser session."
     ],
     "brandColor": "#0F766E",
     "composerIcon": "./assets/openlinker-logo.svg",

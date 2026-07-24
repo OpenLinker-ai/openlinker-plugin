@@ -10,10 +10,11 @@ OpenLinker 官方 Codex 与 Claude Code 双向原生插件。
 | --- | --- | --- |
 | Use Mode（调用模式） | Codex 或 Claude Code → OpenLinker | 发现、调用、检查和取消其他 Agent。 |
 | Agent Mode（被调用模式） | OpenLinker → Codex 或 Claude Code | 把当前宿主变成可调用 Agent，并私有复用 Provider Session。 |
+| Browser Agent | OpenLinker → Codex 或 Claude Code → 隔离 Browser | 为显式启用的 Agent 提供客户端 Browser 工具，不使用 Provider computer API。 |
 
-插件会启动本地 stdio MCP bridge；bridge 由校验和锁定版本的 `openlinker` CLI
+插件会启动本地 stdio MCP bridge；这些 bridge 由校验和锁定版本的 `openlinker` CLI
 和官方 OpenLinker SDK 提供能力。Agent Mode 默认关闭，不依赖 OpenLinker Agent
-Node。
+Node。Browser 入口在隔离 Browser Runtime 和权威 Attachment 都存在之前同样不会工作。
 
 ## 五分钟开始
 
@@ -120,10 +121,35 @@ Claude Code：
 `OPENLINKER_NODE_ID` 可以省略。Runtime 会在缺失时生成并私有持久化。继续阅读
 [Agent Mode 指南](./docs/serving-as-agent.zh-CN.md)。
 
+### 5. 使用隔离 Browser
+
+Browser 是正在执行的 Codex 或 Claude 客户端工具。它不会探测或调用 Provider
+`computer` 能力，也不会为了测试当前模型而调用一个无关的 OpenLinker Agent。
+
+要运行可被调用的 Browser Agent，请使用生产 Browser compose override，并把这个专用、
+仅 Owner 可见的 Agent 配置为 `execution_profile: browser`。Runtime 会把
+`browser_session` 注入子客户端，并在模型参数之外提供全部 Attachment 身份。Browser
+容器永远拿不到 Provider Key。
+
+Codex：
+
+```text
+$use-isolated-browser Explain Browser Agent readiness without opening a page.
+```
+
+Claude Code：
+
+```text
+/openlinker:openlinker-browser Explain Browser Agent readiness without opening a page.
+```
+
+继续阅读[隔离 Browser 指南](./docs/isolated-browser.zh-CN.md)。
+
 ## 指南
 
 - [调用 OpenLinker Agent（Use Mode）](./docs/calling-agents.zh-CN.md)
 - [把当前宿主作为 Agent（Agent Mode）](./docs/serving-as-agent.zh-CN.md)
+- [使用隔离 Browser](./docs/isolated-browser.zh-CN.md)
 - [配置参考](./docs/configuration.zh-CN.md)
 
 英文文档是权威版本，每份指南均链接到中文辅助版本。
@@ -142,8 +168,9 @@ ChatGPT 包目前有意保持不可安装。访问用户数据或提供写操作
 客户端，但不是 OAuth 授权流。在 OAuth discovery、PKCE、刷新、撤销和生产 endpoint
 测试完成前，仓库会保持真实 Connector ID 为空并让发布检查失败。
 
-未来的 ChatGPT 工作流可以组合另行安装、由宿主提供的 Browser Plugin。Browser
-不会打包进本地 CLI 插件或 Provider Runtime 镜像。
+未来的 ChatGPT App 可以组合另行安装、由宿主提供的 Browser Plugin。本仓库的 Codex
+和 Claude 包已经声明客户端 Browser MCP 入口；Chromium 仍位于独立隔离 Runtime
+容器，绝不会打包进 Provider 镜像。
 
 ## 本地校验
 
