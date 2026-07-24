@@ -112,7 +112,8 @@ Provider Session Recovery、Runtime Reattachment、Cancel、Expiry 或 Completio
 不同 Conversation 或 Principal 不能复用同一个 active Browser Attachment。持久登录
 Profile 的部署边界是一个专用私有 Browser Agent。明文 Profile State 只在 Active
 期间存在于 Browser tmpfs；Checkpoint 使用 Browser-only Root Key 和按身份派生的
-Wrapping Key 加密。Inactive Profile 会在 30 天后过期。
+Wrapping Key 加密。Root Key 与加密 Profile Payload 使用两个独立的 Browser-only
+Volume，Provider Runtime 均不挂载。Inactive Profile 会在 30 天后过期。
 
 ## 持久历史
 

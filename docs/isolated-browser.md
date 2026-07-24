@@ -127,7 +127,9 @@ Different conversations or principals cannot reuse the same active Browser
 attachment. A dedicated private Browser Agent is the deployment boundary for a
 persistent logged-in Profile. Plaintext Profile state exists only in Browser
 tmpfs while active; checkpoints are encrypted with a Browser-only root key and
-an identity-derived wrapping key. Inactive Profiles expire after 30 days.
+an identity-derived wrapping key. The root key and encrypted Profile payload
+use separate Browser-only volumes; neither is mounted into the Provider
+Runtime. Inactive Profiles expire after 30 days.
 
 ## Durable history
 
