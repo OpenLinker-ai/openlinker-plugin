@@ -49,6 +49,7 @@ const codexEnvironment = [
   "NO_PROXY",
   "OPENLINKER_AGENT_CAPACITY",
   "OPENLINKER_AGENT_CONFIG",
+  "OPENLINKER_AGENT_EXECUTION_PROFILE",
   "OPENLINKER_AGENT_ID",
   "OPENLINKER_AGENT_SESSION_REUSE",
   "OPENLINKER_AGENT_STATE_DIR",
@@ -63,6 +64,11 @@ const codexEnvironment = [
   "OPENLINKER_CLAUDE_MODEL",
   "OPENLINKER_CLAUDE_PERMISSION",
   "OPENLINKER_CLAUDE_WEB_SEARCH",
+  "OPENLINKER_BROWSER_BROKER_ROOT",
+  "OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE",
+  "OPENLINKER_BROWSER_LEASE_ROOT",
+  "OPENLINKER_BROWSER_PLUGIN_BIN",
+  "OPENLINKER_BROWSER_SOCKET",
   "OPENLINKER_CLI_BIN",
   "OPENLINKER_CODEX_APPROVAL",
   "OPENLINKER_CODEX_BASE_URL",
@@ -84,8 +90,30 @@ assert.equal(codexServer.cwd, ".");
 assert.deepEqual(codexServer.env_vars, codexEnvironment);
 assert.equal("env" in codexServer, false, "Codex MCP manifest must not contain inline environment values");
 assert.deepEqual(claudeMCP.mcpServers.openlinker.args, ["plugin", "serve", "--host", "claude"]);
+const codexBrowser = codexMCP.mcpServers.openlinker_browser;
+assert.deepEqual(codexBrowser.args, ["plugin", "browser-serve", "--host", "codex"]);
+assert.equal(codexBrowser.cwd, ".");
+assert.deepEqual(codexBrowser.env_vars, [
+  "OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE",
+  "OPENLINKER_BROWSER_LEASE_FILE",
+  "OPENLINKER_BROWSER_SOCKET",
+  "OPENLINKER_CLI_BIN",
+  "OPENLINKER_PLUGIN_DATA",
+]);
+assert.equal("env" in codexBrowser, false, "Codex Browser MCP manifest must not contain inline environment values");
+assert.deepEqual(
+  claudeMCP.mcpServers.openlinker_browser.args,
+  ["plugin", "browser-serve", "--host", "claude"],
+);
 for (const path of ["platforms/codex/openlinker/bin/openlinker-plugin", "platforms/claude/openlinker/bin/openlinker-plugin"]) {
-  assert.match(await readFile(join(root, path), "utf8"), /--require plugin\.serve/);
+  const launcher = await readFile(join(root, path), "utf8");
+  assert.match(launcher, /required_capability=plugin\.serve/);
+  assert.match(launcher, /required_capability=plugin\.browser\.serve/);
+}
+for (const path of ["platforms/codex/openlinker/bin/openlinker-plugin.cmd", "platforms/claude/openlinker/bin/openlinker-plugin.cmd"]) {
+  const launcher = await readFile(join(root, path), "utf8");
+  assert.match(launcher, /REQUIRED_CAPABILITY=plugin\.serve/);
+  assert.match(launcher, /REQUIRED_CAPABILITY=plugin\.browser\.serve/);
 }
 assert.equal(codexMarket.plugins[0].name, codex.name);
 assert.equal(codexMarket.plugins[0].source.path, "./platforms/codex/openlinker");
@@ -110,10 +138,15 @@ assert.deepEqual(agent.tools, [
   "configure_agent_mode", "enable_agent_mode", "disable_agent_mode",
   "get_agent_mode_status", "diagnose_agent_mode",
 ]);
-for (const capability of ["agent.configure", "agent.serve", "agent.status", "agent.doctor", "plugin.serve"]) {
+for (const capability of ["agent.configure", "agent.serve", "agent.status", "agent.doctor", "plugin.serve", "plugin.browser.serve"]) {
   assert.ok(agent.capabilities.includes(capability));
 }
 assert.equal(agent.security.runtime, "token_only");
 assert.equal(agent.security.agent_mode_default, "disabled");
+assert.deepEqual(agent.execution_profiles, ["standard", "browser"]);
+assert.equal(agent.browser.model_tool, "browser_session");
+assert.equal(agent.browser.provider_computer_api, false);
+assert.equal(agent.browser.server_authoritative_identity, true);
+assert.equal(agent.browser.provider_credentials_visible_to_browser, false);
 
 console.log("dual-platform manifest contracts passed");

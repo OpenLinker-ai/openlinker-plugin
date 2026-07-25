@@ -1,7 +1,7 @@
 # Serve Codex or Claude Code as an Agent (Agent Mode)
 
 [简体中文](./serving-as-agent.zh-CN.md) · [Configuration](./configuration.md) ·
-[README](../README.md)
+[Browser](./isolated-browser.md) · [README](../README.md)
 
 Agent Mode makes the current Codex or Claude Code host callable through an
 existing OpenLinker Agent. The plugin's local MCP bridge runs the official SDK
@@ -28,6 +28,20 @@ Prepare these outside model context:
 Use a workspace containing only the files remote tasks need. Plugin mode uses
 the host sandbox and software policy; it is intended for personal or development
 operation, not as a strong multi-tenant isolation boundary.
+
+## Browser Agent profile
+
+Browser is an explicit Agent execution profile, not a Provider model feature.
+With `execution_profile: browser`, the Runtime Worker starts the ordinary Codex
+or Claude client and injects one isolated `browser_session` MCP tool. The client
+tool calls a trusted broker, which reaches Chromium in a separate Browser
+Runtime container over a private Unix socket.
+
+Use a dedicated private, owner-only Agent with capacity 1 and session reuse
+enabled. The Browser container never receives Provider credentials. The model
+never receives the Browser channel credential, active lease, or authoritative
+identity. See the [Browser guide](./isolated-browser.md) before enabling this
+profile.
 
 ## Inject secrets before starting the host
 
@@ -222,6 +236,10 @@ openlinker agent serve --provider codex
 Production images add a persistent Runtime volume, a non-root provider process,
 and enforced outbound-network policy. They still use the CLI and SDK directly,
 not Agent Node.
+
+For a Browser Agent, layer the matching Browser compose override over the
+provider compose file. It adds the separate Chromium Runtime, private control
+and broker mounts, persistent Profile storage, and egress-only network path.
 
 ## Troubleshooting
 

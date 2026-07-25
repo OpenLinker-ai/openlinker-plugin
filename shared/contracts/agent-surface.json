@@ -10,7 +10,8 @@
     "agent.serve",
     "agent.status",
     "agent.doctor",
-    "plugin.serve"
+    "plugin.serve",
+    "plugin.browser.serve"
   ],
   "providers": ["codex", "claude"],
   "states": ["disabled", "starting", "ready", "draining", "stopped", "error"],
@@ -29,5 +30,13 @@
     "secrets_allowed_as_tool_arguments": false,
     "provider_session_ids_public": false,
     "core_owned_conversation_required": true
+  },
+  "execution_profiles": ["standard", "browser"],
+  "browser": {
+    "model_tool": "browser_session",
+    "provider_computer_api": false,
+    "server_authoritative_identity": true,
+    "provider_credentials_visible_to_browser": false,
+    "capacity": 1
   }
 }

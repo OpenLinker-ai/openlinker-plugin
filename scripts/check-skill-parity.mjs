@@ -8,7 +8,13 @@ const platformRoots = [
   join(repoRoot, "platforms/codex/openlinker/skills"),
   join(repoRoot, "platforms/claude/openlinker/skills"),
 ];
-const sharedSkills = ["find-and-run-agent", "inspect-openlinker-run", "serve-openlinker-agent", "setup-openlinker-cli"];
+const sharedSkills = [
+  "find-and-run-agent",
+  "inspect-openlinker-run",
+  "serve-openlinker-agent",
+  "setup-openlinker-cli",
+  "use-isolated-browser",
+];
 
 async function filesUnder(root, current = root) {
   const entries = await readdir(current, { withFileTypes: true });

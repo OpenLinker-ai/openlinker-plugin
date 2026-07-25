@@ -3,7 +3,7 @@
   "name": "openlinker",
   "displayName": "OpenLinker",
   "version": "0.1.0",
-  "description": "Discover and call OpenLinker Agents, or expose Claude Code as a reusable OpenLinker Runtime Agent.",
+  "description": "Call OpenLinker Agents, expose Claude Code as a reusable Agent, and use an isolated Browser tool.",
   "author": {
     "name": "OpenLinker",
     "email": "support@openlinker.ai",
@@ -19,7 +19,8 @@
     "a2a",
     "cli",
     "runtime",
-    "session-reuse"
+    "session-reuse",
+    "isolated-browser"
   ],
   "skills": "./skills/",
   "commands": "./commands/"

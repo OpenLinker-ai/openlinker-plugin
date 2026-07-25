@@ -18,6 +18,8 @@ Collect and save only:
 - the public OpenLinker platform URL;
 - optional state directory, model, capacity, timeout, sandbox/permission, web
   search and session-reuse preferences;
+- optional `execution_profile: browser` for a dedicated private Browser Agent,
+  which requires capacity 1, session reuse, and private Runtime paths;
 - for Codex only, an optional validated OpenAI-compatible `codex_base_url`
   without credentials, a query, or a fragment.
 
@@ -55,3 +57,8 @@ using Core-owned history.
 Local Plugin mode provides software boundaries and the host sandbox. For 24/7
 or strong network isolation, use the corresponding production image or supervise
 `openlinker agent serve --provider <provider>` with persistent private state.
+
+Browser is a client MCP tool of the child Codex or Claude process, not a
+Provider `computer` API. In the Browser profile, never ask the model for channel
+credentials, active leases, or attachment identity. Use the matching Browser
+compose override so Chromium remains in its separate egress-restricted Runtime.

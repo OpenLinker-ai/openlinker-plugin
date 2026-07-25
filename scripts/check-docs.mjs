@@ -8,6 +8,7 @@ const pairs = [
   ["docs/calling-agents.md", "docs/calling-agents.zh-CN.md"],
   ["docs/serving-as-agent.md", "docs/serving-as-agent.zh-CN.md"],
   ["docs/configuration.md", "docs/configuration.zh-CN.md"],
+  ["docs/isolated-browser.md", "docs/isolated-browser.zh-CN.md"],
 ];
 
 const documents = new Map();
@@ -43,9 +44,11 @@ for (const invocation of [
   "$openlinker",
   "$setup-openlinker-cli",
   "$serve-openlinker-agent",
+  "$use-isolated-browser",
   "/openlinker:openlinker",
   "/openlinker:openlinker-setup",
   "/openlinker:openlinker-agent",
+  "/openlinker:openlinker-browser",
 ]) {
   assert.ok(allUserDocs.includes(invocation), `native invocation ${invocation} is undocumented`);
 }
@@ -54,6 +57,7 @@ for (const forbidden of [
   /`\/openlinker`/,
   /`\/openlinker-setup`/,
   /`\/openlinker-agent`/,
+  /`\/openlinker-browser`/,
 ]) {
   assert.equal(forbidden.test(allUserDocs), false, `unnamespaced Claude invocation ${forbidden} is advertised`);
 }
@@ -64,6 +68,11 @@ for (const required of [
   "OPENLINKER_AGENT_TOKEN",
   "OPENLINKER_AGENT_TOKEN_FILE",
   "OPENLINKER_NODE_ID",
+  "OPENLINKER_AGENT_EXECUTION_PROFILE",
+  "OPENLINKER_BROWSER_SOCKET",
+  "OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE",
+  "OPENLINKER_BROWSER_LEASE_ROOT",
+  "OPENLINKER_BROWSER_BROKER_ROOT",
 ]) {
   assert.ok(allUserDocs.includes(required), `configuration ${required} is undocumented`);
 }

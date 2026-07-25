@@ -17,6 +17,7 @@
         "NO_PROXY",
         "OPENLINKER_AGENT_CAPACITY",
         "OPENLINKER_AGENT_CONFIG",
+        "OPENLINKER_AGENT_EXECUTION_PROFILE",
         "OPENLINKER_AGENT_ID",
         "OPENLINKER_AGENT_SESSION_REUSE",
         "OPENLINKER_AGENT_STATE_DIR",
@@ -31,6 +32,11 @@
         "OPENLINKER_CLAUDE_MODEL",
         "OPENLINKER_CLAUDE_PERMISSION",
         "OPENLINKER_CLAUDE_WEB_SEARCH",
+        "OPENLINKER_BROWSER_BROKER_ROOT",
+        "OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE",
+        "OPENLINKER_BROWSER_LEASE_ROOT",
+        "OPENLINKER_BROWSER_PLUGIN_BIN",
+        "OPENLINKER_BROWSER_SOCKET",
         "OPENLINKER_CLI_BIN",
         "OPENLINKER_CODEX_APPROVAL",
         "OPENLINKER_CODEX_BASE_URL",
@@ -46,6 +52,18 @@
         "OPENLINKER_USER_TOKEN",
         "OPENLINKER_WORKSPACE",
         "SSL_CERT_FILE"
+      ]
+    },
+    "openlinker_browser": {
+      "command": "./bin/openlinker-plugin",
+      "args": ["plugin", "browser-serve", "--host", "codex"],
+      "cwd": ".",
+      "env_vars": [
+        "OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE",
+        "OPENLINKER_BROWSER_LEASE_FILE",
+        "OPENLINKER_BROWSER_SOCKET",
+        "OPENLINKER_CLI_BIN",
+        "OPENLINKER_PLUGIN_DATA"
       ]
     }
   }

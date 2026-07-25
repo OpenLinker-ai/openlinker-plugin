@@ -1,7 +1,8 @@
 # OpenLinker Plugin 配置参考
 
 [English](./configuration.md) · [Use Mode](./calling-agents.zh-CN.md) ·
-[Agent Mode](./serving-as-agent.zh-CN.md) · [README](../README.zh-CN.md)
+[Agent Mode](./serving-as-agent.zh-CN.md) ·
+[Browser](./isolated-browser.zh-CN.md) · [README](../README.zh-CN.md)
 
 这是本地 Codex 与 Claude Code Plugin 的配置参考。两种模式使用相互独立的凭据，
 不能混用。
@@ -13,6 +14,7 @@
 | 调用方 | `OPENLINKER_USER_TOKEN` | 搜索、创建 Run、检查、Artifact、取消 | Runtime 注册或 Provider 认证 |
 | Runtime Agent | `OPENLINKER_AGENT_TOKEN` 或 `_FILE` | Token-only Runtime 注册和交付 | 调用方操作或 Provider 认证 |
 | Provider | 本地登录、`CODEX_API_KEY` 或 `ANTHROPIC_API_KEY` | 专用 Provider CLI 执行 | Core 调用方或 Runtime 认证 |
+| Browser channel | 自动生成且仅 Owner 可读的文件 | Provider Runtime 到 Browser Runtime 的 UDS 认证 | Provider API、Core、模型参数或网页输入 |
 
 不要把凭据写入 Prompt、MCP 参数、`agent.json`、Run Input、Metadata、项目文件或日志。
 
@@ -58,6 +60,12 @@ Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
 | `timeout_seconds` | 否 | `1800` | Provider 执行超时，必须为正数。 |
 | `session_reuse` | 否 | `true` | 每个 Core Conversation 私有复用 Provider Session。 |
 | `web_search` | 否 | `false` | 允许 Provider Web Search。 |
+| `execution_profile` | 否 | `standard` | `standard` 或显式启用的 `browser`；Browser 强制 capacity 1 并启用 Session Reuse。 |
+| `browser_plugin_bin` | 仅 Browser | 当前 CLI | Browser MCP 子进程使用的兼容 OpenLinker CLI 绝对路径。 |
+| `browser_socket` | 仅 Browser | — | 私有 Browser Runtime Unix Socket。 |
+| `browser_credential_file` | 仅 Browser | — | 仅 Owner 可读的 Browser Channel Credential 路径，绝不是 Credential Value。 |
+| `browser_lease_root` | 仅 Browser | — | 私有、权威的 Per-Run Lease Directory。 |
+| `browser_broker_root` | 仅 Browser | — | 私有本地 Browser MCP Broker Directory。 |
 | `codex_base_url` | 仅 Codex | Provider 默认值 | 经过校验的 OpenAI-compatible HTTP(S) Base URL；禁止包含凭据、查询参数和 fragment。 |
 | `codex_sandbox` | 仅 Codex | `read-only` | `read-only` 或 `workspace-write`。 |
 | `codex_approval` | 仅 Codex | `never` | `never`、`untrusted` 或 `on-request`。 |
@@ -80,6 +88,7 @@ Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
   "timeout_seconds": 1800,
   "session_reuse": true,
   "web_search": false,
+  "execution_profile": "standard",
   "codex_base_url": "https://router.example/v1",
   "codex_sandbox": "read-only",
   "codex_approval": "never",
@@ -148,6 +157,12 @@ Runtime 中的环境变量优先于已存储的非敏感 Agent 配置。
 | `OPENLINKER_AGENT_TIMEOUT_SECONDS` | `timeout_seconds` |
 | `OPENLINKER_AGENT_SESSION_REUSE` | `session_reuse` |
 | `OPENLINKER_AGENT_WEB_SEARCH` | `web_search` Fallback |
+| `OPENLINKER_AGENT_EXECUTION_PROFILE` | `execution_profile` |
+| `OPENLINKER_BROWSER_PLUGIN_BIN` | `browser_plugin_bin` |
+| `OPENLINKER_BROWSER_SOCKET` | `browser_socket` |
+| `OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE` | `browser_credential_file` |
+| `OPENLINKER_BROWSER_LEASE_ROOT` | `browser_lease_root` |
+| `OPENLINKER_BROWSER_BROKER_ROOT` | `browser_broker_root` |
 | `OPENLINKER_CODEX_MODEL`、`OPENLINKER_CLAUDE_MODEL` | 所选 Provider 的 `model` |
 | `OPENLINKER_CODEX_BASE_URL` | `codex_base_url`；新建和恢复 Codex Session 都会使用 |
 | `OPENLINKER_CODEX_WEB_SEARCH`、`OPENLINKER_CLAUDE_WEB_SEARCH` | Provider 专用 `web_search` |
@@ -176,7 +191,8 @@ Runtime 中的环境变量优先于已存储的非敏感 Agent 配置。
 ### Codex CLI
 
 启动 `codex` 前设置环境变量，安装 Plugin 并新建 Session。显式原生 Skill 使用
-`$openlinker`、`$setup-openlinker-cli` 和 `$serve-openlinker-agent`。
+`$openlinker`、`$setup-openlinker-cli`、`$serve-openlinker-agent` 和
+`$use-isolated-browser`。
 
 Codex 包只声明本地 Bridge 所需的环境变量名称，不内嵌任何值。MCP 进程从已安装的
 Plugin Root 启动，因此 Bundled Launcher 的解析不依赖用户当前 Workspace。
@@ -189,15 +205,16 @@ Plugin Root 启动，因此 Bundled Launcher 的解析不依赖用户当前 Work
 ### Claude Code
 
 启动 `claude` 前设置环境变量。安装或启用 Plugin 后运行 `/reload-plugins`。显式原生
-命令为 `/openlinker:openlinker`、`/openlinker:openlinker-setup` 和
-`/openlinker:openlinker-agent`。
+命令为 `/openlinker:openlinker`、`/openlinker:openlinker-setup`、
+`/openlinker:openlinker-agent` 和 `/openlinker:openlinker-browser`。
 
 ## 代理与网络范围
 
 CLI 和 Provider 子进程遵循标准 `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY` 和
-`ALL_PROXY`。本地原生
-Plugin 不提供硬网络隔离边界；如果必须强制拦截私网、Link-local、Metadata、DNS
-Rebinding 或代理绕过，应使用生产 Provider 镜像及其 Egress Gateway。
+`ALL_PROXY`。本地原生 Plugin 不提供硬网络隔离边界。生产 Browser Profile 把
+Chromium 留在独立容器并强制通过 Egress Gateway，且不暴露 CDP、WebDriver、VNC 或
+TCP Control Port。如果必须强制拦截 Private Address、Link-local、Metadata、DNS
+Rebinding、直连 DNS、QUIC、WebRTC、DoH 或代理绕过，应使用该部署。
 
 ## 安全诊断
 

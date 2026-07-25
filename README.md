@@ -10,10 +10,13 @@ Install one native plugin to use either direction:
 | --- | --- | --- |
 | Use Mode | Codex or Claude Code → OpenLinker | Discover, call, inspect, and cancel other Agents. |
 | Agent Mode | OpenLinker → Codex or Claude Code | Make this host a callable Agent with private provider-session reuse. |
+| Browser Agent | OpenLinker → Codex or Claude Code → isolated Browser | Give an opt-in Agent a client-owned Browser tool without using a Provider computer API. |
 
-The plugin starts a local stdio MCP bridge backed by a checksum-pinned
+The plugin starts local stdio MCP bridges backed by a checksum-pinned
 `openlinker` CLI and the official OpenLinker SDK. Agent Mode is disabled by
-default and does not depend on OpenLinker Agent Node.
+default and does not depend on OpenLinker Agent Node. The Browser entrypoint is
+also inert until an isolated Browser Runtime and authoritative attachment are
+present.
 
 ## Five-minute start
 
@@ -123,10 +126,37 @@ Claude Code:
 `OPENLINKER_NODE_ID` is optional. The Runtime generates and privately persists
 one when it is absent. Continue with the [Agent Mode guide](./docs/serving-as-agent.md).
 
+### 5. Use the isolated Browser
+
+Browser is a tool of the executing Codex or Claude client. It does not test or
+invoke a Provider `computer` capability, and it does not call an unrelated
+OpenLinker Agent.
+
+For a callable Browser Agent, use the production Browser compose override and
+configure that dedicated, owner-only Agent with `execution_profile: browser`.
+The Runtime then injects `browser_session` into the child client and supplies
+all attachment identity outside model arguments. The Browser container never
+receives the Provider key.
+
+Codex:
+
+```text
+$use-isolated-browser Explain Browser Agent readiness without opening a page.
+```
+
+Claude Code:
+
+```text
+/openlinker:openlinker-browser Explain Browser Agent readiness without opening a page.
+```
+
+Continue with the [isolated Browser guide](./docs/isolated-browser.md).
+
 ## Guides
 
 - [Call OpenLinker Agents (Use Mode)](./docs/calling-agents.md)
 - [Serve this host as an Agent (Agent Mode)](./docs/serving-as-agent.md)
+- [Use the isolated Browser](./docs/isolated-browser.md)
 - [Configuration reference](./docs/configuration.md)
 
 English is the canonical documentation language. Each guide links to its
@@ -148,9 +178,11 @@ for local MCP clients but is not an OAuth authorization flow. The repository
 keeps the real connector ID unset and fails its release check until OAuth
 discovery, PKCE, refresh, revocation, and production endpoint tests complete.
 
-The future ChatGPT workflow can compose OpenLinker tools with a separately
-installed, host-provided Browser plugin. Browser is not bundled into the local
-CLI plugins or Provider Runtime images.
+The future ChatGPT App can compose OpenLinker tools with a separately installed
+host-provided Browser plugin. The Codex and Claude packages in this repository
+already declare the client Browser MCP entrypoint; Chromium remains in a
+separate isolated Runtime container and is never bundled into the Provider
+image.
 
 ## Local validation
 

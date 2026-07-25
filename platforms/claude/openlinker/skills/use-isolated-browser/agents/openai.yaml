@@ -1,0 +1,4 @@
+interface:
+  display_name: "Use Isolated Browser"
+  short_description: "Operate the client-owned container Browser tool"
+  default_prompt: "Use $use-isolated-browser to operate the isolated Browser Runtime without exposing credentials or attachment identity."

@@ -1,7 +1,7 @@
 # 把 Codex 或 Claude Code 作为 Agent（Agent Mode）
 
 [English](./serving-as-agent.md) · [配置参考](./configuration.zh-CN.md) ·
-[README](../README.zh-CN.md)
+[Browser](./isolated-browser.zh-CN.md) · [README](../README.zh-CN.md)
 
 Agent Mode 通过已有 OpenLinker Agent，让当前 Codex 或 Claude Code 宿主可被调用。
 Plugin 的本地 MCP bridge 运行官方 SDK Runtime Worker，并为每个远端 Run 启动专用
@@ -25,6 +25,18 @@ Agent Mode 默认关闭。安装、更新或调用 Plugin 都不会自动启用�
 
 工作目录只应包含远端任务确实需要的文件。Plugin Mode 使用宿主 Sandbox 和软件策略，
 适用于个人或开发环境，不是强多租户隔离边界。
+
+## Browser Agent Profile
+
+Browser 是显式 Agent Execution Profile，不是 Provider Model Feature。设置
+`execution_profile: browser` 后，Runtime Worker 会启动普通 Codex 或 Claude 客户端，
+并注入一个隔离的 `browser_session` MCP Tool。客户端工具调用受信 Broker，再通过私有
+Unix Socket 访问独立 Browser Runtime 容器中的 Chromium。
+
+请使用专用、私有、仅 Owner 可见的 Agent，Capacity 固定为 1，并启用 Session Reuse。
+Browser 容器永远拿不到 Provider Credential；模型永远拿不到 Browser Channel
+Credential、Active Lease 或权威身份。启用前先阅读
+[Browser 指南](./isolated-browser.zh-CN.md)。
 
 ## 启动宿主前注入 Secret
 
@@ -205,6 +217,10 @@ openlinker agent serve --provider codex
 
 `agent serve` 在前台运行，不要求 `enabled: true`。生产镜像增加持久 Runtime Volume、
 非 Root Provider 进程和强制出站网络策略；它们仍直接使用 CLI 和 SDK，不使用 Agent Node。
+
+Browser Agent 需要把对应 Browser Compose Override 叠加到 Provider Compose 文件。
+它会加入独立 Chromium Runtime、私有 Control 与 Broker Mount、持久 Profile Storage
+以及 Egress-only 网络路径。
 
 ## 故障排查
 

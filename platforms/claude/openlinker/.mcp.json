@@ -3,6 +3,10 @@
     "openlinker": {
       "command": "${CLAUDE_PLUGIN_ROOT}/bin/openlinker-plugin",
       "args": ["plugin", "serve", "--host", "claude"]
+    },
+    "openlinker_browser": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/openlinker-plugin",
+      "args": ["plugin", "browser-serve", "--host", "claude"]
     }
   }
 }
