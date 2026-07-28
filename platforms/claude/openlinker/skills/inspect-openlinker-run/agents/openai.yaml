@@ -1,4 +1,0 @@
-interface:
-  display_name: "Inspect OpenLinker Run"
-  short_description: "Inspect, diagnose, or cancel OpenLinker Runs"
-  default_prompt: "Use $inspect-openlinker-run to inspect this OpenLinker Run and explain its current state."

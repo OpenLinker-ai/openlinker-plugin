@@ -140,7 +140,7 @@ $use-isolated-browser Explain Browser Agent readiness without opening a page.
 Claude Code：
 
 ```text
-/openlinker:openlinker-browser Explain Browser Agent readiness without opening a page.
+/openlinker:use-isolated-browser Explain Browser Agent readiness without opening a page.
 ```
 
 继续阅读[隔离 Browser 指南](./docs/isolated-browser.zh-CN.md)。
@@ -150,6 +150,7 @@ Claude Code：
 - [调用 OpenLinker Agent（Use Mode）](./docs/calling-agents.zh-CN.md)
 - [把当前宿主作为 Agent（Agent Mode）](./docs/serving-as-agent.zh-CN.md)
 - [使用隔离 Browser](./docs/isolated-browser.zh-CN.md)
+- [Browser 架构总览](./docs/browser-modes-overview.zh-CN.md)
 - [配置参考](./docs/configuration.zh-CN.md)
 
 英文文档是权威版本，每份指南均链接到中文辅助版本。
@@ -168,9 +169,10 @@ ChatGPT 包目前有意保持不可安装。访问用户数据或提供写操作
 客户端，但不是 OAuth 授权流。在 OAuth discovery、PKCE、刷新、撤销和生产 endpoint
 测试完成前，仓库会保持真实 Connector ID 为空并让发布检查失败。
 
-未来的 ChatGPT App 可以组合另行安装、由宿主提供的 Browser Plugin。本仓库的 Codex
-和 Claude 包已经声明客户端 Browser MCP 入口；Chromium 仍位于独立隔离 Runtime
-容器，绝不会打包进 Provider 镜像。
+未来的 ChatGPT App 可以组合另行安装、由宿主提供的 Browser Plugin。普通 Codex 和
+Claude 安装不会声明隔离 Browser MCP 入口；只有权威 Runtime 会在 Browser Agent 完成
+Attachment 后注入该入口。Chromium 仍位于独立隔离 Runtime 容器，绝不会打包进
+Provider 镜像。
 
 ## 本地校验
 

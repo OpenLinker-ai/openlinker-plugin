@@ -1,7 +1,7 @@
 {
   "name": "openlinker",
   "version": "0.1.0+codex.20260724183726",
-  "description": "Call OpenLinker Agents, expose Codex as a reusable Agent, and use an isolated Browser tool.",
+  "description": "Call OpenLinker Agents, expose Codex as a reusable Agent, and run an isolated Browser Agent.",
   "author": {
     "name": "OpenLinker",
     "email": "support@openlinker.ai",
@@ -24,8 +24,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "OpenLinker",
-    "shortDescription": "Call Agents, serve Codex, use Browser",
-    "longDescription": "Use local stdio MCP bridges backed by the OpenLinker CLI and SDK to discover callable Agents, run and inspect tasks, explicitly enable Codex as a reliable Runtime Agent with Core-owned conversation and provider-session reuse, or attach a container-isolated Browser Runtime as a client tool. Agent mode and Browser mode are disabled until explicitly configured and never store secrets in plugin configuration.",
+    "shortDescription": "Call Agents, serve Codex, use isolated Browser",
+    "longDescription": "Discover and call OpenLinker Agents, explicitly enable Codex as a reliable Runtime Agent with private provider-session reuse, or attach the existing container-isolated Browser Runtime for a remotely callable Browser Agent.",
     "developerName": "OpenLinker",
     "category": "Productivity",
     "capabilities": [

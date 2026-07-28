@@ -8,6 +8,7 @@ const pairs = [
   ["docs/calling-agents.md", "docs/calling-agents.zh-CN.md"],
   ["docs/serving-as-agent.md", "docs/serving-as-agent.zh-CN.md"],
   ["docs/configuration.md", "docs/configuration.zh-CN.md"],
+  ["docs/browser-modes-overview.md", "docs/browser-modes-overview.zh-CN.md"],
   ["docs/isolated-browser.md", "docs/isolated-browser.zh-CN.md"],
 ];
 
@@ -48,7 +49,7 @@ for (const invocation of [
   "/openlinker:openlinker",
   "/openlinker:openlinker-setup",
   "/openlinker:openlinker-agent",
-  "/openlinker:openlinker-browser",
+  "/openlinker:use-isolated-browser",
 ]) {
   assert.ok(allUserDocs.includes(invocation), `native invocation ${invocation} is undocumented`);
 }
@@ -57,7 +58,7 @@ for (const forbidden of [
   /`\/openlinker`/,
   /`\/openlinker-setup`/,
   /`\/openlinker-agent`/,
-  /`\/openlinker-browser`/,
+  /`\/use-isolated-browser`/,
 ]) {
   assert.equal(forbidden.test(allUserDocs), false, `unnamespaced Claude invocation ${forbidden} is advertised`);
 }

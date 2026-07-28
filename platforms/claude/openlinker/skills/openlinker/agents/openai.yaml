@@ -1,4 +1,0 @@
-interface:
-  display_name: "OpenLinker"
-  short_description: "Discover, run, and inspect OpenLinker Agents"
-  default_prompt: "Use OpenLinker to handle this request through the local CLI."

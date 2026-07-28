@@ -147,7 +147,7 @@ $use-isolated-browser Explain Browser Agent readiness without opening a page.
 Claude Code:
 
 ```text
-/openlinker:openlinker-browser Explain Browser Agent readiness without opening a page.
+/openlinker:use-isolated-browser Explain Browser Agent readiness without opening a page.
 ```
 
 Continue with the [isolated Browser guide](./docs/isolated-browser.md).
@@ -157,6 +157,7 @@ Continue with the [isolated Browser guide](./docs/isolated-browser.md).
 - [Call OpenLinker Agents (Use Mode)](./docs/calling-agents.md)
 - [Serve this host as an Agent (Agent Mode)](./docs/serving-as-agent.md)
 - [Use the isolated Browser](./docs/isolated-browser.md)
+- [Browser architecture overview](./docs/browser-modes-overview.md)
 - [Configuration reference](./docs/configuration.md)
 
 English is the canonical documentation language. Each guide links to its
@@ -179,10 +180,10 @@ keeps the real connector ID unset and fails its release check until OAuth
 discovery, PKCE, refresh, revocation, and production endpoint tests complete.
 
 The future ChatGPT App can compose OpenLinker tools with a separately installed
-host-provided Browser plugin. The Codex and Claude packages in this repository
-already declare the client Browser MCP entrypoint; Chromium remains in a
-separate isolated Runtime container and is never bundled into the Provider
-image.
+host-provided Browser plugin. Ordinary Codex and Claude installs do not declare
+the isolated Browser MCP entrypoint; the authoritative Runtime injects it only
+for an attached Browser Agent. Chromium remains in a separate isolated Runtime
+container and is never bundled into the Provider image.
 
 ## Local validation
 

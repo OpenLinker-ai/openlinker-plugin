@@ -219,7 +219,7 @@ the app, and start a new task. The repository must never contain that file.
 Set environment variables before launching `claude`. After installing or
 enabling the Plugin, run `/reload-plugins`. Explicit native commands are
 `/openlinker:openlinker`, `/openlinker:openlinker-setup`,
-`/openlinker:openlinker-agent`, and `/openlinker:openlinker-browser`.
+`/openlinker:openlinker-agent`, and `/openlinker:use-isolated-browser`.
 
 ## Proxies and network scope
 
