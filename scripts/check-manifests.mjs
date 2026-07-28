@@ -34,6 +34,8 @@ assert.equal("apps" in codex, false, "ChatGPT App is a separate release target")
 assert.equal(await exists("platforms/codex/openlinker/.claude-plugin/plugin.json"), false);
 assert.equal(await exists("platforms/claude/openlinker/.codex-plugin/plugin.json"), false);
 assert.equal(await exists("platforms/codex/openlinker/commands"), false);
+assert.equal(await exists("commands"), false, "legacy root commands directory must not exist");
+assert.equal(await exists("plugins"), false, "legacy root plugins directory must not exist");
 
 const codexServer = codexMCP.mcpServers.openlinker;
 const codexEnvironment = [
@@ -90,30 +92,27 @@ assert.equal(codexServer.cwd, ".");
 assert.deepEqual(codexServer.env_vars, codexEnvironment);
 assert.equal("env" in codexServer, false, "Codex MCP manifest must not contain inline environment values");
 assert.deepEqual(claudeMCP.mcpServers.openlinker.args, ["plugin", "serve", "--host", "claude"]);
-const codexBrowser = codexMCP.mcpServers.openlinker_browser;
-assert.deepEqual(codexBrowser.args, ["plugin", "browser-serve", "--host", "codex"]);
-assert.equal(codexBrowser.cwd, ".");
-assert.deepEqual(codexBrowser.env_vars, [
-  "OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE",
-  "OPENLINKER_BROWSER_LEASE_FILE",
-  "OPENLINKER_BROWSER_SOCKET",
-  "OPENLINKER_CLI_BIN",
-  "OPENLINKER_PLUGIN_DATA",
-]);
-assert.equal("env" in codexBrowser, false, "Codex Browser MCP manifest must not contain inline environment values");
 assert.deepEqual(
-  claudeMCP.mcpServers.openlinker_browser.args,
-  ["plugin", "browser-serve", "--host", "claude"],
+  Object.keys(codexMCP.mcpServers),
+  ["openlinker"],
+  "ordinary Codex installs must not advertise a phantom Browser MCP server",
+);
+assert.deepEqual(
+  Object.keys(claudeMCP.mcpServers),
+  ["openlinker"],
+  "ordinary Claude installs must not advertise a phantom Browser MCP server",
 );
 for (const path of ["platforms/codex/openlinker/bin/openlinker-plugin", "platforms/claude/openlinker/bin/openlinker-plugin"]) {
   const launcher = await readFile(join(root, path), "utf8");
   assert.match(launcher, /required_capability=plugin\.serve/);
   assert.match(launcher, /required_capability=plugin\.browser\.serve/);
+  assert.doesNotMatch(launcher, /client-browser/);
 }
 for (const path of ["platforms/codex/openlinker/bin/openlinker-plugin.cmd", "platforms/claude/openlinker/bin/openlinker-plugin.cmd"]) {
   const launcher = await readFile(join(root, path), "utf8");
   assert.match(launcher, /REQUIRED_CAPABILITY=plugin\.serve/);
   assert.match(launcher, /REQUIRED_CAPABILITY=plugin\.browser\.serve/);
+  assert.doesNotMatch(launcher, /client-browser/);
 }
 assert.equal(codexMarket.plugins[0].name, codex.name);
 assert.equal(codexMarket.plugins[0].source.path, "./platforms/codex/openlinker");

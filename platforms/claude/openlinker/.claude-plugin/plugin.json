@@ -3,7 +3,7 @@
   "name": "openlinker",
   "displayName": "OpenLinker",
   "version": "0.1.0",
-  "description": "Call OpenLinker Agents, expose Claude Code as a reusable Agent, and use an isolated Browser tool.",
+  "description": "Call OpenLinker Agents, expose Claude Code as a reusable Agent, and run an isolated Browser Agent.",
   "author": {
     "name": "OpenLinker",
     "email": "support@openlinker.ai",

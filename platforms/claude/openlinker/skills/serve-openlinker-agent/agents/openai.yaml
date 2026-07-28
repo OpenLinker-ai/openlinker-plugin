@@ -1,4 +1,0 @@
-interface:
-  display_name: "Serve OpenLinker Agent"
-  short_description: "Expose Codex or Claude as an OpenLinker Agent"
-  default_prompt: "Use $serve-openlinker-agent to configure Agent Mode, but do not enable it until I confirm."

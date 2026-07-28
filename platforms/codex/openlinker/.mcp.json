@@ -53,18 +53,6 @@
         "OPENLINKER_WORKSPACE",
         "SSL_CERT_FILE"
       ]
-    },
-    "openlinker_browser": {
-      "command": "./bin/openlinker-plugin",
-      "args": ["plugin", "browser-serve", "--host", "codex"],
-      "cwd": ".",
-      "env_vars": [
-        "OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE",
-        "OPENLINKER_BROWSER_LEASE_FILE",
-        "OPENLINKER_BROWSER_SOCKET",
-        "OPENLINKER_CLI_BIN",
-        "OPENLINKER_PLUGIN_DATA"
-      ]
     }
   }
 }

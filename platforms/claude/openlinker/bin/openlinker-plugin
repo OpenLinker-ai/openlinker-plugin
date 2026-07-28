@@ -10,6 +10,5 @@ required_capability=plugin.serve
 if [ "${1:-}" = plugin ] && { [ "${2:-}" = browser-serve ] || [ "${2:-}" = browser-proxy ]; }; then
   required_capability=plugin.browser.serve
 fi
-
 cli_path=$("$plugin_root/scripts/resolve-openlinker-cli" --require "$required_capability")
 exec "$cli_path" "$@"

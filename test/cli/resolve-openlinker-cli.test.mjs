@@ -11,7 +11,15 @@ async function fakeCLI(root, context) {
   const bin = join(root, "openlinker");
   await writeFile(
     bin,
-    `#!/bin/sh\nif [ "\${1}" != context ]; then exit 9; fi\ncat <<'JSON'\n${JSON.stringify(context, null, 2)}\nJSON\n`,
+    `#!/bin/sh
+if [ "\${1}" = context ]; then
+  cat <<'JSON'
+${JSON.stringify(context, null, 2)}
+JSON
+  exit 0
+fi
+printf 'COMMAND:%s\n' "$*"
+`,
   );
   await chmod(bin, 0o755);
   return bin;
@@ -40,6 +48,43 @@ result = spawnSync(resolver, ["--require", "runs.cancel"], {
 });
 assert.equal(result.status, 5);
 assert.match(result.stderr, /capability missing: runs\.cancel/);
+
+const browserRoot = join(root, "browser");
+await mkdir(browserRoot, { recursive: true });
+const browserCompatible = await fakeCLI(browserRoot, {
+  api_base: "https://api.openlinker.ai",
+  cli_version: "0.2.0-rc.1",
+  surface_version: "openlinker.cli.v1",
+  capabilities: ["plugin.browser.serve"],
+});
+result = spawnSync(resolver, ["--require", "plugin.browser.serve"], {
+  encoding: "utf8",
+  env: { ...process.env, OPENLINKER_CLI_BIN: browserCompatible },
+});
+assert.equal(result.status, 0, result.stderr);
+assert.equal(result.stdout.trim(), browserCompatible);
+
+const launcher = join(
+  repoRoot,
+  "platforms/codex/openlinker/bin/openlinker-plugin",
+);
+result = spawnSync(
+  launcher,
+  ["plugin", "browser-proxy", "--host", "codex"],
+  {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      OPENLINKER_CLI_BIN: browserCompatible,
+      PLUGIN_ROOT: join(repoRoot, "platforms/codex/openlinker"),
+    },
+  },
+);
+assert.equal(result.status, 0, result.stderr);
+assert.equal(
+  result.stdout.trim(),
+  "COMMAND:plugin browser-proxy --host codex",
+);
 
 const incompatible = await fakeCLI(join(root, "data", "bin"), {
   cli_version: "0.1.42",

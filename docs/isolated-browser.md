@@ -1,6 +1,7 @@
 # Use the Isolated Browser
 
 [简体中文](./isolated-browser.zh-CN.md) ·
+[Browser modes](./browser-modes-overview.md) ·
 [Configuration](./configuration.md) ·
 [Agent Mode](./serving-as-agent.md) · [README](../README.md)
 
@@ -23,19 +24,20 @@ loads no Browser tool or Browser configuration.
 
 ## Two client contexts
 
-The Plugin has the same Browser tool entrypoint in both contexts, but authority
-is provisioned differently:
+The same Browser tool can appear in two authoritative contexts, but the
+ordinary Plugin manifest does not register it:
 
 | Context | Who registers `browser_session` | Who supplies attachment authority |
 | --- | --- | --- |
-| Interactive Codex or Claude host | Installed OpenLinker Plugin | A separately managed local Browser Runtime deployment |
+| Runtime-attached interactive Codex or Claude host | Explicit Runtime-generated MCP configuration | A separately managed local Browser Runtime deployment |
 | Callable Browser Agent | Runtime Worker injects an isolated Browser-only MCP configuration into its child client | Core and the Runtime Worker |
 
-The supported production path is the callable Browser Agent. The manifest
-entrypoint for an interactive host remains unavailable until an operator has
-provisioned the private Runtime socket, channel credential file, and
-authoritative active lease. Do not hand-author a lease or put its contents in a
-prompt.
+The supported production path is the callable Browser Agent. An ordinary
+Plugin install intentionally exposes only the OpenLinker bridge, so it never
+shows a Browser tool that is guaranteed to fail. An interactive host requires
+an explicit Runtime-generated configuration after the private socket, channel
+credential file, active lease, and preflight are valid. Do not hand-author a
+lease or put its contents in a prompt.
 
 ## Configure a Browser Agent
 
@@ -81,21 +83,58 @@ $use-isolated-browser Open the requested public page and summarize it.
 Claude command:
 
 ```text
-/openlinker:openlinker-browser Open the requested public page and summarize it.
+/openlinker:use-isolated-browser Open the requested public page and summarize it.
 ```
 
 The client calls `browser_session` with:
 
-- `observe` for the current screenshot and bounded page metadata;
+- `observe` for bounded semantic page state by default;
 - `act` for typed navigation, pointer, keyboard, scrolling, or wait actions;
 - `checkpoint` for an explicit Profile checkpoint;
 - `close` to close the current attachment.
+
+For `observe` or `act`, choose `observation: semantic`, `screenshot`, or
+`both`. Omitting it selects `semantic`; screenshots are never implicit.
+Multi-action batches perform no full intermediate observation and return only
+the final one. A failed batch reports `completed_actions`.
+
+Phase 1 permits public navigation, ordinary public links, non-sensitive text
+and search fields, and public GET search forms. It rejects credentials,
+buttons, custom activation controls, select controls, Space activation,
+state-changing page requests, and high-impact actions.
 
 The tool schema intentionally has no Run, Agent, principal, Session,
 attachment, epoch, credential, lease, proxy, or Provider-key argument. The
 trusted broker adds the immutable identity tuple
 `(runtime_session_id, session_epoch, attachment_id)` and the Browser control
 epoch.
+
+## Reliability outcomes and evidence
+
+The first structured Browser result in each MCP session/control epoch includes
+`attachment_evidence` with the validated Browser engine, distribution, major
+version, locale, timezone, and font contract. It is emitted again after a
+Provider/MCP recovery and is not repeated on every action.
+
+Handle stable site outcomes without guessing:
+
+- `BROWSER_ACCESS_DENIED`: the current attachment remains usable. After three
+  consecutive top-level 403 responses, only that origin is blocked for the
+  rest of the attachment.
+- `BROWSER_RATE_LIMITED` or `BROWSER_ORIGIN_RATE_LIMITED`: respect the bounded
+  `retry_after_ms`; do not retry automatically or switch identity, Profile,
+  proxy, or Browser engine.
+- `BROWSER_CHALLENGE_SUSPECTED`: do not click, type, submit, or otherwise
+  interact with the suspected challenge. Read-only inspection or navigation
+  away may remain available. `challenge_release_unavailable: true` means the
+  restriction cannot clear in this attachment.
+- `BROWSER_CHALLENGE_REQUIRED`: the attachment is fenced and closed. This
+  release has no remote Viewer/controller, so the user cannot solve the
+  challenge inside that Browser process.
+
+`classifier_rules_version` identifies the released challenge rules. These
+outcomes never authorize CAPTCHA solving, a host-browser fallback, proxy
+rotation, or automation-evasion behavior.
 
 ## Isolation and credentials
 
@@ -120,8 +159,12 @@ the same conversation may reuse its Provider Session and Browser Profile.
 Every Run gets a new attachment and control epoch.
 
 A Provider session recovery, Runtime reattachment, cancellation, expiry, or
-completion invalidates the old attachment. Late actions are rejected against
-the full immutable identity and cannot affect a replacement connection.
+completion invalidates the old attachment. `ready` is emitted only after the
+Runtime has validated the lease, Profile, Chromium, Gateway, and a bounded
+blank observation. `close` durably revokes the exact attachment, including
+across a new MCP connection or Runtime restart. Late actions are rejected
+against the full immutable identity and cannot affect a replacement
+connection.
 
 Different conversations or principals cannot reuse the same active Browser
 attachment. A dedicated private Browser Agent is the deployment boundary for a

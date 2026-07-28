@@ -1,4 +1,0 @@
-interface:
-  display_name: "Set Up OpenLinker CLI"
-  short_description: "Install or verify the OpenLinker CLI safely"
-  default_prompt: "Use $setup-openlinker-cli to verify or install the compatible OpenLinker CLI."

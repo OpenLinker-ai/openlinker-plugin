@@ -206,7 +206,7 @@ Plugin Root 启动，因此 Bundled Launcher 的解析不依赖用户当前 Work
 
 启动 `claude` 前设置环境变量。安装或启用 Plugin 后运行 `/reload-plugins`。显式原生
 命令为 `/openlinker:openlinker`、`/openlinker:openlinker-setup`、
-`/openlinker:openlinker-agent` 和 `/openlinker:openlinker-browser`。
+`/openlinker:openlinker-agent` 和 `/openlinker:use-isolated-browser`。
 
 ## 代理与网络范围
 
