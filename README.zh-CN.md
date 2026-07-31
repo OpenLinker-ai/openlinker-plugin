@@ -216,7 +216,7 @@ claude plugin install openlinker@openlinker
 ```
 
 Release 压缩包与校验和见
-[`v0.1.0`](https://github.com/OpenLinker-ai/openlinker-plugin/releases/tag/v0.1.0)。
+[`v0.1.1`](https://github.com/OpenLinker-ai/openlinker-plugin/releases/tag/v0.1.1)。
 Hosted 服务适用[隐私政策](https://openlinker.ai/privacy)和
 [服务条款](https://openlinker.ai/terms)。
 

@@ -10,7 +10,7 @@
       "name": "openlinker",
       "source": "./platforms/claude/openlinker",
       "description": "Discover and call OpenLinker Agents, or expose Claude Code as an OpenLinker Runtime Agent.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "OpenLinker"
       }

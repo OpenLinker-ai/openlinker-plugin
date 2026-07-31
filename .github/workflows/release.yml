@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release:
@@ -38,18 +40,52 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
+          runtime_package_root="${RUNNER_TEMP}/openlinker-agent-runtime"
+          node scripts/build-agent-runtime-packages.mjs --out "${runtime_package_root}"
           codex_archive="openlinker-codex-plugin-${GITHUB_REF_NAME}.tar.gz"
           claude_archive="openlinker-claude-plugin-${GITHUB_REF_NAME}.tar.gz"
           skills_archive="openlinker-skills-${GITHUB_REF_NAME}.tar.gz"
+          codex_runtime_archive="openlinker-agent-runtime-codex-plugin-${GITHUB_REF_NAME}.tar.gz"
+          claude_runtime_archive="openlinker-agent-runtime-claude-plugin-${GITHUB_REF_NAME}.tar.gz"
+          codex_runtime_sbom="${codex_runtime_archive}.spdx.json"
+          claude_runtime_sbom="${claude_runtime_archive}.spdx.json"
           tar -C platforms/codex -czf "dist/${codex_archive}" openlinker
           tar -C platforms/claude -czf "dist/${claude_archive}" openlinker
           tar -C shared -czf "dist/${skills_archive}" skills
+          node scripts/create-deterministic-tar-gz.mjs \
+            --root "${runtime_package_root}/codex-marketplace" \
+            --out "dist/${codex_runtime_archive}"
+          node scripts/create-deterministic-tar-gz.mjs \
+            --root "${runtime_package_root}/claude-plugin/openlinker" \
+            --prefix openlinker \
+            --out "dist/${claude_runtime_archive}"
+          node scripts/generate-agent-runtime-sbom.mjs \
+            --root "${runtime_package_root}/codex-marketplace" \
+            --name openlinker-agent-runtime-codex-plugin \
+            --version "${GITHUB_REF_NAME}" \
+            --out "dist/${codex_runtime_sbom}"
+          node scripts/generate-agent-runtime-sbom.mjs \
+            --root "${runtime_package_root}/claude-plugin/openlinker" \
+            --name openlinker-agent-runtime-claude-plugin \
+            --version "${GITHUB_REF_NAME}" \
+            --out "dist/${claude_runtime_sbom}"
           (
             cd dist
             sha256sum "${codex_archive}" > "${codex_archive}.sha256"
             sha256sum "${claude_archive}" > "${claude_archive}.sha256"
             sha256sum "${skills_archive}" > "${skills_archive}.sha256"
+            sha256sum "${codex_runtime_archive}" > "${codex_runtime_archive}.sha256"
+            sha256sum "${claude_runtime_archive}" > "${claude_runtime_archive}.sha256"
+            sha256sum "${codex_runtime_sbom}" > "${codex_runtime_sbom}.sha256"
+            sha256sum "${claude_runtime_sbom}" > "${claude_runtime_sbom}.sha256"
           )
+
+      - name: Attest Agent Runtime Plugin artifacts
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            dist/openlinker-agent-runtime-codex-plugin-${{ github.ref_name }}.tar.gz
+            dist/openlinker-agent-runtime-claude-plugin-${{ github.ref_name }}.tar.gz
 
       - name: Publish GitHub Release
         env:

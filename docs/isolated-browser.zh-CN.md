@@ -28,12 +28,19 @@ Browser 配置。
 | 上下文 | 谁注册 `browser_session` | 谁提供 Attachment Authority |
 | --- | --- | --- |
 | 已连接 Runtime 的交互式 Codex 或 Claude 宿主 | Runtime 显式生成的 MCP 配置 | 另行管理的本地 Browser Runtime 部署 |
-| 可被调用的 Browser Agent | Runtime Worker 向子客户端注入隔离的 Browser-only MCP 配置 | Core 和 Runtime Worker |
+| 可被调用的 Browser Agent，`native` | 镜像内 Codex/Claude Browser-only Plugin | Core 和 Runtime Worker |
+| 可被调用的 Browser Agent，`mcp` | Runtime Worker 注入隔离的 Browser-only MCP 配置 | Core 和 Runtime Worker |
 
-当前支持的生产路径是可被调用的 Browser Agent。普通 Plugin 安装只暴露 OpenLinker
-Bridge，因此不会显示一个必然失败的 Browser 工具。交互式宿主只有在私有 Runtime
-Socket、Channel Credential File、Active Lease 与 Preflight 均有效后，才能使用
-Runtime 显式生成的配置。不要手写 Lease，也不要把它的内容放进 Prompt。
+封装镜像还支持 `auto`：模型启动前校验原生 Plugin 加载，仅在封闭枚举的加载故障下
+选择直接 MCP。它不会同时暴露两个入口，不会在 Browser Action 已开始后切换，也不会
+把策略或站点失败当作回退授权。“原生”描述 Provider Plugin 体验；工具传输仍是 MCP，
+两种模式共享同一个 Browser Runtime。
+
+当前支持的生产路径是可被调用的 Browser Agent，且不需要 User Token。普通公开
+Plugin 安装只暴露 OpenLinker Bridge，因此不会显示一个必然失败的 Browser 工具。
+交互式宿主只有在私有 Runtime Socket、Channel Credential File、Active Lease 与
+Preflight 均有效后，才能使用 Runtime 显式生成的配置。不要手写 Lease，也不要把它的
+内容放进 Prompt。
 
 ## 配置 Browser Agent
 
@@ -58,7 +65,10 @@ docker compose \
 
 Claude 使用 `compose.claude.yml` 和 `compose.claude.browser.yml`。Entrypoint 会固定
 私有路径、生成 Browser channel credential，并配置 `execution_profile: browser`。
-Operator 仍需在模型上下文之外提供普通 Agent Token 和 Provider 认证。
+新的 Browser Overlay 默认设置 `OPENLINKER_BROWSER_CLIENT_MODE=auto`；Operator
+可用严格 `native` 或 `mcp` 做诊断和回滚。改变模式会 Drain 旧 Provider Session
+Generation，但不会改变 Profile Identity。Operator 仍需在模型上下文之外提供普通
+Agent Token 和 Provider 认证；该封装 Agent 路径不支持 `OPENLINKER_USER_TOKEN`。
 
 通过原生 Plugin 配置时，调用 `configure_agent_mode` 并设置
 `execution_profile: browser`、`capacity: 1`、`session_reuse: true`。容器部署中的

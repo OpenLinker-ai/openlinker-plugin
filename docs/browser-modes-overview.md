@@ -12,7 +12,8 @@ container-isolated Browser Runtime.
 | --- | --- |
 | Native entry | Codex: `$use-isolated-browser`; Claude: `/openlinker:use-isolated-browser` |
 | Direction | OpenLinker Runtime → child Codex/Claude → container Chromium |
-| Browser control | Runtime-injected `browser_session` MCP tool |
+| Browser client mode | `auto`, strict `native`, or strict `mcp` |
+| Browser control | One `browser_session` surface: native Plugin UX or direct Runtime-injected MCP |
 | Session reuse | Browser Session and encrypted Profile under Runtime authority |
 | Network boundary | Container Browser with mandatory Egress Gateway |
 | Availability | Codex and Claude Code |
@@ -24,10 +25,28 @@ must happen inside the container-isolated Browser Runtime, especially for a
 remotely callable Browser Agent. Configure that dedicated private Agent with
 `execution_profile: browser`.
 
-An ordinary Plugin installation intentionally does not advertise
-`openlinker_browser`. The authoritative Runtime injects `browser_session` only
-after its attachment and preflight are valid. The default observation is
-semantic; request `screenshot` or `both` only when pixels are needed.
+The packaged Codex and Claude Agent images support:
+
+- `auto`: validate the image-owned Browser-only Plugin before model execution,
+  then use direct MCP only for a bounded native loading failure;
+- `native`: strictly load the Browser-only Codex or Claude Plugin;
+- `mcp`: strictly use the Runtime-injected MCP configuration.
+
+“Native” means the Provider's native Plugin, Skill, and Command experience.
+Its callable tool transport is still MCP. It is not ChatGPT's private Browser,
+a Provider `computer` API, a host browser, or a second Browser engine. Both
+client modes terminate at the same trusted broker and isolated Browser
+Runtime. Exactly one surface is visible to a Provider Session generation.
+
+The packaged Agent path uses the Agent Token and Provider API key. It neither
+requires nor accepts `OPENLINKER_USER_TOKEN`; the complete public caller Plugin
+is not installed into the child Provider. An ordinary interactive Plugin
+installation also intentionally does not advertise `openlinker_browser`
+without Runtime authority.
+
+The authoritative Runtime exposes `browser_session` only after its attachment
+and preflight are valid. The default observation is semantic; request
+`screenshot` or `both` only when pixels are needed.
 
 ## Safety Rules
 

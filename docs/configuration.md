@@ -64,6 +64,8 @@ configure`.
 | `session_reuse` | No | `true` | Reuse a private provider session per Core conversation. |
 | `web_search` | No | `false` | Allow provider web search. |
 | `execution_profile` | No | `standard` | `standard` or opt-in `browser`; Browser requires capacity 1 and session reuse. |
+| `browser_client_mode` | Browser only | `mcp` | `auto`, strict `native`, or strict `mcp`. Official packaged Browser templates set `auto`. |
+| `browser_native_plugin` | Native only | Image path | Absolute Runtime-owned Browser-only Plugin path; never caller supplied in official images. |
 | `browser_plugin_bin` | Browser only | Current CLI | Absolute compatible OpenLinker CLI used for the Browser MCP subprocess. |
 | `browser_socket` | Browser only | — | Private Browser Runtime Unix socket. |
 | `browser_credential_file` | Browser only | — | Owner-only Browser channel credential path, never the credential value. |
@@ -167,6 +169,8 @@ Environment values override stored non-secret Agent configuration at Runtime.
 | `OPENLINKER_AGENT_WEB_SEARCH` | `web_search` fallback |
 | `OPENLINKER_AGENT_EXECUTION_PROFILE` | `execution_profile` |
 | `OPENLINKER_BROWSER_PLUGIN_BIN` | `browser_plugin_bin` |
+| `OPENLINKER_BROWSER_CLIENT_MODE` | `browser_client_mode` |
+| `OPENLINKER_BROWSER_NATIVE_PLUGIN_PATH` | `browser_native_plugin` |
 | `OPENLINKER_BROWSER_SOCKET` | `browser_socket` |
 | `OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE` | `browser_credential_file` |
 | `OPENLINKER_BROWSER_LEASE_ROOT` | `browser_lease_root` |
