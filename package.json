@@ -1,9 +1,10 @@
 {
   "name": "openlinker-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
+    "build:agent-runtime": "node scripts/build-agent-runtime-packages.mjs --out dist/agent-runtime",
     "check:manifests": "node scripts/check-manifests.mjs",
     "check:skills": "node scripts/check-skill-parity.mjs",
     "check:packages": "node scripts/check-package-parity.mjs",
@@ -15,7 +16,8 @@
     "lock:cli": "node scripts/generate-cli-lock.mjs",
     "test:cli": "node test/cli/resolve-openlinker-cli.test.mjs",
     "test:installer": "node test/cli/install-openlinker-cli.test.mjs",
-    "test": "npm run check:manifests && npm run check:skills && npm run check:packages && npm run check:docs && npm run check:secrets && npm run check:publication && node --test test/publication-boundary.test.mjs && npm run check:chatgpt && npm run test:cli && npm run test:installer",
+    "test:agent-runtime": "node --test test/agent-runtime-packages.test.mjs test/agent-runtime-sbom.test.mjs",
+    "test": "npm run check:manifests && npm run check:skills && npm run check:packages && npm run check:docs && npm run check:secrets && npm run check:publication && node --test test/publication-boundary.test.mjs && npm run check:chatgpt && npm run test:agent-runtime && npm run test:cli && npm run test:installer",
     "release:check": "npm test && npm run check:release-lock"
   },
   "engines": {

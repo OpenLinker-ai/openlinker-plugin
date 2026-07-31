@@ -61,6 +61,8 @@ Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
 | `session_reuse` | 否 | `true` | 每个 Core Conversation 私有复用 Provider Session。 |
 | `web_search` | 否 | `false` | 允许 Provider Web Search。 |
 | `execution_profile` | 否 | `standard` | `standard` 或显式启用的 `browser`；Browser 强制 capacity 1 并启用 Session Reuse。 |
+| `browser_client_mode` | 仅 Browser | `mcp` | `auto`、严格 `native` 或严格 `mcp`；官方封装 Browser 模板设置为 `auto`。 |
+| `browser_native_plugin` | 仅 Native | 镜像路径 | Runtime 拥有的 Browser-only Plugin 绝对路径；官方镜像不接受调用方指定。 |
 | `browser_plugin_bin` | 仅 Browser | 当前 CLI | Browser MCP 子进程使用的兼容 OpenLinker CLI 绝对路径。 |
 | `browser_socket` | 仅 Browser | — | 私有 Browser Runtime Unix Socket。 |
 | `browser_credential_file` | 仅 Browser | — | 仅 Owner 可读的 Browser Channel Credential 路径，绝不是 Credential Value。 |
@@ -159,6 +161,8 @@ Runtime 中的环境变量优先于已存储的非敏感 Agent 配置。
 | `OPENLINKER_AGENT_WEB_SEARCH` | `web_search` Fallback |
 | `OPENLINKER_AGENT_EXECUTION_PROFILE` | `execution_profile` |
 | `OPENLINKER_BROWSER_PLUGIN_BIN` | `browser_plugin_bin` |
+| `OPENLINKER_BROWSER_CLIENT_MODE` | `browser_client_mode` |
+| `OPENLINKER_BROWSER_NATIVE_PLUGIN_PATH` | `browser_native_plugin` |
 | `OPENLINKER_BROWSER_SOCKET` | `browser_socket` |
 | `OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE` | `browser_credential_file` |
 | `OPENLINKER_BROWSER_LEASE_ROOT` | `browser_lease_root` |

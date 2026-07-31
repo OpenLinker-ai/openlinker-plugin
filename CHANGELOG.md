@@ -4,7 +4,15 @@ All notable changes to the OpenLinker Skills and native plugins are documented
 here. This package is pre-1.0 and remains Developer Preview until its pinned
 CLI release and cross-platform installation matrix pass.
 
-## 0.1.0 - Unreleased
+## 0.1.1 - Unreleased
+
+- Add minimal Codex and Claude Agent Runtime Browser Plugin artifacts for
+  packaged Provider images.
+- Document mutually exclusive `auto`, `native`, and `mcp` Browser client modes.
+- Keep caller and Agent-control surfaces, User Tokens, and Provider credentials
+  out of the packaged Agent Runtime artifacts.
+
+## 0.1.0 - 2026-07-22
 
 - Added standalone Agent discovery/invocation and Run inspection Skills.
 - Added native Codex and Claude Code plugin manifests, marketplaces, Claude

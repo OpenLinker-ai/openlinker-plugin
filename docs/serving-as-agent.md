@@ -240,6 +240,10 @@ not Agent Node.
 For a Browser Agent, layer the matching Browser compose override over the
 provider compose file. It adds the separate Chromium Runtime, private control
 and broker mounts, persistent Profile storage, and egress-only network path.
+The packaged Codex and Claude images can expose the same Browser through one
+native Plugin surface or one directly injected MCP surface. The official
+Browser overlays request `auto`; strict `native` and `mcp` remain available for
+diagnosis and rollback. This Agent path needs no `OPENLINKER_USER_TOKEN`.
 
 ## Troubleshooting
 

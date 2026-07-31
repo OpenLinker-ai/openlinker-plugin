@@ -30,14 +30,22 @@ ordinary Plugin manifest does not register it:
 | Context | Who registers `browser_session` | Who supplies attachment authority |
 | --- | --- | --- |
 | Runtime-attached interactive Codex or Claude host | Explicit Runtime-generated MCP configuration | A separately managed local Browser Runtime deployment |
-| Callable Browser Agent | Runtime Worker injects an isolated Browser-only MCP configuration into its child client | Core and the Runtime Worker |
+| Callable Browser Agent, `native` | Image-owned Codex/Claude Browser-only Plugin | Core and the Runtime Worker |
+| Callable Browser Agent, `mcp` | Runtime Worker injects an isolated Browser-only MCP configuration | Core and the Runtime Worker |
 
-The supported production path is the callable Browser Agent. An ordinary
-Plugin install intentionally exposes only the OpenLinker bridge, so it never
-shows a Browser tool that is guaranteed to fail. An interactive host requires
-an explicit Runtime-generated configuration after the private socket, channel
-credential file, active lease, and preflight are valid. Do not hand-author a
-lease or put its contents in a prompt.
+The packaged images also support `auto`, which validates native Plugin loading
+before the model starts and otherwise selects direct MCP for a closed set of
+loading failures. It never exposes both surfaces, switches after Browser
+actions begin, or uses a policy/site failure to authorize fallback. “Native”
+describes Provider Plugin UX; its tool transport remains MCP and both modes
+share the same Browser Runtime.
+
+The supported production path is the callable Browser Agent. It requires no
+User Token. An ordinary public Plugin install intentionally exposes only the
+OpenLinker bridge, so it never shows a Browser tool that is guaranteed to fail.
+An interactive host requires an explicit Runtime-generated configuration after
+the private socket, channel credential file, active lease, and preflight are
+valid. Do not hand-author a lease or put its contents in a prompt.
 
 ## Configure a Browser Agent
 
@@ -64,8 +72,12 @@ docker compose \
 For Claude, use `compose.claude.yml` and
 `compose.claude.browser.yml`. The entrypoint fixes the private paths, generates
 the Browser channel credential, and configures `execution_profile: browser`.
-The operator still supplies the ordinary Agent Token and Provider
-authentication outside model context.
+The new Browser overlays select `OPENLINKER_BROWSER_CLIENT_MODE=auto`. Operators
+may set strict `native` or `mcp` for diagnosis and rollback. A mode change drains
+the old Provider Session generation; it never changes Profile identity. The
+operator still supplies the ordinary Agent Token and Provider authentication
+outside model context. `OPENLINKER_USER_TOKEN` is unsupported in this packaged
+Agent path.
 
 For native Plugin configuration, call `configure_agent_mode` with
 `execution_profile: browser`, `capacity: 1`, and `session_reuse: true`. In a

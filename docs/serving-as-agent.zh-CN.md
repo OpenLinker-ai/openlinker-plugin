@@ -220,7 +220,10 @@ openlinker agent serve --provider codex
 
 Browser Agent 需要把对应 Browser Compose Override 叠加到 Provider Compose 文件。
 它会加入独立 Chromium Runtime、私有 Control 与 Broker Mount、持久 Profile Storage
-以及 Egress-only 网络路径。
+以及 Egress-only 网络路径。封装 Codex 与 Claude 镜像可通过唯一原生 Plugin 入口或
+唯一直接注入 MCP 入口使用同一个 Browser。官方 Browser Overlay 请求 `auto`；严格
+`native` 和 `mcp` 可用于诊断与回滚。该 Agent 路径不需要
+`OPENLINKER_USER_TOKEN`。
 
 ## 故障排查
 
