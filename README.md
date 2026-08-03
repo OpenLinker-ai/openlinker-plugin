@@ -231,7 +231,7 @@ claude plugin install openlinker@openlinker
 ```
 
 Release archives and checksums are available from
-[`v0.1.1`](https://github.com/OpenLinker-ai/openlinker-plugin/releases/tag/v0.1.1).
+[`v0.1.2`](https://github.com/OpenLinker-ai/openlinker-plugin/releases/tag/v0.1.2).
 See the Hosted service [privacy policy](https://openlinker.ai/privacy) and
 [terms](https://openlinker.ai/terms).
 

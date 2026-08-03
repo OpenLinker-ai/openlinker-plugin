@@ -70,9 +70,17 @@ Claude 使用 `compose.claude.yml` 和 `compose.claude.browser.yml`。Entrypoint
 Generation，但不会改变 Profile Identity。Operator 仍需在模型上下文之外提供普通
 Agent Token 和 Provider 认证；该封装 Agent 路径不支持 `OPENLINKER_USER_TOKEN`。
 
+每个 Browser Agent 初始使用 `browser_interaction_policy=restricted`。Owner 可在 Agent
+设置中把专用 Private Browser Agent 切换为 `full`，并配置 1 至 32 个精确 HTTPS
+Mutation Origin；通配符、路径、查询、片段、Credential 和 HTTP Origin 均被拒绝。
+本地 Runtime 声明相同 Policy Name；Core 会逐 Run 提供不可变 Generation 与精确
+Origin List。更新策略前必须结束现有 Run 并 Drain Runtime Session。
+
 通过原生 Plugin 配置时，调用 `configure_agent_mode` 并设置
-`execution_profile: browser`、`capacity: 1`、`session_reuse: true`。容器部署中的
-Browser 路径由镜像 Entrypoint 设置。先 Diagnose，再 Enable。
+`execution_profile: browser`、`capacity: 1`、`session_reuse: true`。Full Interaction
+部署还要设置 `browser_interaction_policy: full`；该工具刻意不接受 Origin List，因为
+精确 Origin 只能在 Core Owner 设置中配置。容器部署中的 Browser 路径由镜像
+Entrypoint 设置。先 Diagnose，再 Enable。
 
 ## 使用 Browser 工具
 
@@ -99,9 +107,12 @@ Claude Command：
 `semantic`，绝不隐式返回 Screenshot。多 Action Batch 不执行完整的中间 Observation，
 只返回最终 Observation；失败时会返回 `completed_actions`。
 
-Phase 1 允许公开导航、普通公开链接、非敏感 Text/Search Field 和公开 GET Search
-Form；拒绝 Credential、Button、自定义 Activation Control、Select、Space 激活、
-会改变状态的页面请求及高影响 Action。
+`restricted` 允许公开导航、普通公开链接、非敏感 Text/Search Field 和公开 GET Search
+Form；拒绝 Button、自定义 Activation Control、Select、Space 激活及会改变状态的页面
+请求。`full` 只在 Owner 授权的精确 HTTPS Origin 上增加受支持的 Button/Custom、
+Checkbox/Radio、Enter、Space、Select 及状态变更页面行为；它不增加 Selector 或任意
+Script 执行。Credential 与不受支持的高影响 Action 仍会被阻止，或进入既有人工控制
+边界。
 
 工具 Schema 有意不包含 Run、Agent、Principal、Session、Attachment、Epoch、
 Credential、Lease、Proxy 或 Provider Key 参数。受信 broker 会补充不可变身份元组
@@ -111,8 +122,14 @@ Credential、Lease、Proxy 或 Provider Key 参数。受信 broker 会补充不�
 
 每个 MCP Session/control epoch 的首个结构化 Browser 结果会包含
 `attachment_evidence`，其中是已验证的 Browser Engine、Distribution、Major
-Version、Locale、Timezone 与 Font Contract。Provider/MCP 恢复后会重新发送一次，
-但不会在每个 Action 中重复。
+Version、Locale、Timezone、Font Contract、Interaction Policy、Policy Generation、
+精确 Mutation Origin 及其 Digest、Browser Contract。Provider/MCP 恢复后会重新发送
+一次，但不会在每个 Action 中重复。
+
+网页文本是不可信数据。`full` 下每个状态变更 Action 前后都要重新 Observe。
+`BROWSER_MUTATION_ORIGIN_BLOCKED` 表示应当停止，不得尝试扩大范围；
+`BROWSER_MUTATION_OUTCOME_UNKNOWN` 始终带有 `retry_same_action: false`，即使 Attachment
+仍可使用也绝不能重复该 Action。
 
 按稳定结果处理，不要猜测：
 

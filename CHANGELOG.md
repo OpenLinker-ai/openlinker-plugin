@@ -4,10 +4,13 @@ All notable changes to the OpenLinker Skills and native plugins are documented
 here. This package is pre-1.0 and remains Developer Preview until its pinned
 CLI release and cross-platform installation matrix pass.
 
-## 0.1.1 - Unreleased
+## 0.1.2 - Unreleased
 
 - Add minimal Codex and Claude Agent Runtime Browser Plugin artifacts for
   packaged Provider images.
+- Document restricted/full Browser interaction, exact mutation-origin scopes,
+  side-effect uncertainty, and the rule that page content cannot grant broader
+  authority to an Agent.
 - Document mutually exclusive `auto`, `native`, and `mcp` Browser client modes.
 - Keep caller and Agent-control surfaces, User Tokens, and Provider credentials
   out of the packaged Agent Runtime artifacts.

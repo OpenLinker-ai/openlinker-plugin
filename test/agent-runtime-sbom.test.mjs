@@ -20,7 +20,7 @@ test("Agent Runtime SPDX SBOM enumerates only the bounded package files", async 
       join(root, "scripts", "generate-agent-runtime-sbom.mjs"),
       "--root", packages.codexMarketplace,
       "--name", "openlinker-agent-runtime-codex-plugin",
-      "--version", "v0.1.1",
+      "--version", "v0.1.2",
       "--out", output,
     ]);
     const sbom = JSON.parse(await readFile(output, "utf8"));
