@@ -1,0 +1,47 @@
+name: Feature request
+description: Suggest a change that fits the public Plugin scope.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or contributor problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the plugin behavior or workflow you want.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope fit
+      options:
+        - Codex plugin
+        - Claude plugin
+        - Shared Skills or commands
+        - CLI installation integration
+        - Agent Mode
+        - Isolated Browser guidance
+        - ChatGPT readiness
+        - Documentation
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: textarea
+    id: risks
+    attributes:
+      label: Compatibility, security, or release risks
+    validations:
+      required: false
