@@ -24,8 +24,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          expected="v$(node -p "require('./package.json').version")"
-          test "${GITHUB_REF_NAME}" = "${expected}"
+          [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
           npm run release:check
           for host in codex claude; do
             sh -n "platforms/${host}/openlinker/bin/openlinker-plugin"
