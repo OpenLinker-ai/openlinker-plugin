@@ -16,8 +16,7 @@ const openLinkerTestExtensionID = "abcdefghijklmnopabcdefghijklmnop"
 func TestOfficialChromeAssetsRequireCanonicalLockedCompleteImageFiles(
 	t *testing.T,
 ) {
-	root := t.TempDir()
-	lockPath := writeOfficialChromeAssetFixture(t, root, "linux", "amd64")
+	root, lockPath := writeOfficialChromeAssetFixture(t, t.TempDir(), "linux", "amd64")
 	assets, reason := LoadOfficialChromeAssets(OfficialChromeAssetOptions{
 		ManifestPath:         lockPath,
 		Platform:             "linux",
@@ -55,8 +54,7 @@ func TestOfficialChromeAssetsRequireCanonicalLockedCompleteImageFiles(
 func TestOfficialChromeAssetsRejectUnsupportedPlatformAndNonCanonicalLock(
 	t *testing.T,
 ) {
-	root := t.TempDir()
-	lockPath := writeOfficialChromeAssetFixture(t, root, "linux", "amd64")
+	root, lockPath := writeOfficialChromeAssetFixture(t, t.TempDir(), "linux", "amd64")
 	if _, reason := LoadOfficialChromeAssets(OfficialChromeAssetOptions{
 		ManifestPath:         lockPath,
 		Platform:             "linux",
@@ -90,12 +88,73 @@ func TestOfficialChromeAssetsRejectUnsupportedPlatformAndNonCanonicalLock(
 	}
 }
 
+func TestOfficialChromeAssetFixtureCanonicalizesSymlinkRoot(t *testing.T) {
+	directory := t.TempDir()
+	alias := filepath.Join(t.TempDir(), "asset-root")
+	if err := os.Symlink(directory, alias); err != nil {
+		t.Fatal(err)
+	}
+	root, lockPath := writeOfficialChromeAssetFixture(t, alias, "linux", "amd64")
+	canonical, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if root != canonical || filepath.Dir(lockPath) != root {
+		t.Fatalf("fixture root = %q, lock = %q, want canonical root %q", root, lockPath, canonical)
+	}
+	if _, reason := LoadOfficialChromeAssets(OfficialChromeAssetOptions{
+		ManifestPath:         lockPath,
+		Platform:             "linux",
+		Architecture:         "amd64",
+		ExtensionInstallRoot: filepath.Join(root, "usr", "share", "chromium", "extensions"),
+		ExtensionPolicyPath:  filepath.Join(root, "etc", "opt", "chrome_for_testing", "policies", "managed", "openlinker-native-chrome.json"),
+		NativeMessagingPath:  filepath.Join(root, "etc", "opt", "chrome_for_testing", "native-messaging-hosts", "ai.openlinker.browser.json"),
+	}); reason != "" {
+		t.Fatalf("canonical fixture assets unavailable: %s", reason)
+	}
+}
+
+func TestOfficialChromeAssetsRequireSetuidSandbox(t *testing.T) {
+	root, lockPath := writeOfficialChromeAssetFixture(t, t.TempDir(), "linux", "amd64")
+	options := OfficialChromeAssetOptions{
+		ManifestPath:         lockPath,
+		Platform:             "linux",
+		Architecture:         "amd64",
+		ExtensionInstallRoot: filepath.Join(root, "usr", "share", "chromium", "extensions"),
+		ExtensionPolicyPath:  filepath.Join(root, "etc", "opt", "chrome_for_testing", "policies", "managed", "openlinker-native-chrome.json"),
+		NativeMessagingPath:  filepath.Join(root, "etc", "opt", "chrome_for_testing", "native-messaging-hosts", "ai.openlinker.browser.json"),
+	}
+	if _, reason := LoadOfficialChromeAssets(options); reason != "" {
+		t.Fatalf("valid assets unavailable before removing setuid: %s", reason)
+	}
+	sandboxPath := filepath.Join(root, "chrome-sandbox")
+	if err := os.Chmod(sandboxPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(sandboxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSetuid != 0 {
+		t.Fatal("negative fixture still has setuid enabled")
+	}
+	if _, reason := LoadOfficialChromeAssets(options); reason != "official_assets_invalid" {
+		t.Fatalf("sandbox without setuid reason = %q", reason)
+	}
+	if err := os.Chmod(sandboxPath, os.ModeSetuid|0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, reason := LoadOfficialChromeAssets(options); reason != "" {
+		t.Fatalf("restoring setuid did not restore valid assets: %s", reason)
+	}
+}
+
 func writeOfficialChromeAssetFixture(
 	t *testing.T,
 	root,
 	platform,
 	architecture string,
-) string {
+) (string, string) {
 	t.Helper()
 	resolvedRoot, err := filepath.EvalSymlinks(root)
 	if err != nil {
@@ -184,16 +243,19 @@ func writeOfficialChromeAssetFixture(
 			SHA256: hex.EncodeToString(digest[:]),
 		})
 	}
-	if err := os.Chmod(filepath.Join(root, "chrome-sandbox"), 0o4755); err != nil {
+	// os.FileMode uses a high-bit ModeSetuid flag, not POSIX's octal 04000.
+	// Failing this prerequisite must fail the test, never hide asset checks
+	// behind an unconditional skip.
+	sandboxPath := filepath.Join(root, "chrome-sandbox")
+	if err := os.Chmod(sandboxPath, os.ModeSetuid|0o755); err != nil {
 		t.Fatal(err)
 	}
-	for index := range assets {
-		if assets[index].Path == filepath.Join(root, "chrome-sandbox") {
-			info, err := os.Lstat(assets[index].Path)
-			if err != nil || info.Mode()&os.ModeSetuid == 0 {
-				t.Skip("test filesystem does not preserve the setuid mode bit")
-			}
-		}
+	info, err := os.Lstat(sandboxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSetuid == 0 {
+		t.Fatal("asset fixture requires setuid support; run with file-mode permissions enabled")
 	}
 	for left := 0; left < len(assets); left++ {
 		for right := left + 1; right < len(assets); right++ {
@@ -233,5 +295,7 @@ func writeOfficialChromeAssetFixture(
 	if err := os.WriteFile(lockPath, raw, 0o444); err != nil {
 		t.Fatal(err)
 	}
-	return lockPath
+	// The caller must build its expected manifest paths from the same canonical
+	// root as the lock, including when TMPDIR or its input root is a symlink.
+	return root, lockPath
 }

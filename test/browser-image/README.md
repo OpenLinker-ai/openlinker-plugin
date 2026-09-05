@@ -7,7 +7,7 @@ because it creates a short-lived public HTTPS fixture through a pinned
 Cloudflare Quick Tunnel. The tunnel has no uptime guarantee and is not a
 production dependency.
 
-Run from the CLI repository:
+Run from the Plugin repository (`openlinker-plugin`):
 
 ```sh
 ./test/browser-image/run.sh
