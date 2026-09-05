@@ -3,3 +3,7 @@ node_modules/
 dist/
 coverage/
 *.log
+.openlinker-dev/
+/bin/
+*.test
+coverage.out

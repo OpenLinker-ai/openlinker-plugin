@@ -1,0 +1,25 @@
+services:
+  openlinker-agent-codex:
+    environment:
+      # Codex exec currently requires its explicit non-interactive bypass for
+      # approved MCP calls. The Provider remains externally isolated by this
+      # stack, and the launcher disables all non-Browser built-in action tools.
+      OPENLINKER_CODEX_SANDBOX: danger-full-access
+
+  openlinker-browser-runtime:
+    build:
+      context: ..
+      dockerfile: Dockerfile.browser.native-chrome
+      args:
+        OPENLINKER_BROWSER_BASE: ${OPENLINKER_NATIVE_CHROME_BASE:?set OPENLINKER_NATIVE_CHROME_BASE to an immutable image digest}
+        OPENLINKER_CHROME_ARTIFACT: ${OPENLINKER_NATIVE_CHROME_ARTIFACT:-chrome-linux-amd64.tar}
+        OPENLINKER_CHROME_UPSTREAM_ARTIFACT: ${OPENLINKER_NATIVE_CHROME_UPSTREAM_ARTIFACT:-chrome-linux64.zip}
+        OPENLINKER_CHROME_LOCK: ${OPENLINKER_NATIVE_CHROME_LOCK:-chrome.lock.json}
+        OPENLINKER_CHROME_DISTRIBUTION: ${OPENLINKER_NATIVE_CHROME_DISTRIBUTION:-chrome_for_testing}
+        OPENLINKER_CHROME_VERSION: ${OPENLINKER_NATIVE_CHROME_VERSION:?set OPENLINKER_NATIVE_CHROME_VERSION}
+        OPENLINKER_EXTENSION_ARTIFACT: ${OPENLINKER_NATIVE_CHROME_EXTENSION_ARTIFACT:-openlinker-native-extension.tar}
+        OPENLINKER_EXTENSION_LOCK: ${OPENLINKER_NATIVE_CHROME_EXTENSION_LOCK:-openlinker-native-extension.lock.json}
+        OPENLINKER_EXTENSION_ID: ${OPENLINKER_NATIVE_CHROME_EXTENSION_ID:?set OPENLINKER_NATIVE_CHROME_EXTENSION_ID}
+        OPENLINKER_EXTENSION_VERSION: ${OPENLINKER_NATIVE_CHROME_EXTENSION_VERSION:?set OPENLINKER_NATIVE_CHROME_EXTENSION_VERSION}
+        OPENLINKER_NATIVE_CHROME_PROFILE_GENERATION: ${OPENLINKER_NATIVE_CHROME_PROFILE_GENERATION:?set OPENLINKER_NATIVE_CHROME_PROFILE_GENERATION}
+    image: ${OPENLINKER_NATIVE_CHROME_IMAGE:-openlinker-browser-runtime:native-chrome-dev}

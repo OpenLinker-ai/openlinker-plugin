@@ -1,0 +1,80 @@
+services:
+  openlinker-agent-codex:
+    stop_grace_period: 30s
+    depends_on:
+      openlinker-egress-gateway:
+        condition: service_started
+      openlinker-browser-runtime:
+        condition: service_healthy
+    environment:
+      OPENLINKER_AGENT_EXECUTION_PROFILE: browser
+      OPENLINKER_BROWSER_INTERACTION_POLICY: ${OPENLINKER_BROWSER_INTERACTION_POLICY:-restricted}
+      OPENLINKER_BROWSER_CLIENT_MODE: ${OPENLINKER_BROWSER_CLIENT_MODE:-auto}
+      OPENLINKER_AGENT_CAPACITY: "1"
+      OPENLINKER_BROWSER_HUMAN_CONTROL_ENABLED: "true"
+      # Observation is a separate capability from takeover, so it has its own
+      # flag. The Worker and the Browser Runtime must agree: the Worker declares
+      # the feature and the Runtime creates the bridge, and one without the other
+      # leaves Core believing observation works while every start fails.
+      OPENLINKER_BROWSER_AUTHENTICATED_OBSERVATION_ENABLED: ${OPENLINKER_BROWSER_AUTHENTICATED_OBSERVATION_ENABLED:-false}
+    volumes:
+      - codex-browser-control:/browser-control
+    tmpfs:
+      - /browser-tool:rw,noexec,nosuid,nodev,size=4m,uid=10001,gid=10002,mode=2710
+
+  openlinker-browser-runtime:
+    build:
+      context: ..
+      dockerfile: Dockerfile.browser
+    image: openlinker-browser-runtime:dev
+    init: true
+    depends_on:
+      - openlinker-egress-gateway
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /browser-home:rw,noexec,nosuid,nodev,size=64m,uid=10001,gid=10001,mode=0700
+      - /browser-tmp:rw,noexec,nosuid,nodev,size=512m,uid=10001,gid=10001,mode=0700
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=10001,gid=10001,mode=0700
+    shm_size: 1gb
+    networks:
+      - agent-internal
+    environment:
+      OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE: /browser-control/channel-credential
+      OPENLINKER_BROWSER_EGRESS_PROXY: http://openlinker-egress-gateway:3128
+      OPENLINKER_BROWSER_ACTIVE_LEASE_FILE: /browser-control/leases/active-lease.json
+      OPENLINKER_BROWSER_SOCKET: /browser-control/openlinker.browser.sock
+      OPENLINKER_BROWSER_PROFILE_DIR: /browser-tmp/profiles/active
+      OPENLINKER_BROWSER_PROFILE_STORE: /browser-state/encrypted-profiles
+      OPENLINKER_BROWSER_PROFILE_WORK_ROOT: /browser-tmp/profiles
+      OPENLINKER_BROWSER_PROFILE_ROOT_KEY_FILE: /browser-key/profile-root-key
+      OPENLINKER_BROWSER_HUMAN_CONTROL_ENABLED: "true"
+      # Observation is a separate capability from takeover, so it has its own
+      # flag. The Worker and the Browser Runtime must agree: the Worker declares
+      # the feature and the Runtime creates the bridge, and one without the other
+      # leaves Core believing observation works while every start fails.
+      OPENLINKER_BROWSER_AUTHENTICATED_OBSERVATION_ENABLED: ${OPENLINKER_BROWSER_AUTHENTICATED_OBSERVATION_ENABLED:-false}
+      OPENLINKER_BROWSER_OPS_VIEWER_ENABLED: ${OPENLINKER_BROWSER_OPS_VIEWER_ENABLED:-false}
+    volumes:
+      - codex-browser-control:/browser-control
+      - codex-browser-profile-key:/browser-key
+      - codex-browser-profile:/browser-state
+      - codex-browser-ops:/browser-ops
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/openlinker-browser-runtime", "healthcheck"]
+      interval: 5s
+      timeout: 2s
+      retries: 30
+    pids_limit: 512
+    mem_limit: 3g
+    cpus: 2.0
+
+volumes:
+  codex-browser-control: {}
+  codex-browser-profile-key: {}
+  codex-browser-profile: {}
+  codex-browser-ops: {}

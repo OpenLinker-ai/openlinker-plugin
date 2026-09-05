@@ -1,0 +1,88 @@
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+
+ARG GO_VERSION=1.26.4
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-bookworm@sha256:b305420a68d0f229d91eb3b3ed9e519fcf2cf5461da4bef997bf927e8c0bfd2b AS go-build
+WORKDIR /src
+ENV CGO_ENABLED=0 GOFLAGS=-mod=readonly GOWORK=off
+COPY go.mod go.sum ./
+RUN set -eu; \
+    attempt=1; \
+    until go mod download && go mod verify; do \
+      if [ "${attempt}" -ge 3 ]; then exit 1; fi; \
+      sleep "$((attempt * 2))"; \
+      attempt="$((attempt + 1))"; \
+    done
+COPY . .
+RUN go test ./cmd/openlinker-browser-runtime ./packages/browser-runtime/browserprofile ./packages/browser-runtime/browserprotocol ./packages/browser-runtime/browserruntime ./packages/browser-runtime/netpolicy
+ARG TARGETOS
+ARG TARGETARCH
+RUN test "${TARGETOS}" = linux \
+ && GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -o /out/openlinker-browser-runtime ./cmd/openlinker-browser-runtime
+
+FROM node:24.4.1-bookworm-slim@sha256:36ae19f59c91f3303c7a648f07493fe14c4bd91320ac8d898416327bacf1bbfa AS engine-build
+WORKDIR /src/browser-engine
+COPY packages/browser-runtime/browser-engine/package.json packages/browser-runtime/browser-engine/package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY packages/browser-runtime/browser-engine/tsconfig.json ./
+COPY packages/browser-runtime/browser-engine/contract-fixtures.json ./
+COPY packages/browser-runtime/browser-engine/browser-versions.json ./
+COPY packages/browser-runtime/browser-engine/src ./src
+RUN npm run lint \
+ && npm test \
+ && npm prune --omit=dev \
+ && npm cache clean --force
+
+FROM mcr.microsoft.com/playwright:v1.61.1-noble@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48 AS browser-base
+USER root
+RUN groupadd --gid 10001 openlinker-browser \
+ && useradd --uid 10001 --gid 10001 --home-dir /browser-home --no-create-home --shell /usr/sbin/nologin openlinker-browser \
+ && install -d -o 10001 -g 10001 -m 0700 /browser-home /browser-key /browser-state /browser-state/encrypted-profiles /browser-tmp /browser-tmp/profiles \
+ && install -d -o 10001 -g 10001 -m 0700 /browser-control /browser-control/leases \
+ && install -d -o 10001 -g 10001 -m 0700 /browser-ops \
+ && install -d -o root -g root -m 0555 /opt/openlinker/browser-engine
+COPY --chown=root:root --chmod=0555 test/browser-image/font-manifest.sh /usr/local/bin/openlinker-browser-font-manifest
+COPY --chown=root:root --chmod=0444 packages/browser-runtime/browser-engine/font-contract-v1.sha256 /opt/openlinker/browser-engine/font-contract-v1.sha256
+RUN test "$(/usr/local/bin/openlinker-browser-font-manifest)" = "$(tr -d '\n' </opt/openlinker/browser-engine/font-contract-v1.sha256)"
+COPY --from=go-build --chown=root:root --chmod=0555 /out/openlinker-browser-runtime /usr/local/bin/openlinker-browser-runtime
+COPY --from=engine-build --chown=root:root /src/browser-engine/dist /opt/openlinker/browser-engine/dist
+COPY --from=engine-build --chown=root:root /src/browser-engine/node_modules /opt/openlinker/browser-engine/node_modules
+COPY --from=engine-build --chown=root:root /src/browser-engine/package.json /opt/openlinker/browser-engine/package.json
+
+FROM browser-base AS browser-linux-amd64
+ENV OPENLINKER_BROWSER_VERSION=149.0.7827.55
+
+FROM browser-base AS browser-linux-arm64
+ENV OPENLINKER_BROWSER_VERSION=149.0.7827.0
+
+FROM browser-${TARGETOS}-${TARGETARCH} AS browser
+ENV HOME=/browser-home \
+    TMPDIR=/browser-tmp \
+    NO_PROXY= \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    OPENLINKER_BROWSER_SOCKET=/browser-control/openlinker.browser.sock \
+    OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE=/browser-control/channel-credential \
+    OPENLINKER_BROWSER_ACTIVE_LEASE_FILE=/browser-control/leases/active-lease.json \
+    OPENLINKER_BROWSER_OPS_VIEWER_ENABLED=false \
+    OPENLINKER_BROWSER_OPS_SOCKET=/browser-ops/openlinker.browser.ops-viewer.sock \
+    OPENLINKER_BROWSER_OPS_CREDENTIAL_FILE=/browser-ops/channel-credential \
+    OPENLINKER_BROWSER_PROFILE_DIR=/browser-tmp/profiles/active \
+    OPENLINKER_BROWSER_PROFILE_STORE=/browser-state/encrypted-profiles \
+    OPENLINKER_BROWSER_PROFILE_WORK_ROOT=/browser-tmp/profiles \
+    OPENLINKER_BROWSER_PROFILE_ROOT_KEY_FILE=/browser-key/profile-root-key \
+    OPENLINKER_BROWSER_ENGINE=chromium \
+    OPENLINKER_BROWSER_DISTRIBUTION=playwright_chromium \
+    OPENLINKER_BROWSER_PROFILE_GENERATION=1 \
+    OPENLINKER_BROWSER_MAX_ACTIONS_PER_ORIGIN_MINUTE=120 \
+    OPENLINKER_BROWSER_MAX_NAVIGATIONS_PER_ORIGIN_MINUTE=20 \
+    OPENLINKER_BROWSER_LOCALE=en-US \
+    OPENLINKER_BROWSER_TIMEZONE=UTC \
+    OPENLINKER_BROWSER_FONT_CONTRACT_VERSION=openlinker.browser.fonts.v1 \
+    OPENLINKER_BROWSER_FONT_MANIFEST_SHA256=8a130568f9f30f5ca10a64b5e99e16d3b813e4cf733fd8feefc43992c6fc759f
+WORKDIR /browser-state
+USER 10001:10001
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/usr/local/bin/openlinker-browser-runtime"]
+LABEL org.opencontainers.image.title="OpenLinker Browser Runtime" \
+      org.opencontainers.image.description="Isolated Chromium runtime for the private OpenLinker Browser contract" \
+      org.opencontainers.image.source="https://github.com/OpenLinker-ai/openlinker-plugin" \
+      org.opencontainers.image.licenses="Apache-2.0"

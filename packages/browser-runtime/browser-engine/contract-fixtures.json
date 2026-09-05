@@ -1,0 +1,81 @@
+{
+  "public_urls": [
+    { "value": "https://example.com/path", "accepted": true },
+    { "value": "http://news.example/search?q=openlinker", "accepted": true },
+    { "value": "http://127.0.0.1/", "accepted": false },
+    { "value": "http://2130706433/", "accepted": false },
+    { "value": "http://0177.0.0.1/", "accepted": false },
+    { "value": "http://0x7f000001/", "accepted": false },
+    { "value": "http://0x7f.0.0.1/", "accepted": false },
+    { "value": "http://[::1]/", "accepted": false },
+    { "value": "http://localhost/", "accepted": false },
+    { "value": "http://metadata.google.internal/", "accepted": false },
+    { "value": "file:///etc/passwd", "accepted": false }
+  ],
+  "coordinates": [
+    { "x": 0, "y": 0, "accepted": true },
+    { "x": 1279, "y": 719, "accepted": true },
+    { "x": 1280, "y": 0, "accepted": false },
+    { "x": 0, "y": 720, "accepted": false },
+    { "x": -1, "y": 0, "accepted": false }
+  ],
+  "continuations": [
+    {
+      "value": "https://example.com/path",
+      "normalized": "https://example.com/path"
+    },
+    {
+      "value": "https://example.com/path?state=kept#discarded",
+      "normalized": "https://example.com/path?state=kept"
+    },
+    {
+      "value": "http://news.example/",
+      "normalized": "http://news.example/"
+    },
+    { "value": "about:blank", "normalized": null },
+    { "value": "http://0177.0.0.1/", "normalized": null },
+    { "value": "https://service.internal/", "normalized": null }
+  ],
+  "origin_budgets": [
+    {
+      "value": "{\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"entries\":[]}",
+      "accepted": true
+    },
+    {
+      "value": "{\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"entries\":[{\"key\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action_ms\":[1000,1000],\"navigation_ms\":[1000],\"retry_after_ms\":2000,\"updated_at_ms\":1000}]}",
+      "accepted": true
+    },
+    {
+      "value": "{\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"entries\":[{\"key\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action_ms\":[],\"navigation_ms\":[],\"updated_at_ms\":1000},{\"key\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"action_ms\":[],\"navigation_ms\":[],\"updated_at_ms\":1000}]}",
+      "accepted": true
+    },
+    {
+      "value": "{\"contract_id\": \"openlinker.browser.origin-budgets.v1\",\"entries\":[]}",
+      "accepted": false
+    },
+    {
+      "value": "{\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"entries\":[]}",
+      "accepted": false
+    },
+    {
+      "value": "{\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"entries\":[{\"key\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action_ms\":[],\"navigation_ms\":[],\"updated_at_ms\":1},{\"key\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action_ms\":[],\"navigation_ms\":[],\"updated_at_ms\":2}]}",
+      "accepted": false
+    },
+    {
+      "value": "{\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"entries\":[{\"key\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"action_ms\":[],\"navigation_ms\":[],\"updated_at_ms\":2},{\"key\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action_ms\":[],\"navigation_ms\":[],\"updated_at_ms\":1}]}",
+      "accepted": false
+    },
+    {
+      "value": "{\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"entries\":[{\"key\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"action_ms\":[],\"navigation_ms\":[],\"updated_at_ms\":1},{\"key\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action_ms\":[],\"navigation_ms\":[],\"updated_at_ms\":1}]}",
+      "accepted": false
+    },
+    {
+      "value": "{\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"entries\":[{\"key\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action_ms\":[2,1],\"navigation_ms\":[],\"updated_at_ms\":2}]}",
+      "accepted": false
+    },
+    {
+      "value": "{\"contract_id\":\"openlinker.browser.origin-budgets.v1\",\"entries\":[{\"updated_at_ms\":1,\"key\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action_ms\":[],\"navigation_ms\":[]}]}",
+      "accepted": false
+    }
+  ]
+}

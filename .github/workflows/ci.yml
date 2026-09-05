@@ -31,6 +31,30 @@ jobs:
           done
           node --check scripts/generate-cli-lock.mjs
 
+  validate-go:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm run test:go
+      - run: npm run check:go-boundaries
+      - run: npm run check:agent-runtime-integration
+      - name: Build service entrypoints
+        run: GOWORK=off go build ./cmd/...
+      - name: Validate production image topology
+        run: |
+          docker compose --env-file deploy/.env.providers.example -f deploy/compose.providers.yml --profile codex --profile claude config >/dev/null
+          docker compose --env-file deploy/.env.providers.example -f deploy/compose.codex.yml -f deploy/compose.codex.workspace-write.yml config >/dev/null
+          docker compose --env-file deploy/.env.providers.example -f deploy/compose.claude.yml -f deploy/compose.claude.workspace-write.yml config >/dev/null
+          docker compose --env-file deploy/.env.providers.example -f deploy/compose.codex.yml -f deploy/compose.codex.browser.yml config >/dev/null
+          docker compose --env-file deploy/.env.providers.example -f deploy/compose.claude.yml -f deploy/compose.claude.browser.yml config >/dev/null
+
   validate-powershell:
     runs-on: windows-2025
     steps:

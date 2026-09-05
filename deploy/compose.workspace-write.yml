@@ -1,0 +1,18 @@
+services:
+  openlinker-agent-codex:
+    environment:
+      OPENLINKER_CODEX_SANDBOX: workspace-write
+    volumes:
+      - type: bind
+        source: ${OPENLINKER_CODEX_WORKSPACE:?set OPENLINKER_CODEX_WORKSPACE}
+        target: /workspace
+        read_only: false
+
+  openlinker-agent-claude:
+    environment:
+      OPENLINKER_CLAUDE_PERMISSION: acceptEdits
+    volumes:
+      - type: bind
+        source: ${OPENLINKER_CLAUDE_WORKSPACE:?set OPENLINKER_CLAUDE_WORKSPACE}
+        target: /workspace
+        read_only: false

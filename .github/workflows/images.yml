@@ -1,0 +1,214 @@
+name: Provider images
+
+on:
+  pull_request:
+    paths:
+      - "Dockerfile.providers"
+      - ".dockerignore"
+      - "Dockerfile.browser"
+      - "Dockerfile.browser.chrome"
+      - "Dockerfile.browser.native-chrome"
+      - "packages/browser-runtime/browser-engine/**"
+      - "packages/browser-runtime/native-chrome/**"
+      - "deploy/**"
+      - "cmd/**"
+      - "packages/**"
+      - "test/browser-image/**"
+      - "test/browser-provider-live/**"
+      - "test/release-images/**"
+      - "shared/cli-lock.json"
+      - "scripts/download-pinned-cli.mjs"
+      - "scripts/build-agent-runtime-packages.mjs"
+      - "shared/skills/use-isolated-browser/**"
+      - "platforms/claude/openlinker/commands/use-isolated-browser.md"
+      - "package.json"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/images.yml"
+  workflow_dispatch:
+    inputs:
+      publish_images:
+        description: Publish compatible images from an existing immutable release tag
+        required: true
+        default: false
+        type: boolean
+      run_live_provider:
+        description: Run credential-backed Codex and Claude Browser validation
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  browser-acceptance:
+    name: Real Chromium no-bypass acceptance (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Require an immutable tag and live gate for publication
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_images
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RUN_LIVE_PROVIDER: ${{ inputs.run_live_provider }}
+        run: test "$RELEASE_REF_TYPE" = tag && test "$RUN_LIVE_PROVIDER" = true
+      - name: Self-test release evidence rejection
+        run: ./test/release-images/verify.test.sh
+      - name: Self-test credential-backed matrix verifier
+        run: |
+          sh -n ./test/browser-provider-live/run.sh
+          sh -n ./test/browser-provider-live/matrix.sh
+          node --test ./test/browser-provider-live/verify-results.test.mjs
+      - name: Test native Chrome image and Native Messaging contracts
+        run: node --test ./packages/browser-runtime/native-chrome/test/*.test.mjs ./test/browser-image/native-chrome-image.test.mjs
+      - name: Run deterministic production Browser and Egress images
+        env:
+          # Keep the asserted image platform explicit even though each acceptance
+          # leg runs natively on the matching GitHub-hosted architecture.
+          DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
+        run: ./test/browser-image/run.sh
+
+  live-provider-acceptance:
+    name: Credential-backed Codex and Claude Browser acceptance
+    if: github.event_name == 'workflow_dispatch' && inputs.run_live_provider
+    needs: browser-acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare credential-backed Provider gate
+        env:
+          LIVE_CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          LIVE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -eu
+          test -n "$LIVE_CODEX_API_KEY" || { echo "CODEX_API_KEY secret is required" >&2; exit 1; }
+          test -n "$LIVE_ANTHROPIC_API_KEY" || { echo "ANTHROPIC_API_KEY secret is required" >&2; exit 1; }
+          umask 077
+          printf '%s\n' "$LIVE_CODEX_API_KEY" >"$RUNNER_TEMP/openlinker-codex-api-key"
+          printf '%s\n' "$LIVE_ANTHROPIC_API_KEY" >"$RUNNER_TEMP/openlinker-anthropic-api-key"
+      - name: Run credential-backed Codex and Claude Browser matrix
+        env:
+          OPENLINKER_BROWSER_LIVE_CODEX_API_KEY_FILE: ${{ runner.temp }}/openlinker-codex-api-key
+          OPENLINKER_BROWSER_LIVE_ANTHROPIC_API_KEY_FILE: ${{ runner.temp }}/openlinker-anthropic-api-key
+          OPENLINKER_BROWSER_LIVE_EVIDENCE_FILE: ${{ runner.temp }}/browser-provider-live-evidence.jsonl
+          OPENLINKER_CODEX_BASE_URL: ${{ vars.OPENLINKER_CODEX_BASE_URL }}
+          OPENLINKER_CODEX_MODEL: ${{ vars.OPENLINKER_CODEX_MODEL }}
+          OPENLINKER_CLAUDE_MODEL: ${{ vars.OPENLINKER_CLAUDE_MODEL }}
+        run: ./test/browser-provider-live/run.sh
+      - name: Upload redacted Browser Provider evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-provider-live-evidence-${{ github.ref_name || github.run_id }}
+          path: ${{ runner.temp }}/browser-provider-live-evidence.jsonl
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Remove Provider credential files
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/openlinker-codex-api-key" "$RUNNER_TEMP/openlinker-anthropic-api-key"
+
+  images:
+    # Source PRs exercise Browser/Egress without requiring a downstream CLI
+    # release. Building compatible Provider images is a separate explicit gate.
+    needs: [browser-acceptance, live-provider-acceptance]
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && needs.browser-acceptance.result == 'success' && (needs.live-provider-acceptance.result == 'success' || !inputs.publish_images) }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: codex
+            image: openlinker-agent-codex
+            dockerfile: Dockerfile.providers
+          - target: claude
+            image: openlinker-agent-claude
+            dockerfile: Dockerfile.providers
+          - target: egress
+            image: openlinker-egress-gateway
+            dockerfile: Dockerfile.providers
+          - target: browser
+            image: openlinker-browser-runtime
+            dockerfile: Dockerfile.browser
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v3
+        with:
+          image: docker.io/tonistiigi/binfmt:qemu-v10.2.3-68@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/openlinker-ai/${{ matrix.image }}
+          tags: |
+            type=ref,event=tag
+            type=sha,prefix=sha-
+      - name: Build and optionally publish
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=providers-${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=providers-${{ matrix.target }}
+          sbom: true
+          provenance: mode=max
+
+  verify-release-evidence:
+    name: Verify release platforms, SBOM, and provenance
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag'
+    needs: images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify the published release evidence
+        env:
+          OPENLINKER_RELEASE_EVIDENCE_DIR: release-evidence
+        run: |
+          ./test/release-images/verify.sh \
+            ghcr.io/openlinker-ai \
+            "${GITHUB_REF_NAME}"
+      - name: Upload the inspected release evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: provider-release-evidence-${{ github.ref_name }}
+          path: release-evidence/
+          if-no-files-found: error
+          retention-days: 90

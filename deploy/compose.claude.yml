@@ -1,0 +1,82 @@
+name: openlinker-claude-provider
+
+services:
+  openlinker-egress-gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile.providers
+      target: egress
+    image: openlinker-egress-gateway:dev
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    networks:
+      agent-internal:
+        aliases: [openlinker-egress-gateway]
+      egress-public: {}
+    environment:
+      OPENLINKER_EGRESS_LISTEN: 0.0.0.0:3128
+      OPENLINKER_EGRESS_UPSTREAM_PROXY: ${OPENLINKER_EGRESS_UPSTREAM_PROXY:-}
+      OPENLINKER_EGRESS_UPSTREAM_PROXY_FILE: ${OPENLINKER_EGRESS_UPSTREAM_PROXY_FILE:-}
+      OPENLINKER_EGRESS_DOH_URL: ${OPENLINKER_EGRESS_DOH_URL:-https://1.1.1.1/dns-query}
+    restart: unless-stopped
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: 0.5
+
+  openlinker-agent-claude:
+    build:
+      context: ..
+      dockerfile: Dockerfile.providers
+      target: claude
+    image: openlinker-agent-claude:dev
+    depends_on:
+      - openlinker-egress-gateway
+    read_only: true
+    user: "0:0"
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777
+    networks:
+      - agent-internal
+    environment:
+      OPENLINKER_URL: ${OPENLINKER_URL:?set OPENLINKER_URL}
+      OPENLINKER_AGENT_ID: ${OPENLINKER_CLAUDE_AGENT_ID:?set OPENLINKER_CLAUDE_AGENT_ID}
+      OPENLINKER_AGENT_TOKEN: ${OPENLINKER_CLAUDE_AGENT_TOKEN:-}
+      OPENLINKER_AGENT_TOKEN_FILE: ${OPENLINKER_CLAUDE_AGENT_TOKEN_FILE:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_API_KEY_FILE: ${ANTHROPIC_API_KEY_FILE:-}
+      OPENLINKER_NODE_ID: ${OPENLINKER_CLAUDE_NODE_ID:-}
+      OPENLINKER_CLAUDE_MODEL: ${OPENLINKER_CLAUDE_MODEL:-}
+      OPENLINKER_CLAUDE_WEB_SEARCH: ${OPENLINKER_CLAUDE_WEB_SEARCH:-false}
+      OPENLINKER_AGENT_TRANSPORT: ${OPENLINKER_AGENT_TRANSPORT:-auto}
+      OPENLINKER_AGENT_CAPACITY: ${OPENLINKER_AGENT_CAPACITY:-1}
+      OPENLINKER_AGENT_TIMEOUT_SECONDS: ${OPENLINKER_AGENT_TIMEOUT_SECONDS:-1800}
+      OPENLINKER_EGRESS_PROXY_URL: http://openlinker-egress-gateway:3128
+      OPENLINKER_BLOCK_PRIVATE_NETWORK: "true"
+    volumes:
+      - claude-runtime:/runtime
+      - claude-provider:/provider
+      - type: bind
+        source: ${OPENLINKER_CLAUDE_WORKSPACE:?set OPENLINKER_CLAUDE_WORKSPACE}
+        target: /workspace
+        read_only: true
+    restart: unless-stopped
+    pids_limit: 256
+    mem_limit: 4g
+    cpus: 2.0
+
+networks:
+  agent-internal:
+    internal: true
+  egress-public: {}
+
+volumes:
+  claude-runtime: {}
+  claude-provider: {}
