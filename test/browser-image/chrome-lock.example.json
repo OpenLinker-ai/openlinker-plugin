@@ -1,0 +1,9 @@
+{
+  "distribution": "chrome_for_testing",
+  "version": "151.0.7922.77",
+  "filename": "chrome-linux-amd64.tar",
+  "source_reference": "https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.77/linux64/chrome-linux64.zip",
+  "sha256": "replace-with-lowercase-sha256-of-deterministic-tar",
+  "upstream_filename": "chrome-linux64.zip",
+  "upstream_sha256": "replace-with-lowercase-sha256-of-upstream-zip"
+}

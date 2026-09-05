@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+# Debian's xvfb-run executes its child with `2>&1`. Preserve the supervisor's
+# diagnostic channel before entering xvfb-run, then explicitly restore it for
+# Node so Engine stdout remains a JSON-only protocol stream.
+exec 3>&2
+exec /usr/bin/xvfb-run \
+  --auto-servernum \
+  --server-args="-screen 0 1440x1000x24 -nolisten tcp" \
+  /bin/sh -c 'exec /usr/bin/node /opt/openlinker/browser-engine/dist/main.js 2>&3'

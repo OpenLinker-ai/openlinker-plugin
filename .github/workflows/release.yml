@@ -4,6 +4,13 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      publish_native:
+        description: Publish native packages after the compatible CLI release exists (select its immutable Plugin tag)
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -11,7 +18,27 @@ permissions:
   attestations: write
 
 jobs:
+  go-module:
+    # A Go tag/source release must not depend on a downstream CLI archive.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm run test:go
+      - run: npm run check:go-boundaries
+      - run: npm run check:agent-runtime-integration
+      - run: GOWORK=off go mod verify
+      - run: GOWORK=off go build ./cmd/...
+
   release:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_native && github.ref_type == 'tag'
+    needs: go-module
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -19,6 +46,14 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify downstream CLI artifact compatibility
+        run: npm run check:provider-cli -- --expected-sdk "$(GOWORK=off go list -m -f '{{.Version}}' github.com/OpenLinker-ai/openlinker-go)"
 
       - name: Validate release contract
         shell: bash
@@ -95,4 +130,4 @@ jobs:
           if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --generate-notes
           fi
-          gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
+          gh release upload "${GITHUB_REF_NAME}" dist/*.tar.gz dist/*.sha256 dist/*.spdx.json --clobber

@@ -1,0 +1,175 @@
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+
+ARG GO_VERSION=1.26.4
+ARG OPENLINKER_GO_VERSION=v0.2.0-rc7
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-bookworm@sha256:b305420a68d0f229d91eb3b3ed9e519fcf2cf5461da4bef997bf927e8c0bfd2b AS go-source
+ARG OPENLINKER_GO_VERSION
+WORKDIR /src
+ENV CGO_ENABLED=0 GOFLAGS=-mod=readonly GOWORK=off
+COPY go.mod go.sum ./
+RUN set -eu; \
+    attempt=1; \
+    until go mod download && go mod verify; do \
+      if [ "${attempt}" -ge 3 ]; then exit 1; fi; \
+      sleep "$((attempt * 2))"; \
+      attempt="$((attempt + 1))"; \
+    done; \
+    test "$(go list -m -f '{{.Version}}' github.com/OpenLinker-ai/openlinker-go)" = "${OPENLINKER_GO_VERSION}"
+COPY . .
+
+FROM go-source AS go-build
+RUN go test ./cmd/... ./packages/agent-adapters/... ./packages/browser-runtime/... ./test/browser-provider-live/client
+ARG TARGETOS
+ARG TARGETARCH
+RUN test "${TARGETOS}" = linux \
+ && GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -o /out/openlinker-browser-runtime ./cmd/openlinker-browser-runtime \
+ && GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w -X main.fixedProvider=codex" -o /out/openlinker-provider-launcher-codex ./cmd/openlinker-provider-launcher \
+ && GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w -X main.fixedProvider=claude" -o /out/openlinker-provider-launcher-claude ./cmd/openlinker-provider-launcher \
+ && GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w -X main.fixedProvider=codex" -o /out/openlinker-runtime-entrypoint-codex ./cmd/openlinker-runtime-entrypoint \
+ && GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w -X main.fixedProvider=claude" -o /out/openlinker-runtime-entrypoint-claude ./cmd/openlinker-runtime-entrypoint \
+ && GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -o /out/openlinker-browser-provider-live ./test/browser-provider-live/client
+
+FROM go-source AS egress-build
+RUN go test ./cmd/openlinker-egress-gateway ./packages/browser-runtime/egressgateway ./packages/browser-runtime/netpolicy
+ARG TARGETOS
+ARG TARGETARCH
+RUN test "${TARGETOS}" = linux \
+ && GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go build -trimpath -ldflags="-s -w" -o /out/openlinker-egress-gateway ./cmd/openlinker-egress-gateway
+
+# Build native Browser plugin assets from this checkout, not its own release.
+FROM --platform=$BUILDPLATFORM node:24.4.1-bookworm-slim@sha256:36ae19f59c91f3303c7a648f07493fe14c4bd91320ac8d898416327bacf1bbfa AS agent-runtime-plugin
+WORKDIR /src
+COPY package.json LICENSE ./
+COPY scripts/build-agent-runtime-packages.mjs ./scripts/build-agent-runtime-packages.mjs
+COPY shared/skills/use-isolated-browser ./shared/skills/use-isolated-browser
+COPY platforms/claude/openlinker/commands/use-isolated-browser.md ./platforms/claude/openlinker/commands/use-isolated-browser.md
+RUN node scripts/build-agent-runtime-packages.mjs --out /out \
+ && find /out -type d -exec chmod 0555 {} + \
+ && find /out -type f -exec chmod 0444 {} + \
+ && test -f /out/codex-marketplace/.agents/plugins/marketplace.json \
+ && test -f /out/claude-plugin/openlinker/.claude-plugin/plugin.json
+
+# No reverse Plugin -> CLI source dependency. Old locks fail build-info checks.
+FROM agent-runtime-plugin AS cli-artifact
+ARG TARGETOS
+ARG TARGETARCH
+ARG OPENLINKER_GO_VERSION
+COPY --from=go-source /usr/local/go /usr/local/go
+ENV PATH=/usr/local/go/bin:$PATH
+COPY shared/cli-lock.json ./shared/cli-lock.json
+COPY scripts/download-pinned-cli.mjs ./scripts/download-pinned-cli.mjs
+RUN node scripts/download-pinned-cli.mjs \
+      --platform "${TARGETOS}-${TARGETARCH}" \
+      --expected-sdk "${OPENLINKER_GO_VERSION}" \
+      --out /out/openlinker
+
+FROM node:24.4.1-bookworm-slim@sha256:36ae19f59c91f3303c7a648f07493fe14c4bd91320ac8d898416327bacf1bbfa AS provider-base
+ARG OPENLINKER_GO_VERSION
+ARG OPENLINKER_UID=10001
+ARG OPENLINKER_GID=10001
+ARG PROVIDER_UID=10002
+ARG PROVIDER_GID=10002
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --gid "${OPENLINKER_GID}" openlinker \
+ && groupadd --gid "${PROVIDER_GID}" provider \
+ && useradd --uid "${OPENLINKER_UID}" --gid "${OPENLINKER_GID}" --home-dir /runtime --no-create-home --shell /usr/sbin/nologin openlinker \
+ && useradd --uid "${PROVIDER_UID}" --gid "${PROVIDER_GID}" --home-dir /provider --no-create-home --shell /usr/sbin/nologin provider \
+ && install -d -o "${OPENLINKER_UID}" -g "${OPENLINKER_GID}" -m 0700 /runtime \
+ && install -d -o "${PROVIDER_UID}" -g "${PROVIDER_GID}" -m 0700 /provider \
+ && install -d -o "${OPENLINKER_UID}" -g "${OPENLINKER_GID}" -m 0555 /workspace
+COPY --from=cli-artifact /out/openlinker /usr/local/bin/openlinker
+COPY --from=cli-artifact --chown=root:root --chmod=0444 /out/cli-build-info.json /opt/openlinker/cli-build-info.json
+ENV OPENLINKER_AGENT_TRANSPORT=auto \
+    OPENLINKER_AGENT_CAPACITY=1 \
+    OPENLINKER_AGENT_TIMEOUT_SECONDS=1800 \
+    OPENLINKER_AGENT_SESSION_REUSE=true \
+    OPENLINKER_BLOCK_PRIVATE_NETWORK=true \
+    OPENLINKER_EGRESS_PROXY_URL=http://openlinker-egress-gateway:3128 \
+    TMPDIR=/tmp
+WORKDIR /workspace
+USER 0:0
+STOPSIGNAL SIGTERM
+LABEL org.opencontainers.image.openlinker-go.version="${OPENLINKER_GO_VERSION}"
+
+FROM provider-base AS codex
+ARG CODEX_CLI_VERSION=0.145.0-alpha.27
+ARG CODEX_CLI_INTEGRITY=sha512-CqQmtU0avLks+u0xrh5AaLTXy90XAW+g9jWZ2W3NPMgBxjUbcsRiqANR/Ai0FHa7JIKD8qZwkfRWWrUAxIGt2w==
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl --version
+RUN test "$(npm view "@openai/codex@${CODEX_CLI_VERSION}" dist.integrity)" = "${CODEX_CLI_INTEGRITY}" \
+ && npm install --global --ignore-scripts=false "@openai/codex@${CODEX_CLI_VERSION}" \
+ && codex --version \
+ && npm cache clean --force
+COPY --from=go-build /out/openlinker-runtime-entrypoint-codex /usr/local/bin/openlinker-runtime-entrypoint
+COPY --from=go-build /out/openlinker-provider-launcher-codex /usr/local/bin/openlinker-provider-launcher
+COPY --from=agent-runtime-plugin /out/codex-marketplace /opt/openlinker/agent-runtime-plugin/codex
+RUN set -eu; \
+    chmod 0555 /opt/openlinker/agent-runtime-plugin/codex; \
+    test "$(stat -c '%U:%G %a' /opt/openlinker/agent-runtime-plugin/codex)" = "root:root 555"; \
+    validation_home="$(mktemp -d)"; \
+    HOME="${validation_home}" CODEX_HOME="${validation_home}" \
+      codex plugin marketplace add /opt/openlinker/agent-runtime-plugin/codex --json >/tmp/codex-marketplace.json; \
+    HOME="${validation_home}" CODEX_HOME="${validation_home}" \
+      codex plugin add openlinker@openlinker-agent-runtime --json >/tmp/codex-plugin-add.json; \
+    HOME="${validation_home}" CODEX_HOME="${validation_home}" \
+      codex plugin list --json >/tmp/codex-plugin-list.json; \
+    node -e "const value=require('/tmp/codex-plugin-list.json'); if(value.installed.length !== 1 || value.available.length !== 0 || value.installed[0].pluginId !== 'openlinker@openlinker-agent-runtime' || !value.installed[0].enabled) process.exit(1)"; \
+    rm -rf "${validation_home}" /tmp/codex-marketplace.json /tmp/codex-plugin-add.json /tmp/codex-plugin-list.json
+ENV OPENLINKER_CODEX_BIN=/usr/local/bin/openlinker-provider-launcher \
+    OPENLINKER_CODEX_SANDBOX=read-only \
+    OPENLINKER_CODEX_APPROVAL=never \
+    OPENLINKER_CODEX_WEB_SEARCH=disabled
+ENTRYPOINT ["/usr/local/bin/openlinker-runtime-entrypoint"]
+LABEL org.opencontainers.image.title="OpenLinker Runtime Codex" \
+      org.opencontainers.image.description="OpenLinker CLI Runtime Worker with a pinned Codex CLI provider" \
+      org.opencontainers.image.source="https://github.com/OpenLinker-ai/openlinker-plugin" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+FROM provider-base AS claude
+ARG CLAUDE_CODE_VERSION=2.1.215
+ARG CLAUDE_CODE_INTEGRITY=sha512-lsWBvyMyBqg/rOZ06o/HEhlpOzHsH8IBf9RH4u5gzizQ1LWS/oXAh5nqWNUu3hn2d8QkyYg0aseNzMDlGD+3qg==
+RUN test "$(npm view "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" dist.integrity)" = "${CLAUDE_CODE_INTEGRITY}" \
+ && npm install --global --ignore-scripts=false "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+ && claude --version \
+ && npm cache clean --force
+COPY --from=go-build /out/openlinker-runtime-entrypoint-claude /usr/local/bin/openlinker-runtime-entrypoint
+COPY --from=go-build /out/openlinker-provider-launcher-claude /usr/local/bin/openlinker-provider-launcher
+COPY --from=agent-runtime-plugin /out/claude-plugin/openlinker /opt/openlinker/agent-runtime-plugin/claude
+RUN chmod 0555 /opt/openlinker/agent-runtime-plugin/claude \
+ && test "$(stat -c '%U:%G %a' /opt/openlinker/agent-runtime-plugin/claude)" = "root:root 555" \
+ && claude plugin validate --strict /opt/openlinker/agent-runtime-plugin/claude
+ENV OPENLINKER_CLAUDE_BIN=/usr/local/bin/openlinker-provider-launcher \
+    OPENLINKER_CLAUDE_PERMISSION=dontAsk \
+    OPENLINKER_CLAUDE_WEB_SEARCH=false
+ENTRYPOINT ["/usr/local/bin/openlinker-runtime-entrypoint"]
+LABEL org.opencontainers.image.title="OpenLinker Runtime Claude" \
+      org.opencontainers.image.description="OpenLinker CLI Runtime Worker with a pinned Claude Code CLI provider" \
+      org.opencontainers.image.source="https://github.com/OpenLinker-ai/openlinker-plugin" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# Test-only descendants retain the exact pinned Provider CLI, Runtime Plugin,
+# privilege boundary and filesystem layout from the production images. They
+# replace only the entrypoint so the credential-backed release gate can execute
+# one controlled Browser Run without registering a real Agent in Core.
+FROM codex AS codex-live
+COPY --from=go-build /out/openlinker-browser-provider-live /usr/local/bin/openlinker-browser-provider-live
+ENV OPENLINKER_BROWSER_LIVE_PROVIDER=codex
+ENTRYPOINT ["/usr/local/bin/openlinker-browser-provider-live"]
+
+FROM claude AS claude-live
+COPY --from=go-build /out/openlinker-browser-provider-live /usr/local/bin/openlinker-browser-provider-live
+ENV OPENLINKER_BROWSER_LIVE_PROVIDER=claude
+ENTRYPOINT ["/usr/local/bin/openlinker-browser-provider-live"]
+
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35 AS egress
+COPY --from=egress-build /out/openlinker-egress-gateway /usr/local/bin/openlinker-egress-gateway
+EXPOSE 3128
+ENTRYPOINT ["/usr/local/bin/openlinker-egress-gateway"]
+LABEL org.opencontainers.image.title="OpenLinker Egress Gateway" \
+      org.opencontainers.image.description="Restricted HTTP and HTTPS egress proxy for OpenLinker Runtime images" \
+      org.opencontainers.image.source="https://github.com/OpenLinker-ai/openlinker-plugin" \
+      org.opencontainers.image.licenses="Apache-2.0"

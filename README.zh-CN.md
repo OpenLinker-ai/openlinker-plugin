@@ -16,6 +16,18 @@ OpenLinker 官方 Codex 与 Claude Code 双向原生插件。
 和官方 OpenLinker SDK 提供能力。Agent Mode 默认关闭，不依赖 OpenLinker Agent
 Node。Browser 入口在隔离 Browser Runtime 和权威 Attachment 都存在之前同样不会工作。
 
+## 源码与交付边界
+
+本仓库同时拥有轻量原生宿主包和可复用 Go module
+`github.com/OpenLinker-ai/openlinker-plugin`。`packages/agent-adapters` 管理
+Provider/Session 执行和 SDK 应用装配；`packages/browser-runtime` 管理纯 Browser
+协议、服务、engine、native assets 与 egress。SDK 仍是 Runtime Worker 的唯一实现。
+CLI 依赖这些包并保持单可执行文件；Plugin Go 包不得反向依赖 CLI/Cobra，纯 Browser
+包不得传递依赖 SDK。独立 Agent 不要求安装原生 Plugin，Browser 仍独立进程/镜像。
+
+Dockerfiles、便携 [compose](./deploy/compose.providers.yml) 和回归门禁由本仓库维护。
+原生安装 archive 不携带 Go 源码/浏览器二进制；宿主凭据、卷、Profile 格式和身份不变。
+
 ## 五分钟开始
 
 ### 1. 安装
@@ -178,20 +190,27 @@ Provider 镜像。
 
 ```bash
 npm test
+npm run test:go
+npm run check:go-boundaries
+npm run check:agent-runtime-integration
 python3 /path/to/plugin-creator/scripts/validate_plugin.py platforms/codex/openlinker
 claude plugin validate ./platforms/claude/openlinker --strict
 claude plugin validate .
 ```
 
-Python validator 需要 PyYAML；公开发布工作流会在隔离环境中安装依赖。
+可选 Python validator 需要在其独立环境中提供 PyYAML。同树集成门禁会生成两个最小
+原生包，再用 Go 消费方验证其实际 manifest、Skill 与 Browser 接线。
 
 ## 发布顺序
 
-Plugin 发布依赖已发布且兼容的 CLI。CLI release 存在后，生成不可变的六平台 lock
-并运行发布门禁：
+先发布不可变 Plugin Go module，其 tag CI 不依赖新的 CLI artifact。CLI 固定该 module
+并发布后，再生成六平台 CLI lock，选择已有 release tag 显式触发 native 包与镜像发布。
+Provider 镜像验证 archive checksum、Plugin/SDK build-info 与真实 CLI VCS revision；
+旧 lock 在新 CLI 发布前明确失败。同树生成最小 Runtime native 包，不下载自己的未发布
+release。原生包发布前运行：
 
 ```bash
-npm run lock:cli -- v0.2.0-rc.2 --write
+npm run lock:cli -- <published-cli-version> --write
 npm run release:check
 ```
 

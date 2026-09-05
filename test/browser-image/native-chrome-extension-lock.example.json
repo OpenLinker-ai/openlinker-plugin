@@ -1,0 +1,8 @@
+{
+  "activation_path": "/openlinker-runtime/index.html",
+  "extension_id": "replace-with-openlinker-extension-id",
+  "filename": "openlinker-native-extension.tar",
+  "sha256": "replace-with-lowercase-sha256-of-openlinker-native-extension.tar",
+  "source_reference": "openlinker-source-commit-and-builder-version",
+  "version": "replace-with-full-openlinker-extension-version"
+}

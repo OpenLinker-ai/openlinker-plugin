@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "OpenLinker Browser Runtime",
+  "version": "1.0.0",
+  "description": "Connects an isolated OpenLinker Browser Runtime to its image-baked Native Messaging Host.",
+  "permissions": ["nativeMessaging"],
+  "background": {
+    "service_worker": "service-worker.mjs",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "openlinker-runtime/index.html"
+  }
+}

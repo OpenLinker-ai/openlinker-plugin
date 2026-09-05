@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.vscode
+.DS_Store
+dist
+coverage
+**/node_modules
+*.log
+.env
+.env.*
+!deploy/.env.providers.example
+artifacts
+tmp
+.openlinker-dev
+**/.openlinker-dev

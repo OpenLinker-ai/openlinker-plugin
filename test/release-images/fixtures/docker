@@ -1,0 +1,69 @@
+#!/bin/sh
+set -eu
+
+reference=${5:-}
+case "$reference" in
+  *@sha256:att-amd64|*@sha256:att-arm64)
+    if [ "${FAKE_MISSING_SBOM:-0}" = "1" ]; then
+      printf '%s\n' '{
+        "schemaVersion": 2,
+        "layers": [
+          {
+            "annotations": {
+              "in-toto.io/predicate-type":
+                "https://slsa.dev/provenance/v1"
+            }
+          }
+        ]
+      }'
+    else
+      printf '%s\n' '{
+        "schemaVersion": 2,
+        "layers": [
+          {
+            "annotations": {
+              "in-toto.io/predicate-type": "https://spdx.dev/Document"
+            }
+          },
+          {
+            "annotations": {
+              "in-toto.io/predicate-type":
+                "https://slsa.dev/provenance/v1"
+            }
+          }
+        ]
+      }'
+    fi
+    ;;
+  *)
+    printf '%s\n' '{
+      "mediaType": "application/vnd.oci.image.index.v1+json",
+      "manifests": [
+        {
+          "digest": "sha256:image-amd64",
+          "platform": {"os": "linux", "architecture": "amd64"}
+        },
+        {
+          "digest": "sha256:att-amd64",
+          "platform": {"os": "unknown", "architecture": "unknown"},
+          "annotations": {
+            "vnd.docker.reference.type": "attestation-manifest",
+            "vnd.docker.reference.digest": "sha256:image-amd64"
+          }
+        },
+        {
+          "digest": "sha256:image-arm64",
+          "platform": {"os": "linux", "architecture": "arm64"}
+        },
+        {
+          "digest": "sha256:att-arm64",
+          "platform": {"os": "unknown", "architecture": "unknown"},
+          "annotations": {
+            "vnd.docker.reference.type": "attestation-manifest",
+            "vnd.docker.reference.digest": "sha256:image-arm64"
+          }
+        }
+      ]
+    }'
+    ;;
+esac

@@ -18,6 +18,21 @@ default and does not depend on OpenLinker Agent Node. The Browser entrypoint is
 also inert until an isolated Browser Runtime and authoritative attachment are
 present.
 
+## Source and delivery boundaries
+
+This repository owns both small native host packages and the reusable Go module
+`github.com/OpenLinker-ai/openlinker-plugin`. `packages/agent-adapters` contains
+Provider/session execution and SDK application composition; `packages/browser-runtime`
+contains pure Browser protocols/services, engine/native assets, and egress.
+The SDK remains the only Runtime Worker implementation. CLI consumes these
+packages while remaining one executable. Plugin Go packages cannot depend on
+CLI/Cobra; pure Browser packages cannot transitively depend on SDK. Standalone
+Agents need no native plugin installation; Browser stays a separate process/image.
+
+Dockerfiles, portable [compose](./deploy/compose.providers.yml), and regression gates
+are owned here. Native installation archives do not contain Go sources or browser
+binaries. Credentials, volumes, Profile formats, and identities remain unchanged.
+
 ## Five-minute start
 
 ### 1. Install
@@ -189,22 +204,31 @@ container and is never bundled into the Provider image.
 
 ```bash
 npm test
+npm run test:go
+npm run check:go-boundaries
+npm run check:agent-runtime-integration
 python3 /path/to/plugin-creator/scripts/validate_plugin.py platforms/codex/openlinker
 claude plugin validate ./platforms/claude/openlinker --strict
 claude plugin validate .
 ```
 
-The Python validator requires PyYAML. The public release workflow installs the
-validator dependency in an isolated environment.
+The optional Python validator requires PyYAML in its own environment. The
+same-tree integration gate generates both minimal native packages and runs the
+Go consumer against their actual manifests, Skills, and Browser wiring.
 
 ## Release ordering
 
-The Plugin release is gated on a published compatible CLI. After the CLI
-release exists, generate the immutable six-platform lock and run the release
-gate:
+Release the immutable Plugin Go module first; its tag CI does not require a
+new CLI artifact. CLI then pins and releases that module. Only afterwards,
+regenerate the immutable six-platform CLI lock and explicitly dispatch native
+package/image publication from the selected release tag. Provider image builds
+verify the CLI archive checksum, Plugin/SDK module build info, and real CLI VCS
+revision; old locks fail until a migrated CLI is published. Minimal Runtime
+native packages are generated from the same checkout, not downloaded from its
+own release. Before native publication, run:
 
 ```bash
-npm run lock:cli -- v0.2.0-rc.2 --write
+npm run lock:cli -- <published-cli-version> --write
 npm run release:check
 ```
 

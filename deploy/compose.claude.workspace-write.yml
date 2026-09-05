@@ -1,0 +1,9 @@
+services:
+  openlinker-agent-claude:
+    environment:
+      OPENLINKER_CLAUDE_PERMISSION: acceptEdits
+    volumes:
+      - type: bind
+        source: ${OPENLINKER_CLAUDE_WORKSPACE:?set OPENLINKER_CLAUDE_WORKSPACE}
+        target: /workspace
+        read_only: false

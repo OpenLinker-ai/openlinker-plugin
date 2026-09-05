@@ -1,0 +1,113 @@
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+
+ARG OPENLINKER_BROWSER_BASE
+FROM ${OPENLINKER_BROWSER_BASE}
+
+ARG OPENLINKER_BROWSER_BASE
+USER root
+ARG TARGETARCH
+ARG OPENLINKER_CHROME_ARTIFACT=chrome-linux-amd64.tar
+ARG OPENLINKER_CHROME_UPSTREAM_ARTIFACT=chrome-linux64.zip
+ARG OPENLINKER_CHROME_LOCK=chrome.lock.json
+ARG OPENLINKER_CHROME_DISTRIBUTION=chrome_for_testing
+ARG OPENLINKER_CHROME_VERSION
+ARG OPENLINKER_EXTENSION_ARTIFACT=openlinker-native-extension.tar
+ARG OPENLINKER_EXTENSION_LOCK=openlinker-native-extension.lock.json
+ARG OPENLINKER_EXTENSION_ID
+ARG OPENLINKER_EXTENSION_VERSION
+ARG OPENLINKER_NATIVE_HOST_PROTOCOL=openlinker.native-chrome.v2
+ARG OPENLINKER_NATIVE_CHROME_PROFILE_GENERATION
+
+COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_ARTIFACT} /tmp/native-chrome/chrome-linux-amd64.tar
+COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_UPSTREAM_ARTIFACT} /tmp/native-chrome/chrome-linux64.zip
+COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_LOCK} /tmp/native-chrome/chrome.lock.json
+COPY --chown=root:root --chmod=0444 ${OPENLINKER_EXTENSION_ARTIFACT} /tmp/native-chrome/openlinker-native-extension.tar
+COPY --chown=root:root --chmod=0444 ${OPENLINKER_EXTENSION_LOCK} /tmp/native-chrome/extension.lock.json
+COPY --chown=root:root --chmod=0444 test/browser-image/verify-chrome-lock.mjs /tmp/native-chrome/verify-chrome-lock.mjs
+COPY --chown=root:root --chmod=0444 test/browser-image/verify-native-chrome-extension-lock.mjs /tmp/native-chrome/verify-extension-lock.mjs
+COPY --chown=root:root --chmod=0444 test/browser-image/build-native-chrome-assets-lock.mjs /tmp/native-chrome/build-assets-lock.mjs
+COPY --chown=root:root --chmod=0444 test/browser-image/crx3.mjs /tmp/native-chrome/crx3.mjs
+COPY --chown=root:root --chmod=0444 test/browser-image/deterministic-archive.mjs /tmp/native-chrome/deterministic-archive.mjs
+COPY --chown=root:root --chmod=0555 packages/browser-runtime/native-chrome/src /opt/openlinker/native-chrome/src
+COPY --chown=root:root --chmod=0555 packages/browser-runtime/native-chrome/bin /opt/openlinker/native-chrome/bin
+
+RUN set -eu; \
+    base_digest="${OPENLINKER_BROWSER_BASE##*@sha256:}"; \
+    test "${OPENLINKER_BROWSER_BASE}" != "${base_digest}"; \
+    test "${#base_digest}" -eq 64; \
+    case "${base_digest}" in *[!0-9a-f]*) exit 1 ;; esac; \
+    test "${TARGETARCH}" = amd64; \
+    test "${OPENLINKER_CHROME_DISTRIBUTION}" = chrome_for_testing; \
+    node /tmp/native-chrome/verify-chrome-lock.mjs \
+      /tmp/native-chrome/chrome.lock.json \
+      /tmp/native-chrome/chrome-linux-amd64.tar \
+      /tmp/native-chrome/chrome-linux64.zip \
+      "${OPENLINKER_CHROME_DISTRIBUTION}" \
+      "${OPENLINKER_CHROME_VERSION}"; \
+    node /tmp/native-chrome/verify-extension-lock.mjs \
+      /tmp/native-chrome/extension.lock.json \
+      /tmp/native-chrome/openlinker-native-extension.tar \
+      "${OPENLINKER_EXTENSION_ID}" \
+      "${OPENLINKER_EXTENSION_VERSION}"; \
+    expr "${OPENLINKER_NATIVE_CHROME_PROFILE_GENERATION}" : '[1-9][0-9]*$' >/dev/null; \
+    tar -tf /tmp/native-chrome/chrome-linux-amd64.tar \
+      | awk 'BEGIN { ok=1 } !/^chrome\// || /(^|\/)\.\.($|\/)/ || /^\// { ok=0 } END { exit ok ? 0 : 1 }'; \
+    tar -tf /tmp/native-chrome/openlinker-native-extension.tar \
+      | awk 'BEGIN { ok=1 } !/^extension\// || /(^|\/)\.\.($|\/)/ || /^\// { ok=0 } END { exit ok ? 0 : 1 }'; \
+    test -z "$(tar -tvf /tmp/native-chrome/chrome-linux-amd64.tar | awk 'substr($1,1,1) != "-" && substr($1,1,1) != "d" { print }')"; \
+    test -z "$(tar -tvf /tmp/native-chrome/openlinker-native-extension.tar | awk 'substr($1,1,1) != "-" && substr($1,1,1) != "d" { print }')"; \
+    tar -tvf /tmp/native-chrome/chrome-linux-amd64.tar \
+      | awk 'BEGIN { ok=1 } NR > 4096 { ok=0; exit } { total += $3 } END { exit ok && total <= 2147483648 ? 0 : 1 }'; \
+    tar -tvf /tmp/native-chrome/openlinker-native-extension.tar \
+      | awk 'BEGIN { ok=1 } NR > 4096 { ok=0; exit } { total += $3 } END { exit ok && total <= 536870912 ? 0 : 1 }'; \
+    install -d -o root -g root -m 0555 \
+      /opt/google \
+      /opt/openlinker/native-chrome/extension \
+      /usr/share/chromium/extensions \
+      /etc/opt/chrome_for_testing/policies/managed \
+      /etc/opt/chrome_for_testing/native-messaging-hosts; \
+    tar -xf /tmp/native-chrome/chrome-linux-amd64.tar -C /opt/google --no-same-owner --no-same-permissions; \
+    tar -xf /tmp/native-chrome/openlinker-native-extension.tar -C /opt/openlinker/native-chrome --no-same-owner --no-same-permissions; \
+    test -x /opt/google/chrome/chrome; \
+    test -f /opt/google/chrome/chrome-sandbox; \
+    test -f /opt/openlinker/native-chrome/extension/manifest.json; \
+    test -f /opt/openlinker/native-chrome/extension/extension.crx; \
+    test -x /usr/bin/xvfb-run; \
+    test "$(/opt/google/chrome/chrome --version | grep -oE '[0-9]+(\.[0-9]+){1,3}' | tail -n 1)" = "${OPENLINKER_CHROME_VERSION}"; \
+    chown -R root:root /opt/google/chrome /opt/openlinker/native-chrome; \
+    chmod -R a-w /opt/google/chrome /opt/openlinker/native-chrome; \
+    find /opt/openlinker/native-chrome/extension -type d -exec chmod 0555 {} +; \
+    find /opt/openlinker/native-chrome/extension -type f -exec chmod 0444 {} +; \
+    find /opt/openlinker/native-chrome/src -type d -exec chmod 0555 {} +; \
+    find /opt/openlinker/native-chrome/src -type f -exec chmod 0444 {} +; \
+    chmod 4755 /opt/google/chrome/chrome-sandbox; \
+    chmod 0555 /opt/openlinker/native-chrome/bin/*; \
+    node /tmp/native-chrome/build-assets-lock.mjs \
+      /tmp/native-chrome/chrome.lock.json \
+      /tmp/native-chrome/extension.lock.json \
+      /opt/google/chrome \
+      /opt/google/chrome/chrome \
+      /opt/openlinker/native-chrome/extension \
+      "/usr/share/chromium/extensions/${OPENLINKER_EXTENSION_ID}.json" \
+      /opt/openlinker/native-chrome/extension-update.xml \
+      /etc/opt/chrome_for_testing/policies/managed/openlinker-native-chrome.json \
+      /opt/openlinker/native-chrome/bin/openlinker-native-chrome-host \
+      /opt/openlinker/native-chrome/src/native-host.mjs \
+      /opt/openlinker/native-chrome/src/native-framing.mjs \
+      /opt/openlinker/native-chrome/bin/openlinker-native-chrome-engine \
+      /etc/opt/chrome_for_testing/native-messaging-hosts/ai.openlinker.browser.json \
+      "${TARGETARCH}" \
+      "${OPENLINKER_NATIVE_HOST_PROTOCOL}" \
+      "${OPENLINKER_NATIVE_CHROME_PROFILE_GENERATION}" \
+      /opt/openlinker/native-chrome/assets.lock.json; \
+    test ! -e "/opt/google/chrome/extensions/${OPENLINKER_EXTENSION_ID}.json"; \
+    test ! -e /etc/opt/chrome/native-messaging-hosts/ai.openlinker.browser.json; \
+    test ! -e /etc/opt/chrome/policies/managed/openlinker-native-chrome.json; \
+    test "$(stat -c '%U:%G %a' /opt/openlinker/native-chrome/assets.lock.json)" = 'root:root 444'; \
+    rm -rf /tmp/native-chrome
+
+ENV OPENLINKER_NATIVE_CHROME_ASSET_LOCK=/opt/openlinker/native-chrome/assets.lock.json
+USER 10001:10001
+LABEL org.opencontainers.image.title="OpenLinker Native Chrome Browser Runtime" \
+      org.opencontainers.image.description="Locked Official Chrome and extension backend with isolated Chromium fallback" \
+      org.opencontainers.image.openlinker.native-chrome="eligible-after-live-gate"
