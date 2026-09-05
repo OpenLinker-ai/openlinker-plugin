@@ -7,6 +7,7 @@ ENV CGO_ENABLED=0 GOFLAGS=-mod=readonly GOWORK=off
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 COPY packages/browser-runtime ./packages/browser-runtime
+COPY packages/agent-adapters ./packages/agent-adapters
 COPY test/browser-image ./test/browser-image
 RUN go test ./packages/browser-runtime/browserclient ./packages/browser-runtime/browserplugin ./packages/browser-runtime/browserprotocol ./packages/browser-runtime/netpolicy \
  && go test ./test/browser-image/client ./test/browser-image/fixture
