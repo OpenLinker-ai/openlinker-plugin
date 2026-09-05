@@ -5,6 +5,7 @@ import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import { downloadPinnedCLI, validateAsset, verifyBuildInfo } from "../scripts/download-pinned-cli.mjs";
 
 const pluginModule = "github.com/OpenLinker-ai/openlinker-plugin";
@@ -24,6 +25,79 @@ const buildInfo = [
   `\tbuild\tvcs.revision=${revision}`,
   "\tbuild\tvcs.modified=false",
 ].join("\n");
+
+async function providerMetadataGuard() {
+  const dockerfile = await readFile(new URL("../Dockerfile.providers", import.meta.url), "utf8");
+  const base = dockerfile.slice(dockerfile.indexOf(" AS provider-base\n"), dockerfile.indexOf("FROM provider-base AS codex\n"));
+  const match = base.match(/USER 10001:10001\nRUN --network=none node <<'OPENLINKER_METADATA_READABILITY'\n([\s\S]*?)\nOPENLINKER_METADATA_READABILITY\nUSER 0:0\n/);
+  assert.ok(match, "shared Provider base must run the metadata guard without network as the non-root Worker UID, then restore the launcher UID");
+  return { dockerfile, base, guard: match[1], guardOffset: match.index };
+}
+
+test("both Provider images precreate the traversable install directory before copying immutable metadata", async () => {
+  const { dockerfile, base, guardOffset } = await providerMetadataGuard();
+  const directory = base.indexOf("install -d -o root -g root -m 0555 /opt/openlinker\n");
+  const metadata = base.indexOf("COPY --from=cli-artifact --chown=root:root --chmod=0444 /out/cli-build-info.json /opt/openlinker/cli-build-info.json\n");
+  assert.ok(directory >= 0 && metadata > directory && guardOffset > metadata);
+  assert.match(dockerfile, /FROM provider-base AS codex\n/);
+  assert.match(dockerfile, /FROM provider-base AS claude\n/);
+});
+
+test("the exact image metadata guard rejects wrong identity, inaccessible modes, and invalid metadata", async (t) => {
+  const { guard } = await providerMetadataGuard();
+  // Execute the same guard body, not a second implementation. The real UID and
+  // filesystem access are exercised by RUN in each shared Provider image build.
+  const defaults = {
+    uid: 10001, gid: 10001, directoryMode: 0o555, fileMode: 0o444,
+    directoryUID: 0, directoryGID: 0, fileUID: 0, fileGID: 0,
+    directoryType: true, fileType: true,
+    metadata: JSON.stringify({ cli_commit: revision, plugin_module_version: pluginVersion, openlinker_go_version: sdkVersion, cli_release: "v0.2.0-rc.6", cli_archive_sha256: "a".repeat(64) }),
+  };
+  function execute(overrides = {}) {
+    const value = { ...defaults, ...overrides };
+    let reads = 0;
+    runInNewContext(guard, {
+      process: { getuid: () => value.uid, getgid: () => value.gid },
+      require(specifier) {
+        if (specifier === "node:assert/strict") return assert;
+        assert.equal(specifier, "node:fs");
+        return {
+          lstatSync(path) {
+            if (path === "/opt/openlinker") return { isDirectory: () => value.directoryType, uid: value.directoryUID, gid: value.directoryGID, mode: value.directoryMode };
+            assert.equal(path, "/opt/openlinker/cli-build-info.json");
+            return { isFile: () => value.fileType, uid: value.fileUID, gid: value.fileGID, mode: value.fileMode };
+          },
+          readFileSync(path, encoding) {
+            assert.equal(path, "/opt/openlinker/cli-build-info.json");
+            assert.equal(encoding, "utf8");
+            reads++;
+            return value.metadata;
+          },
+        };
+      },
+    });
+    assert.equal(reads, 1, "guard must actually read the metadata");
+  }
+  execute();
+  for (const [name, overrides] of [
+    ["root UID", { uid: 0 }],
+    ["root GID", { gid: 0 }],
+    ["original untraversable directory", { directoryMode: 0o444 }],
+    ["writable directory", { directoryMode: 0o755 }],
+    ["non-root directory owner", { directoryUID: 10001 }],
+    ["non-root directory group", { directoryGID: 10001 }],
+    ["directory symlink or non-directory", { directoryType: false }],
+    ["owner-only metadata", { fileMode: 0o400 }],
+    ["writable metadata", { fileMode: 0o644 }],
+    ["non-root metadata owner", { fileUID: 10001 }],
+    ["non-root metadata group", { fileGID: 10001 }],
+    ["metadata symlink or non-file", { fileType: false }],
+    ["invalid JSON", { metadata: "not JSON" }],
+    ["missing source evidence", { metadata: "{}" }],
+  ]) {
+    await t.test(name, () => assert.throws(() => execute(overrides)));
+  }
+});
 
 function lockFor(bytes) {
   const version = "v0.2.0-rc.6";

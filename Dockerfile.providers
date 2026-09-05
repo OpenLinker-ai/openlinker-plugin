@@ -78,9 +78,36 @@ RUN apt-get update \
  && useradd --uid "${PROVIDER_UID}" --gid "${PROVIDER_GID}" --home-dir /provider --no-create-home --shell /usr/sbin/nologin provider \
  && install -d -o "${OPENLINKER_UID}" -g "${OPENLINKER_GID}" -m 0700 /runtime \
  && install -d -o "${PROVIDER_UID}" -g "${PROVIDER_GID}" -m 0700 /provider \
- && install -d -o "${OPENLINKER_UID}" -g "${OPENLINKER_GID}" -m 0555 /workspace
+ && install -d -o "${OPENLINKER_UID}" -g "${OPENLINKER_GID}" -m 0555 /workspace \
+ && install -d -o root -g root -m 0555 /opt/openlinker
 COPY --from=cli-artifact /out/openlinker /usr/local/bin/openlinker
 COPY --from=cli-artifact --chown=root:root --chmod=0444 /out/cli-build-info.json /opt/openlinker/cli-build-info.json
+# Both Provider images must expose immutable source evidence to the Worker UID.
+# Precreate the directory: COPY's file mode must not become its directory mode.
+USER 10001:10001
+RUN --network=none node <<'OPENLINKER_METADATA_READABILITY'
+const assert = require("node:assert/strict");
+const { lstatSync, readFileSync } = require("node:fs");
+assert.equal(process.getuid(), 10001);
+assert.equal(process.getgid(), 10001);
+const directory = lstatSync("/opt/openlinker");
+assert.ok(directory.isDirectory());
+assert.equal(directory.uid, 0);
+assert.equal(directory.gid, 0);
+assert.equal(directory.mode & 0o7777, 0o555);
+const metadataPath = "/opt/openlinker/cli-build-info.json";
+const file = lstatSync(metadataPath);
+assert.ok(file.isFile());
+assert.equal(file.uid, 0);
+assert.equal(file.gid, 0);
+assert.equal(file.mode & 0o7777, 0o444);
+const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
+for (const field of ["cli_commit", "plugin_module_version", "openlinker_go_version", "cli_release", "cli_archive_sha256"]) {
+  assert.equal(typeof metadata?.[field], "string");
+  assert.ok(metadata[field].length > 0);
+}
+OPENLINKER_METADATA_READABILITY
+USER 0:0
 ENV OPENLINKER_AGENT_TRANSPORT=auto \
     OPENLINKER_AGENT_CAPACITY=1 \
     OPENLINKER_AGENT_TIMEOUT_SECONDS=1800 \
