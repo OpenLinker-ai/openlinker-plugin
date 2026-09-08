@@ -43,6 +43,7 @@ services:
       - no-new-privileges:true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777
+      - /delegation-tool:rw,noexec,nosuid,nodev,size=4m,uid=10001,gid=10002,mode=2710
     networks:
       - agent-internal
     environment:
@@ -57,6 +58,7 @@ services:
       OPENLINKER_CODEX_BASE_URL: ${OPENLINKER_CODEX_BASE_URL:-}
       OPENLINKER_CODEX_WEB_SEARCH: ${OPENLINKER_CODEX_WEB_SEARCH:-disabled}
       OPENLINKER_AGENT_TRANSPORT: ${OPENLINKER_AGENT_TRANSPORT:-auto}
+      OPENLINKER_AGENT_DELEGATION_TARGETS: ${OPENLINKER_AGENT_DELEGATION_TARGETS:-}
       OPENLINKER_AGENT_CAPACITY: ${OPENLINKER_AGENT_CAPACITY:-1}
       OPENLINKER_AGENT_TIMEOUT_SECONDS: ${OPENLINKER_AGENT_TIMEOUT_SECONDS:-1800}
       OPENLINKER_EGRESS_PROXY_URL: http://openlinker-egress-gateway:3128

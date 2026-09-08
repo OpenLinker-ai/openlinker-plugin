@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexrpc"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexrpc"
 )
 
 // Exercises the installed official binary against a local fake Responses API.
@@ -22,15 +23,18 @@ func TestInstalledCodexRPCWithLocalResponsesAPI(t *testing.T) {
 	if os.Getenv("OPENLINKER_TEST_CODEX_RPC_LOCAL_MODEL") != "1" {
 		t.Skip("opt-in installed Codex, local fake model only")
 	}
-	for _, native := range []bool{false, true} {
-		name := "standard"
-		if native {
-			name = "native-browser"
-		}
-		t.Run(name, func(t *testing.T) { testInstalledCodexRPCWithLocalAPI(t, native) })
+	for _, test := range []struct {
+		name             string
+		native, codeMode bool
+	}{
+		{"standard", false, false},
+		{"native-browser", true, false},
+		{"native-browser-code-mode", true, true},
+	} {
+		t.Run(test.name, func(t *testing.T) { testInstalledCodexRPCWithLocalAPI(t, test.native, test.codeMode) })
 	}
 }
-func testInstalledCodexRPCWithLocalAPI(t *testing.T, native bool) {
+func testInstalledCodexRPCWithLocalAPI(t *testing.T, native, codeMode bool) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/responses" {
@@ -67,28 +71,55 @@ func testInstalledCodexRPCWithLocalAPI(t *testing.T, native bool) {
 			}
 		}
 		if native && n == 2 {
-			found := false
-			for _, item := range request.Input {
-				if item["type"] == "tool_search_output" {
-					raw, _ := json.Marshal(item)
-					if strings.Contains(string(raw), "mcp__openlinker_browser") && strings.Contains(string(raw), "browser_session") {
-						found = true
+			if codeMode {
+				output := localCodeModeOutput(request.Input, "code-browser-1")
+				if !strings.Contains(output, "isolated browser discovered") {
+					t.Errorf("Code Mode Browser discovery or host-API regression sentinel failed: %s", output)
+				}
+			} else {
+				found := false
+				for _, item := range request.Input {
+					if item["type"] == "tool_search_output" {
+						raw, _ := json.Marshal(item)
+						if strings.Contains(string(raw), "mcp__openlinker_browser") && strings.Contains(string(raw), "browser_session") {
+							found = true
+						}
 					}
 				}
-			}
-			if !found {
-				t.Error("native Browser tool was not discovered")
+				if !found {
+					t.Error("native Browser tool was not discovered")
+				}
 			}
 		}
 		if native && n == 3 {
 			raw, _ := json.Marshal(request.Input)
-			if !strings.Contains(string(raw), "local browser result") {
-				t.Error("native MCP call did not return its result")
+			output := string(raw)
+			if codeMode {
+				output = localCodeModeOutput(request.Input, "code-browser-2")
+			}
+			if !strings.Contains(output, "local browser result") {
+				t.Errorf("native MCP call did not return its result: %s", output)
 			}
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		fmt.Fprintf(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"response-%d\"}}\n\n", n)
-		if native && n == 1 {
+		if codeMode && (n == 1 || n == 2) {
+			// Selected exposure checks only: this is not an exhaustive audit of
+			// dynamic imports, globalThis handles, or the upstream V8 boundary.
+			code := `if ([typeof process, typeof require, typeof Deno, typeof fetch, typeof XMLHttpRequest, typeof WebSocket].some(x => x !== "undefined")) throw Error("unexpected host API");
+if (ALL_TOOLS.some(x => /(^|__)(exec_command|shell|shell_command|write_stdin)$/.test(x.name))) throw Error("shell tool exposed");
+const browser = ALL_TOOLS.find(x => /browser_session$/.test(x.name));
+if (!browser) throw Error("Browser tool missing");
+text("isolated browser discovered");`
+			if n == 2 {
+				code = `const browser = ALL_TOOLS.find(x => /browser_session$/.test(x.name)); text(await tools[browser.name]({}));`
+			}
+			item := map[string]any{"type": "response.output_item.done", "item": map[string]any{
+				"type": "custom_tool_call", "call_id": fmt.Sprintf("code-browser-%d", n), "name": "exec", "input": code,
+			}}
+			raw, _ := json.Marshal(item)
+			fmt.Fprintf(w, "data: %s\n\n", raw)
+		} else if native && n == 1 {
 			fmt.Fprint(w, "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"tool_search_call\",\"call_id\":\"local-search\",\"execution\":\"client\",\"arguments\":{\"query\":\"openlinker_browser browser_session\"}}}\n\n")
 		} else if native && n == 2 {
 			fmt.Fprint(w, "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"call_id\":\"local-browser-call\",\"namespace\":\"mcp__openlinker_browser\",\"name\":\"browser_session\",\"arguments\":\"{}\"}}\n\n")
@@ -122,6 +153,11 @@ func testInstalledCodexRPCWithLocalAPI(t *testing.T, native bool) {
 		config.BrowserClientMode = "native"
 		config.Sandbox = "danger-full-access"
 		config.BrowserNativePlugin = makeLiveBrowserMarketplace(t, workspace)
+	}
+	if codeMode {
+		// The pinned Codex catalog selects Code Mode for this model. Leave
+		// feature defaults unchanged and exercise production's required exec path.
+		config.Model = "gpt-5.6-sol"
 	}
 	provider := CodexProvider{Config: config}
 	run := RunContext{Input: "reply briefly", Conversation: &ConversationContext{SessionKey: "local-rpc-test", Source: "core"}}
@@ -165,6 +201,16 @@ func testInstalledCodexRPCWithLocalAPI(t *testing.T, native bool) {
 			t.Fatal("private home leaked")
 		}
 	}
+}
+
+func localCodeModeOutput(input []map[string]any, callID string) string {
+	for _, item := range input {
+		if item["type"] == "custom_tool_call_output" && item["call_id"] == callID {
+			raw, _ := json.Marshal(item["output"])
+			return string(raw)
+		}
+	}
+	return "missing tool result"
 }
 
 func makeLiveBrowserMarketplace(t *testing.T, workspace string) string {

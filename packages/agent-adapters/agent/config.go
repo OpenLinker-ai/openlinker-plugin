@@ -178,6 +178,14 @@ func validUUID(value string) bool {
 	return value != "00000000-0000-0000-0000-000000000000"
 }
 
+// Claude's delegation and both Browser modes use --bare, which cannot read
+// native OAuth/Keychain credentials. Keep doctor and Worker startup in sync;
+// Codex and Claude's standard --safe-mode path may use native authentication.
+func providerAPIKeyRequired(config Config) bool {
+	return config.Provider == "claude" &&
+		(len(config.DelegationTargets) > 0 || config.ExecutionProfile == "browser")
+}
+
 func resolveSecret(getenv func(string) string, directName, fileName string, required bool) (string, string, error) {
 	direct := strings.TrimSpace(envValue(getenv, directName))
 	path := strings.TrimSpace(envValue(getenv, fileName))

@@ -42,7 +42,16 @@ never all `-32600` errors. Upgrade the fixture if upstream adds a stable code.
 An opt-in acceptance test runs the installed real CLI against an in-process
 fake Responses API and a local MCP fixture, with disposable homes and fake
 credentials. It covers native session resume, final-answer extraction, config
-isolation and native Browser plugin activation without a real model call:
+isolation and native Browser plugin activation without a real model call.
+It covers both direct MCP calls and `exec` discovery/calls with a catalog model
+that requires Code Mode. The latter checks that shell tools are absent and
+`process`, `require`, `Deno`, `fetch`, `XMLHttpRequest` and `WebSocket` are
+undefined. These are regression sentinels for selected APIs, not an exhaustive
+audit of dynamic imports or handles reachable through `globalThis`, nor proof
+of a V8 sandbox. Isolation in the official deployment relies on the hardened
+container boundary, read-only sandbox, disabled shell/multi-agent tools and
+Browser/delegation authorization. CI installs the image-pinned Codex and runs
+this test without provider secrets:
 
 ```sh
 OPENLINKER_TEST_CODEX_RPC_LOCAL_MODEL=1 go test ./packages/agent-adapters/agentexec \

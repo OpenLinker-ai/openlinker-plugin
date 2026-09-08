@@ -157,10 +157,14 @@ func codexLaunchConfiguration(config ProviderConfig, sandbox string) []string {
 		// official hardened Provider container. Keep model-spawned commands from
 		// inheriting provider credentials even though the Codex process itself
 		// needs them to call the configured model endpoint. Native Browser runs
-		// use read-only permissions below and disable shell/image tools.
+		// use read-only permissions and disable shell/image/multi-agent tools.
+		// Leave Code Mode selection to the pinned Codex defaults/model catalog
+		// and keep its host available for models that require it for MCP calls.
+		// Isolation relies on the external container boundary and tool-specific
+		// authorization, not on assumptions about Codex's V8 implementation.
+		// The live test's selected host-API checks are regression sentinels,
+		// not proof of a sandbox boundary.
 		args = append(args,
-			"--disable", "code_mode",
-			"--disable", "code_mode_host",
 			"-c", `shell_environment_policy.inherit="none"`,
 			"-c", "shell_environment_policy.set="+codexCommandEnvironment(config.Env),
 		)
