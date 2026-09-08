@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "version": "v0.2.0-rc.8",
+  "version": "v0.2.0-rc.9",
   "surface_version": "openlinker.cli.v1",
   "capabilities": [
     "agent.configure",
@@ -20,49 +20,49 @@
     "tasks.create"
   ],
   "repository": "OpenLinker-ai/openlinker-cli",
-  "release_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/tag/v0.2.0-rc.8",
+  "release_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/tag/v0.2.0-rc.9",
   "assets": {
     "darwin-amd64": {
-      "archive": "openlinker-cli-v0.2.0-rc.8-darwin-amd64.tar.gz",
-      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-darwin-amd64.tar.gz",
-      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-darwin-amd64.tar.gz.sha256",
-      "sha256": "7e9ca6a568fa2f2de746636f9999b732324c2c47b09fd5adc0a24f107b8068e4",
-      "executable_path": "openlinker-cli-v0.2.0-rc.8-darwin-amd64/openlinker"
+      "archive": "openlinker-cli-v0.2.0-rc.9-darwin-amd64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-darwin-amd64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-darwin-amd64.tar.gz.sha256",
+      "sha256": "fe517c9cdb64b62fe9a5b57aa0e70ed510af8a62a426d9a2623e01fad663fb00",
+      "executable_path": "openlinker-cli-v0.2.0-rc.9-darwin-amd64/openlinker"
     },
     "darwin-arm64": {
-      "archive": "openlinker-cli-v0.2.0-rc.8-darwin-arm64.tar.gz",
-      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-darwin-arm64.tar.gz",
-      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-darwin-arm64.tar.gz.sha256",
-      "sha256": "ea8b9066e41f7859adac835945513923038b6ce7b30d14de9ff131b870943a43",
-      "executable_path": "openlinker-cli-v0.2.0-rc.8-darwin-arm64/openlinker"
+      "archive": "openlinker-cli-v0.2.0-rc.9-darwin-arm64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-darwin-arm64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-darwin-arm64.tar.gz.sha256",
+      "sha256": "9da149db2d33c0ce74c7857569765abd4786a63268c9c8cac9a42c4101c67056",
+      "executable_path": "openlinker-cli-v0.2.0-rc.9-darwin-arm64/openlinker"
     },
     "linux-amd64": {
-      "archive": "openlinker-cli-v0.2.0-rc.8-linux-amd64.tar.gz",
-      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-linux-amd64.tar.gz",
-      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-linux-amd64.tar.gz.sha256",
-      "sha256": "75c64c9e9085dce43ce30afc6cbefa5d5e23aa02cdb60fdab3cdd6a0a3179b85",
-      "executable_path": "openlinker-cli-v0.2.0-rc.8-linux-amd64/openlinker"
+      "archive": "openlinker-cli-v0.2.0-rc.9-linux-amd64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-linux-amd64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-linux-amd64.tar.gz.sha256",
+      "sha256": "d1141bed8ac69333e0ce8633fc835c3716b2d2cceea071ac548d412602066a1a",
+      "executable_path": "openlinker-cli-v0.2.0-rc.9-linux-amd64/openlinker"
     },
     "linux-arm64": {
-      "archive": "openlinker-cli-v0.2.0-rc.8-linux-arm64.tar.gz",
-      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-linux-arm64.tar.gz",
-      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-linux-arm64.tar.gz.sha256",
-      "sha256": "dd4b2fe9d6f60944e22c2b79a7b234869bbad9bb6d1936640a95a7bd1c353853",
-      "executable_path": "openlinker-cli-v0.2.0-rc.8-linux-arm64/openlinker"
+      "archive": "openlinker-cli-v0.2.0-rc.9-linux-arm64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-linux-arm64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-linux-arm64.tar.gz.sha256",
+      "sha256": "97bcd69ccdc3010b59bbeb56fe923ffd031d939e1ab0d3abdd676b286df91fbb",
+      "executable_path": "openlinker-cli-v0.2.0-rc.9-linux-arm64/openlinker"
     },
     "windows-amd64": {
-      "archive": "openlinker-cli-v0.2.0-rc.8-windows-amd64.zip",
-      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-windows-amd64.zip",
-      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-windows-amd64.zip.sha256",
-      "sha256": "a94b1a6dc3c5c206032537913afa342511a9c3745f6f5252e2e7c7efa9c6c78c",
-      "executable_path": "openlinker-cli-v0.2.0-rc.8-windows-amd64/openlinker.exe"
+      "archive": "openlinker-cli-v0.2.0-rc.9-windows-amd64.zip",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-windows-amd64.zip",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-windows-amd64.zip.sha256",
+      "sha256": "139e515cfcfbf78a6aa15fbef8d31742c42cbbb62f699ead3f8467e409cce360",
+      "executable_path": "openlinker-cli-v0.2.0-rc.9-windows-amd64/openlinker.exe"
     },
     "windows-arm64": {
-      "archive": "openlinker-cli-v0.2.0-rc.8-windows-arm64.zip",
-      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-windows-arm64.zip",
-      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.8/openlinker-cli-v0.2.0-rc.8-windows-arm64.zip.sha256",
-      "sha256": "5a9fbb2c21911bb696ec8a6448fa12a7e73cb221f406082e90d4ddcce6eb9276",
-      "executable_path": "openlinker-cli-v0.2.0-rc.8-windows-arm64/openlinker.exe"
+      "archive": "openlinker-cli-v0.2.0-rc.9-windows-arm64.zip",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-windows-arm64.zip",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-cli/releases/download/v0.2.0-rc.9/openlinker-cli-v0.2.0-rc.9-windows-arm64.zip.sha256",
+      "sha256": "9596744be58c6cbf7896e0ee37fece4120798706e27ea1e6b73160cd86820df9",
+      "executable_path": "openlinker-cli-v0.2.0-rc.9-windows-arm64/openlinker.exe"
     }
   }
 }
