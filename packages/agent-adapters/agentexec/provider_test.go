@@ -104,8 +104,6 @@ func TestCodexExternalSandboxRestrictsSpawnedCommandEnvironment(t *testing.T) {
 	joined := strings.Join(args, " ")
 	for _, expected := range []string{
 		`projects={"/workspace"={trust_level="untrusted"}}`,
-		"--disable code_mode",
-		"--disable code_mode_host",
 		`shell_environment_policy.inherit="none"`,
 		`shell_environment_policy.set={PATH="/usr/bin",HOME="/provider",HTTPS_PROXY="http://egress:3128"}`,
 	} {

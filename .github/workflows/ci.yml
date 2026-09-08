@@ -44,8 +44,20 @@ jobs:
           node-version: 22
       - run: node scripts/generate-codex-rpc.mjs --check
       - run: npm run test:go
+      - name: Test pinned Codex tool execution without model credentials
+        env:
+          OPENLINKER_TEST_CODEX_RPC_LOCAL_MODEL: "1"
+        run: |
+          version=$(sed -n 's/^ARG CODEX_CLI_VERSION=//p' Dockerfile.providers)
+          integrity=$(sed -n 's/^ARG CODEX_CLI_INTEGRITY=//p' Dockerfile.providers)
+          test -n "$version" && test -n "$integrity"
+          test "$(npm view "@openai/codex@$version" dist.integrity)" = "$integrity"
+          npm install --global "@openai/codex@$version"
+          GOWORK=off go test -count=1 -run '^TestInstalledCodexRPCWithLocalResponsesAPI$' ./packages/agent-adapters/agentexec
       - name: Test Provider identity isolation as root
         run: sudo env "PATH=$PATH" "GOCACHE=$RUNNER_TEMP/go-root-cache" "GOMODCACHE=$(go env GOMODCACHE)" GOWORK=off go test -count=1 -run '^TestRPCHomePreparedUnderProviderIdentity$' ./cmd/openlinker-provider-launcher
+      - name: Test delegation across isolated Runtime and Provider identities
+        run: sudo env "PATH=$PATH" "GOCACHE=$RUNNER_TEMP/go-root-cache" "GOMODCACHE=$(go env GOMODCACHE)" GOWORK=off go test -count=1 -run '^TestBrokerCrossUIDProviderBoundary$' ./packages/agent-adapters/agentdelegation
       - run: npm run check:go-boundaries
       - run: npm run check:agent-runtime-integration
       - name: Build service entrypoints

@@ -95,16 +95,31 @@ func Start(parent context.Context, root, runID string, targets []string, callbac
 	if err != nil {
 		return nil, fmt.Errorf("create private delegation directory: %w", err)
 	}
+	socketMode, err := delegationSocketMode(root, directory)
+	if err != nil {
+		os.RemoveAll(directory)
+		return nil, err
+	}
 	socket := filepath.Join(directory, "mcp.sock")
 	listener, err := net.Listen("unix", socket)
 	if err != nil {
 		os.RemoveAll(directory)
 		return nil, fmt.Errorf("listen on delegation socket: %w", err)
 	}
-	if err := os.Chmod(socket, 0o600); err != nil {
+	if err := os.Chmod(socket, socketMode); err != nil {
 		listener.Close()
 		os.RemoveAll(directory)
 		return nil, err
+	}
+	if socketMode == 0o660 {
+		// Create the socket before chmod: Linux may clear an inherited setgid
+		// bit when the Runtime owner is not a member of the Provider group.
+		// The socket must inherit that group before exposing the directory.
+		if err := os.Chmod(directory, 0o710); err != nil {
+			listener.Close()
+			os.RemoveAll(directory)
+			return nil, err
+		}
 	}
 	ctx, cancel := context.WithCancel(parent)
 	broker := &Broker{Socket: socket, ctx: ctx, cancel: cancel, listener: listener, directory: directory,
