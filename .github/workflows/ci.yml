@@ -42,6 +42,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      - run: node scripts/generate-codex-rpc.mjs --check
       - run: npm run test:go
       - run: npm run check:go-boundaries
       - run: npm run check:agent-runtime-integration

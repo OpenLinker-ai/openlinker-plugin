@@ -8,15 +8,9 @@ import (
 func buildPrompt(
 	provider string,
 	run RunContext,
-	includeHistory bool,
 	browserEnabled bool,
 ) string {
 	conversation := run.Conversation
-	if conversation != nil && !includeHistory {
-		copyValue := *conversation
-		copyValue.HistoryBeforeCurrent = nil
-		conversation = &copyValue
-	}
 	contextPayload := map[string]any{
 		"run_id": run.RunID, "input": run.Input, "metadata": run.Metadata,
 		"a2a": run.A2A,
@@ -33,7 +27,7 @@ func buildPrompt(
 		"",
 		"OpenLinker run context:", string(encoded),
 	}
-	if conversation != nil && includeHistory {
+	if conversation != nil {
 		lines = append(lines, "", "conversation.history_before_current contains Core-owned prior messages.", "The current user request is in input; do not ask the user to resend prior messages.")
 	}
 	if browserEnabled {
@@ -49,11 +43,10 @@ func buildPrompt(
 
 func buildCodexPrompt(
 	run RunContext,
-	includeHistory,
 	webSearch,
 	browserEnabled bool,
 ) string {
-	prompt := buildPrompt("Codex", run, includeHistory, browserEnabled)
+	prompt := buildPrompt("Codex", run, browserEnabled)
 	if !webSearch {
 		return prompt
 	}

@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agenthost"
 )
 
 const (
@@ -348,7 +350,7 @@ func validateBrowserOnlyMCP(path, provider string) error {
 		if err := decodeStrictBrowserClientJSON(serverRaw, &server); err != nil ||
 			server.Command != "/usr/local/bin/openlinker" ||
 			server.Cwd != "/workspace" ||
-			!equalStrings(server.Args, []string{"plugin", "browser-proxy", "--host", "codex"}) ||
+			!equalStrings(server.Args, agenthost.BrowserProxyArguments("codex")) ||
 			!equalStrings(server.EnvVars, []string{"OPENLINKER_BROWSER_TOOL_SOCKET"}) {
 			return errors.New("Codex Browser MCP declaration is not the bounded Runtime contract")
 		}
@@ -361,7 +363,7 @@ func validateBrowserOnlyMCP(path, provider string) error {
 	}
 	if err := decodeStrictBrowserClientJSON(serverRaw, &server); err != nil ||
 		server.Command != "/usr/local/bin/openlinker" ||
-		!equalStrings(server.Args, []string{"plugin", "browser-proxy", "--host", "claude"}) ||
+		!equalStrings(server.Args, agenthost.BrowserProxyArguments("claude")) ||
 		len(server.Env) != 1 ||
 		server.Env["OPENLINKER_BROWSER_TOOL_SOCKET"] != "${OPENLINKER_BROWSER_TOOL_SOCKET}" {
 		return errors.New("Claude Browser MCP declaration is not the bounded Runtime contract")

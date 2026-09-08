@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
+
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agenthost"
 )
 
 var browserEnvironmentNames = []string{
@@ -241,28 +244,23 @@ func browserClientEvidence(config ProviderConfig) map[string]any {
 
 func codexBrowserMCPArguments(config ProviderConfig) []string {
 	if nativeBrowserClientEnabled(config) {
-		// The Runtime-owned Codex Plugin declares the MCP transport. Per-run
-		// overrides only make that bundled server mandatory and bound its tool
-		// policy; declaring a top-level command here would create a second,
-		// direct-MCP Browser surface.
-		const server = `plugins."openlinker@openlinker-agent-runtime".mcp_servers.openlinker_browser`
+		// Restore only the validated Runtime marketplace and its one Plugin
+		// in the isolated app-server home. The bundled MCP remains mandatory and
+		// bounded; no top-level command creates a second Browser surface.
+		// Codex splits -c keys on literal dots; quoted dotted keys are NOT
+		// TOML paths. Put the plugin ID inside an inline table value instead.
 		return []string{
-			"-c", server + ".enabled=true",
-			"-c", server + ".required=true",
-			"-c", server + `.enabled_tools=["browser_session"]`,
-			"-c", server + `.default_tools_approval_mode="auto"`,
+			"-c", `marketplaces.openlinker-agent-runtime.source_type="local"`,
+			"-c", fmt.Sprintf("marketplaces.openlinker-agent-runtime.source=%q", config.BrowserNativePlugin),
+			"-c", `plugins={"openlinker@openlinker-agent-runtime"={enabled=true,mcp_servers={openlinker_browser={enabled=true,required=true,enabled_tools=["browser_session"],default_tools_approval_mode="approve"}}}}`,
 		}
+
 	}
 	if !directMCPBrowserClientEnabled(config) {
 		return nil
 	}
 	command, _ := json.Marshal(config.BrowserPluginBin)
-	arguments, _ := json.Marshal([]string{
-		"plugin",
-		"browser-proxy",
-		"--host",
-		"codex",
-	})
+	arguments, _ := json.Marshal(BrowserProxyArguments("codex"))
 	environment, _ := json.Marshal(browserEnvironmentNames)
 	return []string{
 		"-c", "mcp_servers.openlinker_browser.command=" + string(command),
@@ -270,7 +268,7 @@ func codexBrowserMCPArguments(config ProviderConfig) []string {
 		"-c", "mcp_servers.openlinker_browser.env_vars=" + string(environment),
 		"-c", "mcp_servers.openlinker_browser.required=true",
 		"-c", `mcp_servers.openlinker_browser.enabled_tools=["browser_session"]`,
-		"-c", `mcp_servers.openlinker_browser.default_tools_approval_mode="auto"`,
+		"-c", `mcp_servers.openlinker_browser.default_tools_approval_mode="approve"`,
 	}
 }
 
@@ -295,13 +293,8 @@ func claudeBrowserMCPConfig(config ProviderConfig) string {
 			"openlinker_browser": map[string]any{
 				"type":    "stdio",
 				"command": config.BrowserPluginBin,
-				"args": []string{
-					"plugin",
-					"browser-proxy",
-					"--host",
-					"claude",
-				},
-				"env": environment,
+				"args":    BrowserProxyArguments("claude"),
+				"env":     environment,
 			},
 		},
 	}
@@ -313,6 +306,9 @@ func claudeBrowserMCPConfig(config ProviderConfig) string {
 }
 
 func setEnvironmentValues(environment []string, values map[string]string) []string {
+	if environment == nil {
+		environment = os.Environ()
+	}
 	result := make([]string, 0, len(environment)+len(values))
 	for _, item := range environment {
 		key, _, ok := strings.Cut(item, "=")
@@ -338,4 +334,9 @@ func appendUniqueString(values []string, candidate string) []string {
 		}
 	}
 	return append(values, candidate)
+}
+
+// BrowserProxyArguments is the canonical embedding-host argv contract.
+func BrowserProxyArguments(provider string) []string {
+	return agenthost.BrowserProxyArguments(provider)
 }

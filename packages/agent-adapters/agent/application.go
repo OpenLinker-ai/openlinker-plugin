@@ -5,11 +5,14 @@ import (
 	"errors"
 	"net/url"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentdelegation"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentexec"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agenthost"
 )
 
 type Diagnostic struct {
@@ -72,8 +75,11 @@ func Diagnose(getenv func(string) string, providerOverride string) Diagnostic {
 			binEnv, fallback, key, keyFile = "OPENLINKER_CLAUDE_BIN", "claude", "ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY_FILE"
 		}
 		bin := firstNonEmpty(envValue(getenv, binEnv), config.ProviderBin, fallback)
-		_, binErr := exec.LookPath(bin)
-		check("provider_cli", binErr == nil, "present", "missing")
+		cliVersion, binErr := agentexec.CheckProviderCLI(context.Background(), agentexec.ProviderConfig{Provider: config.Provider, Bin: bin})
+		check("provider_cli", binErr == nil, cliVersion, "incompatible_or_missing")
+		if binErr != nil {
+			result.Checks["provider_cli_detail"] = boundedStatusMessage(binErr)
+		}
 		_, authSource, authErr := resolveSecret(getenv, key, keyFile, false)
 		check("provider_auth", authErr == nil, authSource, "invalid")
 	}
@@ -82,7 +88,7 @@ func Diagnose(getenv func(string) string, providerOverride string) Diagnostic {
 	if config.ExecutionProfile == "browser" {
 		_, credentialErr := readPrivateSecret(config.BrowserCredentialFile)
 		check("browser_credential", credentialErr == nil, "owner_only_file", "missing_or_invalid")
-		_, pluginErr := exec.LookPath(firstNonEmpty(config.BrowserPluginBin, currentExecutable()))
+		_, pluginErr := agenthost.Resolve(context.Background(), config.BrowserPluginBin, "browser_proxy")
 		check("browser_plugin", pluginErr == nil, "present", "missing")
 		if firstNonEmpty(config.browserSelectedMode, config.BrowserClientMode, "mcp") == "native" {
 			nativeInfo, nativeErr := os.Stat(config.BrowserNativePlugin)
@@ -93,6 +99,10 @@ func Diagnose(getenv func(string) string, providerOverride string) Diagnostic {
 				"missing_or_invalid",
 			)
 		}
+	}
+	if len(config.DelegationTargets) > 0 {
+		_, hostErr := agenthost.Resolve(context.Background(), config.DelegationProxyBin, "delegation_proxy")
+		check("delegation_host", hostErr == nil, "compatible", "incompatible_or_missing")
 	}
 	result.Checks["runtime_security"] = "token_only"
 	return result
@@ -193,14 +203,6 @@ func validBrowserClientMode(value string) bool {
 	}
 }
 
-func currentExecutable() string {
-	value, err := os.Executable()
-	if err != nil {
-		return ""
-	}
-	return value
-}
-
 func validateCodexBaseURL(value string) error {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -220,6 +222,17 @@ func validateCodexBaseURL(value string) error {
 }
 
 func validateProviderPolicy(config Config) error {
+	if err := agentdelegation.ValidateTargets(config.DelegationTargets); err != nil {
+		return err
+	}
+	for _, target := range config.DelegationTargets {
+		if target == config.AgentID {
+			return errors.New("Agent cannot delegate to itself")
+		}
+	}
+	if config.DelegationBrokerRoot != "" && !filepath.IsAbs(config.DelegationBrokerRoot) {
+		return errors.New("delegation broker root must be absolute")
+	}
 	if err := validateCodexBaseURL(config.CodexBaseURL); err != nil {
 		return err
 	}

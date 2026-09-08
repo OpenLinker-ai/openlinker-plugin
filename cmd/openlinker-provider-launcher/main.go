@@ -5,7 +5,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexhome"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"syscall"
@@ -57,6 +59,9 @@ func main() {
 	if err := dropProviderPrivileges(); err != nil {
 		fatal(err)
 	}
+	if strings.EqualFold(fixedProvider, "codex") && environmentValue(environment, codexhome.PrepareEnvironment) == "1" {
+		os.Exit(runIsolatedCodex(target, argv[1:], environment))
+	}
 	if err := syscall.Exec(target, argv, environment); err != nil {
 		fatal(errors.New("start fixed Provider binary"))
 	}
@@ -88,9 +93,35 @@ func runProviderExecStage() {
 		fatal(err)
 	}
 	argv := append([]string{target}, os.Args[1:]...)
+	if strings.EqualFold(fixedProvider, "codex") && environmentValue(environment, codexhome.PrepareEnvironment) == "1" {
+		os.Exit(runIsolatedCodex(target, argv[1:], environment))
+	}
 	if err := syscall.Exec(target, argv, environment); err != nil {
 		fatal(errors.New("start fixed Provider binary"))
 	}
+}
+
+// Called only after all identity/capability drops. The Runtime cannot access
+// Provider-owned auth or private Codex home directories.
+func runIsolatedCodex(target string, args, environment []string) int {
+	environment, cleanup, err := codexhome.Prepare(environment)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "prepare isolated Codex home:", err)
+		return 1
+	}
+	defer cleanup()
+	command := exec.Command(target, args...)
+	command.Env = environment
+	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+	command.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM}
+	if err := command.Run(); err != nil {
+		var exited *exec.ExitError
+		if errors.As(err, &exited) {
+			return exited.ExitCode()
+		}
+		return 1
+	}
+	return 0
 }
 
 func fixedProviderBinary(provider string) (string, error) {
