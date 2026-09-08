@@ -87,21 +87,17 @@ func runCodexRPC(ctx context.Context, bin, workspace, sandbox, sessionID, prompt
 		}
 		if resultErr == nil {
 			// EOF requests app-server shutdown and lets native rollout writes
-			// finish. A wedged shutdown still has a bounded process-tree kill.
+			// finish. Drain StdoutPipe before Wait: Wait closes that pipe and
+			// would race the RPC reader's final read with a successful exit.
+			// A wedged shutdown still has a bounded process-tree kill.
 			_ = stdin.Close()
-			waited := make(chan struct{})
-			go func() { _ = command.Wait(); close(waited) }()
 			select {
-			case <-waited:
+			case <-client.Done():
 			case <-time.After(2 * time.Second):
-				stop()
-				<-waited
 			}
-			client.Close()
-		} else {
-			client.Close()
-			_ = command.Wait()
 		}
+		client.Close()
+		_ = command.Wait()
 		if resultErr == nil {
 			if err := client.Err(); err != nil && !errors.Is(err, io.EOF) {
 				resultErr = err

@@ -117,7 +117,42 @@ func (f *rpcFixture) finish(answer string) {
 	}
 	f.event("turn/completed", map[string]any{"threadId": fixtureThread, "turn": map[string]any{"id": fixtureTurn, "status": status, "items": []any{}}})
 	io.Copy(io.Discard, os.Stdin)
+	if f.scenario == "shutdown-drain" {
+		// A final large notification arrives only after the shutdown request.
+		// The reader must finish consuming it before Wait closes StdoutPipe.
+		f.event("fixture/shutdown", map[string]any{"padding": strings.Repeat("x", 512<<10)})
+	}
+	if f.scenario == "shutdown-malformed" {
+		_, _ = os.Stdout.WriteString("not-json\n")
+	}
+	if f.scenario == "shutdown-hang" {
+		time.Sleep(30 * time.Second)
+	}
 	os.Exit(0)
+}
+
+func TestCodexRPCDrainsShutdownBeforeWaiting(t *testing.T) {
+	for _, scenario := range []string{"shutdown-drain", "shutdown-malformed", "shutdown-hang"} {
+		t.Run(scenario, func(t *testing.T) {
+			dir := t.TempDir()
+			bin := filepath.Join(dir, "codex")
+			writeCodexRPCFixture(t, bin, scenario)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			start := time.Now()
+			_, answer, err := runCodexRPC(ctx, bin, dir, "read-only", "", "test shutdown", false, ProviderConfig{}, nil)
+			if scenario == "shutdown-malformed" {
+				if err == nil || !strings.Contains(err.Error(), "malformed JSON") {
+					t.Fatalf("shutdown protocol error was lost: %v", err)
+				}
+			} else if err != nil || answer != "provider answer" {
+				t.Fatalf("completed turn failed during shutdown: answer=%q err=%v", answer, err)
+			}
+			if time.Since(start) > 4*time.Second {
+				t.Fatal("shutdown exceeded its process-tree kill bound")
+			}
+		})
+	}
 }
 func TestCodexRPCFixtureProcess(t *testing.T) {
 	scenario := os.Getenv("OPENLINKER_CODEX_RPC_FIXTURE")
