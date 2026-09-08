@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
 ARG GO_VERSION=1.26.4
-ARG OPENLINKER_GO_VERSION=v0.2.0-rc7
+ARG OPENLINKER_GO_VERSION=v0.2.0-rc8
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-bookworm@sha256:b305420a68d0f229d91eb3b3ed9e519fcf2cf5461da4bef997bf927e8c0bfd2b AS go-source
 ARG OPENLINKER_GO_VERSION
 WORKDIR /src
@@ -41,6 +41,7 @@ FROM --platform=$BUILDPLATFORM node:24.4.1-bookworm-slim@sha256:36ae19f59c91f330
 WORKDIR /src
 COPY package.json LICENSE ./
 COPY scripts/build-agent-runtime-packages.mjs ./scripts/build-agent-runtime-packages.mjs
+COPY packages/agent-adapters/agenthost/contract.json ./packages/agent-adapters/agenthost/contract.json
 COPY shared/skills/use-isolated-browser ./shared/skills/use-isolated-browser
 COPY platforms/claude/openlinker/commands/use-isolated-browser.md ./platforms/claude/openlinker/commands/use-isolated-browser.md
 RUN node scripts/build-agent-runtime-packages.mjs --out /out \
@@ -121,8 +122,8 @@ STOPSIGNAL SIGTERM
 LABEL org.opencontainers.image.openlinker-go.version="${OPENLINKER_GO_VERSION}"
 
 FROM provider-base AS codex
-ARG CODEX_CLI_VERSION=0.145.0-alpha.27
-ARG CODEX_CLI_INTEGRITY=sha512-CqQmtU0avLks+u0xrh5AaLTXy90XAW+g9jWZ2W3NPMgBxjUbcsRiqANR/Ai0FHa7JIKD8qZwkfRWWrUAxIGt2w==
+ARG CODEX_CLI_VERSION=0.153.0
+ARG CODEX_CLI_INTEGRITY=sha512-k55kUZaclNi5ceUStSVuyW834ruA6AEdzTK7Xi3M1mOyXokUmq1sJLXm1RJ3XD2S7bRPeF1EXNsYB5Qxwus0mw==
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/* \
@@ -147,6 +148,7 @@ RUN set -eu; \
     node -e "const value=require('/tmp/codex-plugin-list.json'); if(value.installed.length !== 1 || value.available.length !== 0 || value.installed[0].pluginId !== 'openlinker@openlinker-agent-runtime' || !value.installed[0].enabled) process.exit(1)"; \
     rm -rf "${validation_home}" /tmp/codex-marketplace.json /tmp/codex-plugin-add.json /tmp/codex-plugin-list.json
 ENV OPENLINKER_CODEX_BIN=/usr/local/bin/openlinker-provider-launcher \
+    OPENLINKER_CODEX_RPC_LAUNCHER=1 \
     OPENLINKER_CODEX_SANDBOX=read-only \
     OPENLINKER_CODEX_APPROVAL=never \
     OPENLINKER_CODEX_WEB_SEARCH=disabled
@@ -157,8 +159,8 @@ LABEL org.opencontainers.image.title="OpenLinker Runtime Codex" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 FROM provider-base AS claude
-ARG CLAUDE_CODE_VERSION=2.1.215
-ARG CLAUDE_CODE_INTEGRITY=sha512-lsWBvyMyBqg/rOZ06o/HEhlpOzHsH8IBf9RH4u5gzizQ1LWS/oXAh5nqWNUu3hn2d8QkyYg0aseNzMDlGD+3qg==
+ARG CLAUDE_CODE_VERSION=2.1.259
+ARG CLAUDE_CODE_INTEGRITY=sha512-kzhz+R36GgL5aouAkeMO9nI1BEIVaRx1NGu0wTTn/H315l61uiLRo13yvva7H10Pfv0PGgzqJ4m+EKv9BzIRXQ==
 RUN test "$(npm view "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" dist.integrity)" = "${CLAUDE_CODE_INTEGRITY}" \
  && npm install --global --ignore-scripts=false "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
  && claude --version \

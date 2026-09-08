@@ -2,7 +2,6 @@ package agentexec
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -16,11 +15,12 @@ import (
 type ClaudeProvider struct{ Config ProviderConfig }
 
 type claudeResponse struct {
-	Type      string `json:"type"`
-	Subtype   string `json:"subtype"`
-	IsError   bool   `json:"is_error"`
-	Result    string `json:"result"`
-	SessionID string `json:"session_id"`
+	Type      string   `json:"type"`
+	Subtype   string   `json:"subtype"`
+	IsError   bool     `json:"is_error"`
+	Result    string   `json:"result"`
+	Errors    []string `json:"errors"`
+	SessionID string   `json:"session_id"`
 }
 
 func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlinker.RuntimeResult, error) {
@@ -29,6 +29,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 	}
 	config := provider.Config
 	config = providerConfigForBrowserRun(config, run.Browser)
+	config = providerConfigForDelegationRun(config, run)
 	bin := strings.TrimSpace(config.Bin)
 	if bin == "" {
 		bin = "claude"
@@ -86,27 +87,38 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 			environment = os.Environ()
 		}
 		allowlist := append([]string{"ANTHROPIC_API_KEY", "CLAUDE_CONFIG_DIR", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE"}, config.EnvAllowlist...)
-		command.Env = sanitizedEnvironment(environment, allowlist)
+		command.Env = append(sanitizedEnvironment(environment, allowlist), "LC_ALL=C", "LANG=C")
 		command.Stdin = strings.NewReader(
 			buildPrompt(
 				"Claude Code",
-				run,
-				sessionID == "",
+				runWithSessionHistory(run, sessionPath, "claude", workspace, sessionKey, sessionID),
 				browserProfileEnabled(config),
 			),
 		)
-		stdout := newLimitedOutputBuffer(cancel)
-		stderr := newLimitedOutputBuffer(cancel)
+		observer := newClaudeJSONLObserver(run.Emit, browserProfileEnabled(config))
+		stdout := newClaudeResultStream(cancel, observer)
+		stderr := &outputTail{}
 		command.Stdout, command.Stderr = stdout, stderr
 		err := command.Run()
-		if limitErr := outputLimitError("Claude", stdout, stderr); limitErr != nil {
-			return openlinker.RuntimeResult{}, limitErr
+		var parseErr error
+		response, parseErr = stdout.Result()
+		if parseErr != nil && stdout.err != nil {
+			return openlinker.RuntimeResult{}, parseErr
 		}
-		if err != nil {
-			if errors.Is(requestCtx.Err(), context.DeadlineExceeded) {
+		if ctxErr := requestCtx.Err(); ctxErr != nil {
+			if errors.Is(ctxErr, context.DeadlineExceeded) {
 				return openlinker.RuntimeResult{}, fmt.Errorf("Claude timed out after %s", timeout)
 			}
-			if sessionID != "" && attempt == 0 && missingProviderSession(stderr.String()) {
+			return openlinker.RuntimeResult{}, ctxErr
+		}
+		if err == nil {
+			err = parseErr
+			if response.IsError || strings.HasPrefix(response.Subtype, "error") {
+				err = errors.New("Claude returned an unsuccessful result")
+			}
+		}
+		if err != nil {
+			if sessionID != "" && attempt == 0 && missingProviderSession(response.failureMessage()+"\n"+stderr.String()) {
 				if deleteErr := deleteSessionID(sessionPath, "claude", workspace, sessionKey); deleteErr != nil {
 					return openlinker.RuntimeResult{}, fmt.Errorf("Claude session recovery failed: %w", deleteErr)
 				}
@@ -121,13 +133,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 			}
 			return openlinker.RuntimeResult{}, fmt.Errorf("Claude failed: %w: %s", err, boundedText(stderr.String(), 500, "no diagnostic output"))
 		}
-		if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &response); err != nil {
-			return openlinker.RuntimeResult{}, errors.New("Claude returned invalid JSON output")
-		}
 		break
-	}
-	if response.IsError || strings.Contains(strings.ToLower(response.Subtype), "error") {
-		return openlinker.RuntimeResult{}, errors.New("Claude returned an unsuccessful result")
 	}
 	summary := strings.TrimSpace(response.Result)
 	if summary == "" {
@@ -142,6 +148,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 			response.SessionID,
 			clientMode,
 			clientModeGeneration,
+			run,
 		); err != nil {
 			return openlinker.RuntimeResult{}, sessionPersistenceError("Claude", err)
 		}
@@ -167,8 +174,8 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 
 func claudeArguments(config ProviderConfig, permission, sessionID string) []string {
 	args := []string{"--safe-mode", "--no-chrome", "--disable-slash-commands"}
-	if directMCPBrowserClientEnabled(config) {
-		args = []string{"--bare", "--no-chrome", "--disable-slash-commands", "--strict-mcp-config", "--mcp-config", claudeBrowserMCPConfig(config)}
+	if directMCPBrowserClientEnabled(config) || config.DelegationSocket != "" {
+		args = []string{"--bare", "--no-chrome", "--disable-slash-commands", "--strict-mcp-config", "--mcp-config", claudeRunMCPConfig(config)}
 	} else if nativeBrowserClientEnabled(config) {
 		args = []string{
 			"--bare",
@@ -177,11 +184,16 @@ func claudeArguments(config ProviderConfig, permission, sessionID string) []stri
 			config.BrowserNativePlugin,
 		}
 	}
-	args = append(args, "-p", "--output-format", "json", "--permission-mode", permission)
+	args = append(args, "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--permission-mode", permission)
 	if config.Model != "" {
 		args = append(args, "--model", config.Model)
 	}
 	allowed := append([]string(nil), config.AllowedTools...)
+	if config.DelegationSocket != "" {
+		for _, tool := range []string{"delegate_agent", "get_delegated_run", "wait_delegated_run"} {
+			allowed = appendUniqueString(allowed, "mcp__openlinker_delegation__"+tool)
+		}
+	}
 	if browserProfileEnabled(config) {
 		allowed = appendUniqueString(allowed, "mcp__openlinker_browser__browser_session")
 	}
@@ -195,4 +207,11 @@ func claudeArguments(config ProviderConfig, permission, sessionID string) []stri
 		args = append(args, "--resume", sessionID)
 	}
 	return args
+}
+
+func (response claudeResponse) failureMessage() string {
+	if !response.IsError && !strings.HasPrefix(response.Subtype, "error") {
+		return ""
+	}
+	return response.Result + "\n" + strings.Join(response.Errors, "\n")
 }

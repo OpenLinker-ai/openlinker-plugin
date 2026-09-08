@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func TestNativeConfigIsolationInvalidatesLegacySession(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sessions.json")
+	workspace := t.TempDir()
+	if err := saveSessionForClientMode(path, "codex", workspace, "conversation", "old", "browser_native", 1); err != nil {
+		t.Fatal(err)
+	}
+	mode := providerSessionClientMode(ProviderConfig{ExecutionProfile: "browser", BrowserClientMode: "native"})
+	id, generation, changed := loadSessionForClientMode(path, "codex", workspace, "conversation", mode)
+	if id != "" || generation != 2 || !changed {
+		t.Fatalf("legacy native session retained its old configuration: %q %d %v", id, generation, changed)
+	}
+}
+
 func TestProviderSessionClientModeChangeAdvancesGeneration(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sessions.json")
 	workspace := t.TempDir()
@@ -52,12 +65,12 @@ func TestProviderSessionClientModeChangeAdvancesGeneration(t *testing.T) {
 func TestLegacyBrowserSessionIsDirectMCPGeneration(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sessions.json")
 	workspace := t.TempDir()
-	if err := saveSessionID(
+	if err := saveSessionForClientMode(
 		path,
 		"codex",
 		workspace,
 		"conversation",
-		"legacy-session",
+		"legacy-session", "", 1,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +111,7 @@ func TestOfficialChromeUsesAnIndependentProviderSessionGeneration(t *testing.T) 
 		ExecutionProfile:       "browser",
 		BrowserClientMode:      "native",
 		BrowserBackendSelected: "official_chrome_extension",
-	}); mode != "browser_native_official_chrome" {
+	}); mode != "browser_native_official_chrome_isolated_v2" {
 		t.Fatalf("official Chrome Provider mode = %q", mode)
 	}
 	if err := saveSessionForClientMode(

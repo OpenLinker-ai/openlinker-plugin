@@ -17,6 +17,7 @@ import (
 
 	openlinker "github.com/OpenLinker-ai/openlinker-go"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentexec"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agenthost"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/browserclientmode"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/browserextension"
 )
@@ -231,6 +232,10 @@ func (service *Service) Enable(parent context.Context, providerOverride string) 
 	workerLock := resolved.workerLock
 	ready := make(chan struct{})
 	readyOnce := sync.Once{}
+	optionalFeatures := runtimeOptionalFeatures(resolved.config.ExecutionProfile, resolved.config.BrowserInteractionPolicy, humanControlEnabled, observationEnabled)
+	if len(resolved.config.DelegationTargets) > 0 {
+		optionalFeatures = append(optionalFeatures, openlinker.RuntimeDelegatedRunReadFeature)
+	}
 	worker, err := openlinker.NewRuntimeWorker(openlinker.RuntimeWorkerConfig{
 		PlatformURL: resolved.url, RuntimeURL: resolved.runtimeURL,
 		Transport: openlinker.RuntimeTransportMode(resolved.config.Transport),
@@ -239,12 +244,7 @@ func (service *Service) Enable(parent context.Context, providerOverride string) 
 		RequireTokenOnly: true,
 		DataDir:          filepath.Join(resolved.stateDir, "runtime"), Capacity: resolved.config.Capacity,
 		Handler: resolved.handler, Logger: service.logger,
-		OptionalFeatures: runtimeOptionalFeatures(
-			resolved.config.ExecutionProfile,
-			resolved.config.BrowserInteractionPolicy,
-			humanControlEnabled,
-			observationEnabled,
-		),
+		OptionalFeatures: optionalFeatures,
 		ExtensionRoutes: runtimeExtensionRoutes(
 			resolved.config.ExecutionProfile,
 			humanControlEnabled,
@@ -467,8 +467,8 @@ func resolveRuntime(getenv func(string) string, providerOverride, version string
 		return resolvedRuntime{}, err
 	}
 	providerBin := firstNonEmpty(envValue(getenv, providerBinEnv), config.ProviderBin, config.Provider)
-	if _, err := exec.LookPath(providerBin); err != nil {
-		return resolvedRuntime{}, fmt.Errorf("%s provider CLI was not found: %w", config.Provider, err)
+	if _, err := agentexec.CheckProviderCLI(context.Background(), agentexec.ProviderConfig{Provider: config.Provider, Bin: providerBin}); err != nil {
+		return resolvedRuntime{}, err
 	}
 	if config.ExecutionProfile == "browser" &&
 		config.browserSelectedMode == "" &&
@@ -509,9 +509,9 @@ func resolveRuntime(getenv func(string) string, providerOverride, version string
 		if _, err := readPrivateSecret(config.BrowserCredentialFile); err != nil {
 			return resolvedRuntime{}, fmt.Errorf("Browser channel credential: %w", err)
 		}
-		browserPluginBin = firstNonEmpty(config.BrowserPluginBin, currentExecutable())
-		if _, err := exec.LookPath(browserPluginBin); err != nil {
-			return resolvedRuntime{}, fmt.Errorf("Browser plugin CLI was not found: %w", err)
+		browserPluginBin, err = agenthost.Resolve(context.Background(), config.BrowserPluginBin, "browser_proxy")
+		if err != nil {
+			return resolvedRuntime{}, err
 		}
 	}
 	environment := removeEnvironmentKeys(os.Environ(),
@@ -521,6 +521,8 @@ func resolveRuntime(getenv func(string) string, providerOverride, version string
 		environment = append(environment, providerKeyName+"="+providerKey)
 	}
 	handler, err := agentexec.NewHandler(agentexec.ProviderConfig{
+		DelegationTargets:  append([]string(nil), config.DelegationTargets...),
+		DelegationProxyBin: config.DelegationProxyBin, DelegationBrokerRoot: config.DelegationBrokerRoot,
 		Version:  version,
 		Provider: config.Provider, Bin: providerBin, Workspace: workspace, Model: config.Model,
 		Sandbox: config.CodexSandbox, CodexApproval: config.CodexApproval, CodexBaseURL: config.CodexBaseURL,

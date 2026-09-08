@@ -6,6 +6,7 @@ import {
   readFile,
   writeFile,
 } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,10 +37,12 @@ async function packageVersion() {
   return JSON.parse(raw).version;
 }
 
+const hostContract = JSON.parse(readFileSync(join(repositoryRoot, "packages/agent-adapters/agenthost/contract.json"), "utf8"));
+
 function browserMCP(host) {
   const server = {
     command: "/usr/local/bin/openlinker",
-    args: ["plugin", "browser-proxy", "--host", host],
+    args: [...hostContract.browser_proxy, host],
   };
   if (host === "codex") {
     server.cwd = "/workspace";

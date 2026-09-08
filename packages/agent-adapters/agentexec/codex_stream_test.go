@@ -1,11 +1,7 @@
 package agentexec
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
-	"os"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -118,83 +114,12 @@ func TestCodexJSONLObserverKeepsBrowserMCPProgressOutOfDurableEvents(t *testing.
 	}
 }
 
-func TestRunCodexCommandKeepsBrowserActionVolumeOutOfProjectedEvents(t *testing.T) {
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	project := func(actionCount int, profile string) []map[string]any {
-		t.Helper()
-		var events []map[string]any
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		_, stderr, err := runCodexCommand(
-			ctx,
-			cancel,
-			executable,
-			[]string{"-test.run=TestCodexJSONLFixtureProcess"},
-			t.TempDir(),
-			"",
-			ProviderConfig{
-				ExecutionProfile: profile,
-				Env: append(os.Environ(),
-					"OPENLINKER_CODEX_JSONL_FIXTURE=1",
-					"OPENLINKER_CODEX_JSONL_ACTIONS="+strconv.Itoa(actionCount),
-				),
-				EnvAllowlist: []string{
-					"OPENLINKER_CODEX_JSONL_FIXTURE",
-					"OPENLINKER_CODEX_JSONL_ACTIONS",
-				},
-			},
-			func(eventType string, payload any) error {
-				if eventType != "run.status.changed" {
-					t.Fatalf("event type = %q", eventType)
-				}
-				events = append(events, payload.(map[string]any))
-				return nil
-			},
-		)
-		if err != nil {
-			t.Fatalf("fixture Codex command failed: %v: %s", err, stderr)
-		}
-		return events
-	}
-
-	one := project(1, "browser")
-	fiveHundred := project(500, "browser")
-	if len(one) != 3 || len(fiveHundred) != len(one) {
-		t.Fatalf("Browser command events: one=%d five-hundred=%d", len(one), len(fiveHundred))
-	}
-	standard := project(500, "standard")
-	if len(standard) != 1003 {
-		t.Fatalf("standard command MCP progress changed: events=%d, want 1003", len(standard))
-	}
-}
-
-func TestCodexJSONLFixtureProcess(t *testing.T) {
-	if os.Getenv("OPENLINKER_CODEX_JSONL_FIXTURE") != "1" {
-		return
-	}
-	actionCount, err := strconv.Atoi(os.Getenv("OPENLINKER_CODEX_JSONL_ACTIONS"))
-	if err != nil || actionCount < 0 {
-		os.Exit(2)
-	}
-	fmt.Println(`{"type":"item.started","item":{"type":"command_execution","status":"in_progress"}}`)
-	fmt.Println(`{"type":"item.completed","item":{"type":"command_execution","status":"completed"}}`)
-	for index := 0; index < actionCount; index++ {
-		fmt.Println(`{"type":"item.started","item":{"type":"mcp_tool_call","server":"openlinker_browser","tool":"browser_session","status":"in_progress"}}`)
-		fmt.Println(`{"type":"item.completed","item":{"type":"mcp_tool_call","server":"openlinker_browser","tool":"browser_session","status":"completed"}}`)
-	}
-	fmt.Println(`{"type":"item.completed","item":{"type":"mcp_tool_call","server":"other_server","tool":"other_tool","status":"completed"}}`)
-	os.Exit(0)
-}
-
 func TestBuildCodexPromptAdvertisesWebOnlyWhenEnabled(t *testing.T) {
 	run := RunContext{
 		RunID: "run-1",
 		Input: map[string]any{"text": "latest news"},
 	}
-	enabled := buildCodexPrompt(run, true, true, false)
+	enabled := buildCodexPrompt(run, true, false)
 	for _, expected := range []string{
 		"Live public-web access is enabled",
 		"use web search or a permitted public HTTP tool before answering",
@@ -206,7 +131,7 @@ func TestBuildCodexPromptAdvertisesWebOnlyWhenEnabled(t *testing.T) {
 			t.Fatalf("enabled prompt missing %q: %s", expected, enabled)
 		}
 	}
-	disabled := buildCodexPrompt(run, true, false, false)
+	disabled := buildCodexPrompt(run, false, false)
 	if strings.Contains(disabled, "Live public-web access") ||
 		strings.Contains(disabled, "use web search or a permitted public HTTP tool") {
 		t.Fatalf("disabled prompt advertised web access: %s", disabled)

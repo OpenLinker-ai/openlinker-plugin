@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,12 +19,13 @@ type sessionStore struct {
 }
 
 type sessionRecord struct {
-	SessionID            string `json:"session_id"`
-	SessionKeyHash       string `json:"session_key_hash"`
-	Workspace            string `json:"workspace"`
-	ClientMode           string `json:"client_mode,omitempty"`
-	ClientModeGeneration uint64 `json:"client_mode_generation,omitempty"`
-	UpdatedAt            string `json:"updated_at"`
+	SessionID            string   `json:"session_id"`
+	SessionKeyHash       string   `json:"session_key_hash"`
+	Workspace            string   `json:"workspace"`
+	ClientMode           string   `json:"client_mode,omitempty"`
+	ClientModeGeneration uint64   `json:"client_mode_generation,omitempty"`
+	HistorySeen          []string `json:"history_seen,omitempty"`
+	UpdatedAt            string   `json:"updated_at"`
 }
 
 var sessionStoreMu sync.Mutex
@@ -47,13 +49,6 @@ func sessionStoreKey(provider, workspace, sessionKey string) string {
 
 func sessionKeyHash(provider, workspace, sessionKey string) string {
 	return sessionStoreKey(provider, workspace, sessionKey)[:24]
-}
-
-func loadSessionID(path, provider, workspace, sessionKey string) string {
-	sessionStoreMu.Lock()
-	defer sessionStoreMu.Unlock()
-	store := readSessionStore(path)
-	return strings.TrimSpace(store.Sessions[sessionStoreKey(provider, workspace, sessionKey)].SessionID)
 }
 
 func loadSessionForClientMode(
@@ -89,24 +84,6 @@ func loadSessionForClientMode(
 	return strings.TrimSpace(record.SessionID), generation, false
 }
 
-func saveSessionID(
-	path,
-	provider,
-	workspace,
-	sessionKey,
-	sessionID string,
-) error {
-	return saveSessionForClientMode(
-		path,
-		provider,
-		workspace,
-		sessionKey,
-		sessionID,
-		"",
-		1,
-	)
-}
-
 func saveSessionForClientMode(
 	path,
 	provider,
@@ -115,6 +92,7 @@ func saveSessionForClientMode(
 	sessionID,
 	clientMode string,
 	generation uint64,
+	runs ...RunContext,
 ) error {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
@@ -127,23 +105,39 @@ func saveSessionForClientMode(
 	defer sessionStoreMu.Unlock()
 	store := readSessionStore(path)
 	key := sessionStoreKey(provider, workspace, sessionKey)
-	store.Sessions[key] = sessionRecord{
+	previous := store.Sessions[key]
+	record := sessionRecord{
 		SessionID: sessionID, SessionKeyHash: key[:24], Workspace: filepath.Clean(workspace),
 		ClientMode: strings.TrimSpace(clientMode), ClientModeGeneration: generation,
 		UpdatedAt: time.Now().UTC().Format(time.RFC3339Nano),
 	}
+	if previous.SessionID == sessionID {
+		record.HistorySeen = previous.HistorySeen
+	}
+	for _, run := range runs {
+		if run.Conversation != nil {
+			for _, message := range run.Conversation.HistoryBeforeCurrent {
+				record.HistorySeen = rememberHistoryKey(record.HistorySeen, historyMessageKey(message), 512)
+			}
+		}
+	}
+	store.Sessions[key] = record
 	return writeSessionStore(path, store)
 }
 
 func providerSessionClientMode(config ProviderConfig) string {
+	return delegationSessionMode(config, providerBaseSessionClientMode(config))
+}
+
+func providerBaseSessionClientMode(config ProviderConfig) string {
 	if !browserProfileEnabled(config) {
 		return "standard"
 	}
 	if nativeBrowserClientEnabled(config) {
 		if strings.TrimSpace(config.BrowserBackendSelected) == "official_chrome_extension" {
-			return "browser_native_official_chrome"
+			return "browser_native_official_chrome_isolated_v2"
 		}
-		return "browser_native"
+		return "browser_native_isolated_v2"
 	}
 	return "browser_mcp"
 }
@@ -166,8 +160,17 @@ func readSessionStore(path string) sessionStore {
 	if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || !sessionFileOwnedByCurrentUser(info) || info.Size() > maxSessionStoreBytes {
 		return store
 	}
-	raw, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
+		return store
+	}
+	defer file.Close()
+	opened, err := file.Stat()
+	if err != nil || !os.SameFile(info, opened) || !opened.Mode().IsRegular() || opened.Mode().Perm()&0o077 != 0 || !sessionFileOwnedByCurrentUser(opened) {
+		return store
+	}
+	raw, err := io.ReadAll(io.LimitReader(file, maxSessionStoreBytes+1))
+	if err != nil || len(raw) > maxSessionStoreBytes {
 		return store
 	}
 	if err := json.Unmarshal(raw, &store); err != nil || store.Sessions == nil {
@@ -189,6 +192,9 @@ func writeSessionStore(path string, store sessionStore) error {
 	raw, err := json.MarshalIndent(store, "", "  ")
 	if err != nil {
 		return err
+	}
+	if len(raw) > maxSessionStoreBytes {
+		return errors.New("provider session store exceeds size limit")
 	}
 	temporary, err := os.CreateTemp(dir, ".sessions-*.tmp")
 	if err != nil {
@@ -266,8 +272,12 @@ func conversationSessionKey(run RunContext) string {
 	return ""
 }
 
-func missingProviderSession(stderr string) bool {
-	lower := strings.ToLower(stderr)
+// The documented event schemas expose human-readable failure messages, not a
+// portable session-not-found code. Inspect the known structured error fields
+// first; keep this narrowly scoped English diagnostic fallback with LC_ALL=C.
+// Never classify arbitrary tool results or every failed turn as a missing session.
+func missingProviderSession(diagnostic string) bool {
+	lower := strings.ToLower(diagnostic)
 	for _, fragment := range []string{"session not found", "unknown session", "no conversation found", "invalid session id", "no rollout found", "thread not found"} {
 		if strings.Contains(lower, fragment) {
 			return true

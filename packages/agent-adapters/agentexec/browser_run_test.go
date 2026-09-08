@@ -241,7 +241,7 @@ func TestBrowserExecutionReusesConversationSessionAndFencesRuntimeReattach(t *te
 }
 
 func TestBrowserClientConfigurationIsOptInAndSecretFree(t *testing.T) {
-	standard := codexArguments(ProviderConfig{}, "/workspace", "read-only", "", true)
+	standard := codexAppServerArguments(ProviderConfig{}, "/workspace", "read-only")
 	if strings.Contains(strings.Join(standard, " "), "openlinker_browser") {
 		t.Fatalf("ordinary Codex arguments changed: %#v", standard)
 	}
@@ -255,7 +255,7 @@ func TestBrowserClientConfigurationIsOptInAndSecretFree(t *testing.T) {
 			"ANTHROPIC_API_KEY=must-not-enter-mcp-config",
 		},
 	}, run)
-	codexArgs := strings.Join(codexArguments(config, "/workspace", "read-only", "", true), " ")
+	codexArgs := strings.Join(codexAppServerArguments(config, "/workspace", "read-only"), " ")
 	for _, expected := range []string{
 		"mcp_servers.openlinker_browser.command",
 		"browser-proxy",
@@ -292,15 +292,15 @@ func TestBrowserClientModesExposeExactlyOneProviderSurface(t *testing.T) {
 		BrowserNativePlugin:        "/opt/openlinker/agent-runtime-plugin/codex",
 	}, run)
 	nativeCodex := strings.Join(
-		codexArguments(native, "/workspace", "danger-full-access", "", true),
+		codexAppServerArguments(native, "/workspace", "danger-full-access"),
 		" ",
 	)
-	nativePluginServer := `plugins."openlinker@openlinker-agent-runtime".mcp_servers.openlinker_browser`
+	nativePluginServer := `plugins={"openlinker@openlinker-agent-runtime"={enabled=true,mcp_servers={openlinker_browser={`
 	for _, expected := range []string{
-		nativePluginServer + ".enabled=true",
-		nativePluginServer + ".required=true",
-		nativePluginServer + `.enabled_tools=["browser_session"]`,
-		nativePluginServer + `.default_tools_approval_mode="auto"`,
+		nativePluginServer + "enabled=true",
+		"required=true",
+		`enabled_tools=["browser_session"]`,
+		`default_tools_approval_mode="approve"`,
 	} {
 		if !strings.Contains(nativeCodex, expected) {
 			t.Fatalf("native Codex Plugin config is missing %q: %s", expected, nativeCodex)
@@ -308,20 +308,20 @@ func TestBrowserClientModesExposeExactlyOneProviderSurface(t *testing.T) {
 	}
 	if strings.Contains(nativeCodex, "mcp_servers.openlinker_browser.command") ||
 		strings.Contains(nativeCodex, "browser-proxy") ||
-		!strings.Contains(nativeCodex, "--dangerously-bypass-approvals-and-sandbox") ||
+		strings.Contains(nativeCodex, "--dangerously-bypass-approvals-and-sandbox") ||
 		!strings.Contains(nativeCodex, "--disable shell_tool") ||
 		!strings.Contains(nativeCodex, "--disable multi_agent") ||
-		!strings.Contains(nativeCodex, "tools.view_image=false") ||
+		!strings.Contains(nativeCodex, "--disable view_image") ||
 		strings.Contains(nativeCodex, "--sandbox danger-full-access") ||
-		strings.Contains(nativeCodex, "--ignore-user-config") {
+		!strings.Contains(nativeCodex, "app-server --listen stdio://") {
 		t.Fatalf("native Codex Plugin surface is incomplete or duplicated: %s", nativeCodex)
 	}
 	nativeReadOnly := strings.Join(
-		codexArguments(native, "/workspace", "read-only", "", true),
+		codexAppServerArguments(native, "/workspace", "read-only"),
 		" ",
 	)
 	if strings.Contains(nativeReadOnly, "--dangerously-bypass-approvals-and-sandbox") ||
-		!strings.Contains(nativeReadOnly, "--sandbox read-only") {
+		!strings.Contains(nativeReadOnly, "app-server --listen stdio://") {
 		t.Fatalf("native Codex bypass escaped the external-sandbox gate: %s", nativeReadOnly)
 	}
 	nativeClaude := strings.Join(claudeArguments(native, "dontAsk", ""), " ")
@@ -339,11 +339,11 @@ func TestBrowserClientModesExposeExactlyOneProviderSurface(t *testing.T) {
 	direct.BrowserClientMode = "mcp"
 	direct.BrowserNativePlugin = ""
 	directCodex := strings.Join(
-		codexArguments(direct, "/workspace", "read-only", "", true),
+		codexAppServerArguments(direct, "/workspace", "read-only"),
 		" ",
 	)
 	if !strings.Contains(directCodex, "mcp_servers.openlinker_browser") ||
-		!strings.Contains(directCodex, "--ignore-user-config") {
+		!strings.Contains(directCodex, "app-server --listen stdio://") {
 		t.Fatalf("direct Codex MCP surface is incomplete: %s", directCodex)
 	}
 	directClaude := strings.Join(claudeArguments(direct, "dontAsk", ""), " ")

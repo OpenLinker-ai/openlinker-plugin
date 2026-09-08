@@ -7,24 +7,29 @@ import (
 	"sync"
 )
 
-type codexJSONLObserver struct {
-	mu                  sync.Mutex
-	pending             []byte
-	emit                func(string, any) error
-	suppressMCPProgress bool
+type jsonlObserver struct {
+	mu       sync.Mutex
+	pending  []byte
+	emit     func(string, any) error
+	progress func(map[string]any) []map[string]any
 }
 
 func newCodexJSONLObserver(
 	emit func(string, any) error,
 	suppressMCPProgress bool,
-) *codexJSONLObserver {
-	return &codexJSONLObserver{
-		emit:                emit,
-		suppressMCPProgress: suppressMCPProgress,
-	}
+) *jsonlObserver {
+	return &jsonlObserver{emit: emit, progress: func(event map[string]any) []map[string]any {
+		if suppressMCPProgress && isOpenLinkerBrowserMCPEvent(event) {
+			return nil
+		}
+		if payload, ok := codexProgressPayload(event); ok {
+			return []map[string]any{payload}
+		}
+		return nil
+	}}
 }
 
-func (observer *codexJSONLObserver) Write(value []byte) (int, error) {
+func (observer *jsonlObserver) Write(value []byte) (int, error) {
 	if observer == nil || len(value) == 0 {
 		return len(value), nil
 	}
@@ -35,7 +40,7 @@ func (observer *codexJSONLObserver) Write(value []byte) (int, error) {
 	return len(value), nil
 }
 
-func (observer *codexJSONLObserver) Flush() {
+func (observer *jsonlObserver) Flush() {
 	if observer == nil {
 		return
 	}
@@ -44,7 +49,7 @@ func (observer *codexJSONLObserver) Flush() {
 	observer.drainLines(true)
 }
 
-func (observer *codexJSONLObserver) drainLines(flush bool) {
+func (observer *jsonlObserver) drainLines(flush bool) {
 	for {
 		index := bytes.IndexByte(observer.pending, '\n')
 		if index < 0 {
@@ -60,7 +65,7 @@ func (observer *codexJSONLObserver) drainLines(flush bool) {
 	}
 }
 
-func (observer *codexJSONLObserver) observeLine(line []byte) {
+func (observer *jsonlObserver) observeLine(line []byte) {
 	if observer.emit == nil {
 		return
 	}
@@ -72,16 +77,10 @@ func (observer *codexJSONLObserver) observeLine(line []byte) {
 	if json.Unmarshal(line, &event) != nil {
 		return
 	}
-	payload, ok := codexProgressPayload(event)
-	if !ok {
-		return
+	// Progress is best-effort and only contains normalized, non-sensitive fields.
+	for _, payload := range observer.progress(event) {
+		_ = observer.emit("run.status.changed", payload)
 	}
-	if observer.suppressMCPProgress && isOpenLinkerBrowserMCPEvent(event) {
-		return
-	}
-	// Provider progress is best-effort. Losing a display-only event must not
-	// terminate a healthy provider process.
-	_ = observer.emit("run.status.changed", payload)
 }
 
 func isOpenLinkerBrowserMCPEvent(event map[string]any) bool {

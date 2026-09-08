@@ -12,6 +12,10 @@ import (
 )
 
 type ProviderConfig struct {
+	DelegationTargets    []string
+	DelegationProxyBin   string
+	DelegationBrokerRoot string
+	DelegationSocket     string
 	// Version is supplied by the embedding executable for Browser MCP metadata.
 	Version                      string
 	Provider                     string
@@ -74,19 +78,22 @@ type ConversationMessage struct {
 }
 
 type RunContext struct {
-	RunID             string
-	AgentID           string
-	AttemptDeadlineAt time.Time
-	RunDeadlineAt     time.Time
-	Authority         *openlinker.RuntimeAuthorityContext
-	Input             any
-	Metadata          map[string]any
-	A2A               map[string]any
-	Conversation      *ConversationContext
-	Browser           *BrowserRunContext
-	RuntimeExtensions *openlinker.RuntimeExtensions
-	Emit              func(string, any) error
-	CallAgent         func(context.Context, string, any, openlinker.RuntimeCallOptions) (any, error)
+	ReadDelegatedRun   func(context.Context, string) (*openlinker.RuntimeDelegatedRun, error)
+	DelegationSocket   string
+	DelegationProxyBin string
+	RunID              string
+	AgentID            string
+	AttemptDeadlineAt  time.Time
+	RunDeadlineAt      time.Time
+	Authority          *openlinker.RuntimeAuthorityContext
+	Input              any
+	Metadata           map[string]any
+	A2A                map[string]any
+	Conversation       *ConversationContext
+	Browser            *BrowserRunContext
+	RuntimeExtensions  *openlinker.RuntimeExtensions
+	Emit               func(string, any) error
+	CallAgent          func(context.Context, string, any, openlinker.RuntimeCallOptions) (any, error)
 }
 
 type BrowserRunContext struct {
@@ -130,12 +137,16 @@ func NewProvider(config ProviderConfig) (Provider, error) {
 	}
 	switch strings.ToLower(strings.TrimSpace(config.ExecutionProfile)) {
 	case "", "standard":
-		return provider, nil
+		return withDelegation(provider, config)
 	case "browser":
 		if err := validateBrowserClientConfig(config); err != nil {
 			return nil, err
 		}
-		return newBrowserExecutionProvider(provider, config)
+		browser, err := newBrowserExecutionProvider(provider, config)
+		if err != nil {
+			return nil, err
+		}
+		return withDelegation(browser, config)
 	default:
 		return nil, fmt.Errorf("execution profile must be standard or browser")
 	}
@@ -172,6 +183,9 @@ func (handler Handler) Handle(ctx context.Context, assignment openlinker.Runtime
 		CallAgent: func(callCtx context.Context, target string, input any, options openlinker.RuntimeCallOptions) (any, error) {
 			return assignment.CallAgent(callCtx, target, input, options)
 		},
+	}
+	if assignment.CanReadDelegatedRuns() {
+		run.ReadDelegatedRun = assignment.ReadDelegatedRun
 	}
 	if conversation := conversationValue(assignmentMetadata["conversation"]); conversation != nil && conversation.Source == "core" {
 		run.Conversation = conversation

@@ -14,6 +14,9 @@ import (
 const configVersion = 1
 
 type Config struct {
+	DelegationTargets        []string `json:"delegation_targets,omitempty"`
+	DelegationProxyBin       string   `json:"delegation_proxy_bin,omitempty"`
+	DelegationBrokerRoot     string   `json:"delegation_broker_root,omitempty"`
 	Version                  int      `json:"version"`
 	Enabled                  bool     `json:"enabled"`
 	Provider                 string   `json:"provider"`
@@ -238,6 +241,11 @@ func envValue(getenv func(string) string, key string) string {
 }
 
 func applyRuntimeEnvironment(config *Config, getenv func(string) string) error {
+	if value := envValue(getenv, "OPENLINKER_AGENT_DELEGATION_TARGETS"); value != "" {
+		config.DelegationTargets = splitNonEmpty(value)
+	}
+	config.DelegationProxyBin = firstNonEmpty(envValue(getenv, "OPENLINKER_AGENT_DELEGATION_PROXY_BIN"), config.DelegationProxyBin)
+	config.DelegationBrokerRoot = firstNonEmpty(envValue(getenv, "OPENLINKER_AGENT_DELEGATION_BROKER_ROOT"), config.DelegationBrokerRoot)
 	config.Transport = firstNonEmpty(envValue(getenv, "OPENLINKER_AGENT_TRANSPORT"), config.Transport)
 	config.Model = firstNonEmpty(envValue(getenv, "OPENLINKER_"+strings.ToUpper(config.Provider)+"_MODEL"), config.Model)
 	config.CodexBaseURL = firstNonEmpty(envValue(getenv, "OPENLINKER_CODEX_BASE_URL"), config.CodexBaseURL)

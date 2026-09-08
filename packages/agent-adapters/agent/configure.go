@@ -6,6 +6,9 @@ import (
 )
 
 type ConfigureOptions struct {
+	DelegationTargets    []string
+	DelegationProxyBin   string
+	DelegationBrokerRoot string
 	// ChangedFields, when non-nil, is the exact set of configuration fields to
 	// update, using their command flag names. It preserves explicit zero, empty,
 	// and false values. Nil retains the non-empty patch behavior of MCP callers.
@@ -116,6 +119,15 @@ func ConfigureNonSecret(getenv func(string) string, options ConfigureOptions) (C
 		if options.ChangedFields != nil {
 			config.ClaudePermission = options.ClaudePermission
 		}
+	}
+	if provided("delegation-target", options.DelegationTargets != nil) {
+		config.DelegationTargets = append([]string(nil), options.DelegationTargets...)
+	}
+	if provided("delegation-proxy-bin", options.DelegationProxyBin != "") {
+		config.DelegationProxyBin = strings.TrimSpace(options.DelegationProxyBin)
+	}
+	if provided("delegation-broker-root", options.DelegationBrokerRoot != "") {
+		config.DelegationBrokerRoot = strings.TrimSpace(options.DelegationBrokerRoot)
 	}
 	if provided("allowed-tool", options.AllowedTools != nil) {
 		config.AllowedTools = append([]string(nil), options.AllowedTools...)

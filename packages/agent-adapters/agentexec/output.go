@@ -10,6 +10,28 @@ import (
 
 const maxProviderOutputBytes = 4 << 20
 
+// Diagnostics must not kill a long-running provider just because it is verbose.
+// Retain only the latest bytes; the model-facing error is separately redacted.
+const maxProviderDiagnosticBytes = 64 << 10
+
+type outputTail struct{ data []byte }
+
+func (tail *outputTail) Write(value []byte) (int, error) {
+	n := len(value)
+	if n >= maxProviderDiagnosticBytes {
+		tail.data = append(tail.data[:0], value[n-maxProviderDiagnosticBytes:]...)
+	} else {
+		if excess := len(tail.data) + n - maxProviderDiagnosticBytes; excess > 0 {
+			copy(tail.data, tail.data[excess:])
+			tail.data = tail.data[:len(tail.data)-excess]
+		}
+		tail.data = append(tail.data, value...)
+	}
+	return n, nil
+}
+
+func (tail *outputTail) String() string { return string(tail.data) }
+
 var errProviderOutputTooLarge = errors.New("provider output exceeded limit")
 
 type limitedOutputBuffer struct {
