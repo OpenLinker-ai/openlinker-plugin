@@ -74,7 +74,7 @@ func testInstalledCodexRPCWithLocalAPI(t *testing.T, native, codeMode bool) {
 			if codeMode {
 				output := localCodeModeOutput(request.Input, "code-browser-1")
 				if !strings.Contains(output, "isolated browser discovered") {
-					t.Errorf("Code Mode did not discover Browser while preserving host isolation: %s", output)
+					t.Errorf("Code Mode Browser discovery or host-API regression sentinel failed: %s", output)
 				}
 			} else {
 				found := false
@@ -104,7 +104,9 @@ func testInstalledCodexRPCWithLocalAPI(t *testing.T, native, codeMode bool) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		fmt.Fprintf(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"response-%d\"}}\n\n", n)
 		if codeMode && (n == 1 || n == 2) {
-			code := `if ([typeof process, typeof require, typeof Deno, typeof fetch].some(x => x !== "undefined")) throw Error("unexpected host API");
+			// Selected exposure checks only: this is not an exhaustive audit of
+			// dynamic imports, globalThis handles, or the upstream V8 boundary.
+			code := `if ([typeof process, typeof require, typeof Deno, typeof fetch, typeof XMLHttpRequest, typeof WebSocket].some(x => x !== "undefined")) throw Error("unexpected host API");
 if (ALL_TOOLS.some(x => /(^|__)(exec_command|shell|shell_command|write_stdin)$/.test(x.name))) throw Error("shell tool exposed");
 const browser = ALL_TOOLS.find(x => /browser_session$/.test(x.name));
 if (!browser) throw Error("Browser tool missing");
@@ -153,8 +155,8 @@ text("isolated browser discovered");`
 		config.BrowserNativePlugin = makeLiveBrowserMarketplace(t, workspace)
 	}
 	if codeMode {
-		// The pinned Codex catalog requires Code Mode for this model even when
-		// features.code_mode=false. Exercise the same exec path as production.
+		// The pinned Codex catalog selects Code Mode for this model. Leave
+		// feature defaults unchanged and exercise production's required exec path.
 		config.Model = "gpt-5.6-sol"
 	}
 	provider := CodexProvider{Config: config}
