@@ -39,7 +39,22 @@ func TestRPCHomePreparedUnderProviderIdentity(t *testing.T) {
 	if err := os.Chown(auth, providerUID, providerGID); err != nil {
 		t.Fatal(err)
 	}
-	command := exec.Command(os.Args[0], "-test.run=TestRPCHomeLauncherHelper")
+	// Go may put its test executable below an owner-only build directory.
+	// Stage a root-owned copy so the Provider UID can execute both helpers
+	// without weakening permissions on Go's build cache or the private home.
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary, err := os.ReadFile(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	helper := filepath.Join(root, "launcher.test")
+	if err := os.WriteFile(helper, binary, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.Command(helper, "-test.run=TestRPCHomeLauncherHelper")
 	command.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: providerUID, Gid: providerGID}}
 	command.Env = []string{"TEST_RPC_LAUNCHER=1", "HOME=" + source, "CODEX_HOME=" + source, codexhome.PrepareEnvironment + "=1"}
 	raw, err := command.CombinedOutput()
