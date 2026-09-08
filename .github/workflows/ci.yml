@@ -44,6 +44,8 @@ jobs:
           node-version: 22
       - run: node scripts/generate-codex-rpc.mjs --check
       - run: npm run test:go
+      - name: Test Provider identity isolation as root
+        run: sudo env "PATH=$PATH" "GOCACHE=$RUNNER_TEMP/go-root-cache" "GOMODCACHE=$(go env GOMODCACHE)" GOWORK=off go test -count=1 -run '^TestRPCHomePreparedUnderProviderIdentity$' ./cmd/openlinker-provider-launcher
       - run: npm run check:go-boundaries
       - run: npm run check:agent-runtime-integration
       - name: Build service entrypoints
