@@ -80,8 +80,13 @@ func Diagnose(getenv func(string) string, providerOverride string) Diagnostic {
 		if binErr != nil {
 			result.Checks["provider_cli_detail"] = boundedStatusMessage(binErr)
 		}
-		_, authSource, authErr := resolveSecret(getenv, key, keyFile, false)
+		required := providerAPIKeyRequired(config)
+		_, authSource, authErr := resolveSecret(getenv, key, keyFile, required)
 		check("provider_auth", authErr == nil, authSource, "invalid")
+		if required && authSource == "missing" {
+			result.Checks["provider_auth"] = "missing"
+			result.Checks["provider_auth_detail"] = "Claude --bare requires ANTHROPIC_API_KEY or ANTHROPIC_API_KEY_FILE; OAuth/Keychain login is not used."
+		}
 	}
 	state, stateErr := stateDir(config, getenv)
 	check("state_dir", stateErr == nil && state != "", "available", "invalid")

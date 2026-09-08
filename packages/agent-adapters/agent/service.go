@@ -462,7 +462,7 @@ func resolveRuntime(getenv func(string) string, providerOverride, version string
 	if config.Provider == "claude" {
 		providerKeyName, providerKeyFileName, providerBinEnv = "ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY_FILE", "OPENLINKER_CLAUDE_BIN"
 	}
-	providerKey, providerSource, err := resolveSecret(getenv, providerKeyName, providerKeyFileName, false)
+	providerKey, providerSource, err := resolveSecret(getenv, providerKeyName, providerKeyFileName, providerAPIKeyRequired(config))
 	if err != nil {
 		return resolvedRuntime{}, err
 	}
