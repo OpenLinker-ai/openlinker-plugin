@@ -122,8 +122,10 @@ func TestBuildCodexPromptAdvertisesWebOnlyWhenEnabled(t *testing.T) {
 	enabled := buildCodexPrompt(run, true, false)
 	for _, expected := range []string{
 		"Live public-web access is enabled",
-		"use web search or a permitted public HTTP tool before answering",
-		"Do not claim that internet access is unavailable unless an actual web tool attempt fails",
+		"obtain live evidence using a tool permitted by the current user request",
+		"Respect explicit tool restrictions",
+		"Browser observations are valid live evidence",
+		"report that limitation instead of silently substituting a forbidden tool",
 		"Identify the public source hosts or URLs",
 		"private, loopback, link-local, metadata, or credential-bearing destinations",
 	} {
@@ -133,7 +135,7 @@ func TestBuildCodexPromptAdvertisesWebOnlyWhenEnabled(t *testing.T) {
 	}
 	disabled := buildCodexPrompt(run, false, false)
 	if strings.Contains(disabled, "Live public-web access") ||
-		strings.Contains(disabled, "use web search or a permitted public HTTP tool") {
+		strings.Contains(disabled, "obtain live evidence using a tool permitted") {
 		t.Fatalf("disabled prompt advertised web access: %s", disabled)
 	}
 }
