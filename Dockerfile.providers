@@ -152,7 +152,7 @@ ENV OPENLINKER_CODEX_BIN=/usr/local/bin/openlinker-provider-launcher \
     OPENLINKER_CODEX_RPC_LAUNCHER=1 \
     OPENLINKER_CODEX_SANDBOX=read-only \
     OPENLINKER_CODEX_APPROVAL=never \
-    OPENLINKER_CODEX_WEB_SEARCH=disabled
+    OPENLINKER_CODEX_WEB_SEARCH=false
 ENTRYPOINT ["/usr/local/bin/openlinker-runtime-entrypoint"]
 LABEL org.opencontainers.image.title="OpenLinker Runtime Codex" \
       org.opencontainers.image.description="OpenLinker CLI Runtime Worker with a pinned Codex CLI provider" \

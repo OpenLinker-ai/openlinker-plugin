@@ -178,6 +178,18 @@ Runtime 中的环境变量优先于已存储的非敏感 Agent 配置。
 
 环境覆盖适合部署注入；交互使用不要把它变成第二套无人管理的配置系统。
 
+两种 Provider 的网页搜索开关统一使用 `true` 或 `false`，默认均为 `false`：
+
+```dotenv
+OPENLINKER_CODEX_WEB_SEARCH=true
+OPENLINKER_CLAUDE_WEB_SEARCH=true
+```
+
+继续兼容旧的 `enabled` / `disabled` 写法。容器预设了 Provider 专用默认值，其优先级
+高于 `OPENLINKER_AGENT_WEB_SEARCH`，因此应显式设置对应 Provider 的变量。
+修改部署环境变量后需要重新创建对应容器。浏览器工具与 Provider 网页搜索分别配置；
+开启此开关后，还需要模型供应商和工具权限支持搜索。
+
 ## 原生 Agent 控制工具
 
 | Tool | 行为 |

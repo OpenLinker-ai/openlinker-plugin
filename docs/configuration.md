@@ -187,6 +187,20 @@ Environment values override stored non-secret Agent configuration at Runtime.
 Use environment overrides for deployment injection, not as a second unmanaged
 configuration system for interactive use.
 
+Use `true` or `false` for both providers' web-search switches (default: `false`):
+
+```dotenv
+OPENLINKER_CODEX_WEB_SEARCH=true
+OPENLINKER_CLAUDE_WEB_SEARCH=true
+```
+
+The legacy `enabled` / `disabled` spellings remain accepted for compatibility.
+Packaged containers set a provider-specific default, which takes precedence over
+`OPENLINKER_AGENT_WEB_SEARCH`; set the provider-specific variable explicitly.
+Recreate the relevant container after changing its deployment environment.
+Browser tools and provider web search are configured separately; enabling this
+switch also requires the model provider and tool permissions to support search.
+
 ## Native Agent-control tools
 
 | Tool | Behavior |

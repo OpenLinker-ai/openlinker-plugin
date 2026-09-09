@@ -227,6 +227,28 @@ func TestApplyRuntimeEnvironmentRejectsInvalidValues(t *testing.T) {
 	}
 }
 
+func TestWebSearchBooleanSpellingsWorkForBothProviders(t *testing.T) {
+	for _, provider := range []string{"codex", "claude"} {
+		for value, want := range map[string]bool{"true": true, "false": false, "enabled": true, "disabled": false} {
+			t.Run(provider+"/"+value, func(t *testing.T) {
+				config := defaultConfig()
+				config.Provider = provider
+				config.WebSearch = !want
+				name := "OPENLINKER_" + strings.ToUpper(provider) + "_WEB_SEARCH"
+				err := applyRuntimeEnvironment(&config, func(key string) string {
+					if key == name {
+						return value
+					}
+					return ""
+				})
+				if err != nil || config.WebSearch != want {
+					t.Fatalf("%s=%s: web_search=%t, error=%v", name, value, config.WebSearch, err)
+				}
+			})
+		}
+	}
+}
+
 func TestAgentModeLockIsExclusiveAndReusable(t *testing.T) {
 	dir := t.TempDir()
 	first, err := acquireAgentModeLock(dir)
