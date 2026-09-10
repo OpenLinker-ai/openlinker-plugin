@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -67,6 +68,43 @@ func TestSharedAppFileProductionConsumers(t *testing.T) {
 	stored, err := os.ReadFile(filepath.Join(state, "node-id"))
 	if err != nil || string(stored) != id+"\n" {
 		t.Fatal("app Node identity filename or format changed")
+	}
+}
+
+func TestSharedAppNodeIdentityProductionConsumer(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "identity")
+	first, err := loadOrCreateNodeID(state, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(first) {
+		t.Fatal("generated app Node identity is not a canonical lowercase UUID v4")
+	}
+	path := filepath.Join(state, "node-id")
+	stored, err := os.ReadFile(path)
+	if err != nil || string(stored) != first+"\n" {
+		t.Fatalf("generated app Node identity was not persisted at its product path: %v", err)
+	}
+	for _, explicit := range []string{"", first} {
+		second, err := loadOrCreateNodeID(state, explicit)
+		if err != nil || second != first {
+			t.Fatalf("persisted app Node identity was not reused: %v", err)
+		}
+	}
+	conflict := "0" + first[1:]
+	if first[0] == '0' {
+		conflict = "1" + first[1:]
+	}
+	value, err := loadOrCreateNodeID(state, conflict)
+	if err == nil || err.Error() != "OPENLINKER_NODE_ID does not match the persisted Node ID" || value != "" {
+		t.Fatalf("conflicting app Node identity was not rejected: %v", err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || string(after) != string(stored) {
+		t.Fatal("reuse or a rejected identity conflict changed the persisted node-id bytes")
+	}
+	if recovered, err := loadOrCreateNodeID(state, ""); err != nil || recovered != first {
+		t.Fatalf("app Node identity did not remain usable after a rejected conflict: %v", err)
 	}
 }
 

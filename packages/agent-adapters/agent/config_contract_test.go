@@ -269,7 +269,17 @@ func TestAgentConfigContractConfigurePatchSemantics(t *testing.T) {
 			root := t.TempDir()
 			path := filepath.Join(root, "agent.json")
 			want := agentConfigPortable(t, fixture, root)
+			if tc.name == "selected-zero-empty-values" {
+				// Prove an actual true -> false patch, not false -> false.
+				want["session_reuse"] = true
+			}
 			agentConfigWrite(t, path, agentConfigJSON(t, want))
+			if tc.name == "selected-zero-empty-values" {
+				before, _, err := loadConfig(agentConfigEnvironment(path, nil))
+				if err != nil || !before.SessionReuse {
+					t.Fatal("explicit false patch lacks a true persisted precondition")
+				}
+			}
 			for name, value := range tc.overrides {
 				want[name] = value
 			}
@@ -317,9 +327,32 @@ func TestAgentConfigContractConfigureCompleteFile(t *testing.T) {
 		BrowserClientMode: expected.BrowserClientMode, BrowserPluginBin: expected.BrowserPluginBin, BrowserNativePlugin: expected.BrowserNativePlugin,
 		BrowserSocket: expected.BrowserSocket, BrowserCredentialFile: expected.BrowserCredentialFile, BrowserLeaseRoot: expected.BrowserLeaseRoot, BrowserBrokerRoot: expected.BrowserBrokerRoot,
 	}
-	config, _, err := ConfigureNonSecret(agentConfigEnvironment(path, nil), options)
+	// Exercise the real writer with available synthetic credentials. Their
+	// absence from a credential-free fixture alone would prove nothing.
+	secrets := map[string]string{
+		"OPENLINKER_AGENT_TOKEN": "SYNTHETIC_AGENT_TOKEN_MUST_NOT_PERSIST",
+		"OPENLINKER_USER_TOKEN":  "SYNTHETIC_USER_TOKEN_MUST_NOT_PERSIST",
+		"CODEX_API_KEY":          "SYNTHETIC_CODEX_API_KEY_MUST_NOT_PERSIST",
+		"ANTHROPIC_API_KEY":      "SYNTHETIC_ANTHROPIC_API_KEY_MUST_NOT_PERSIST",
+	}
+	config, _, err := ConfigureNonSecret(agentConfigEnvironment(path, secrets), options)
 	if err != nil {
 		t.Fatal(err)
+	}
+	persisted := agentConfigRead(t, path)
+	for _, value := range secrets {
+		if bytes.Contains(persisted, []byte(value)) {
+			t.Fatal("ConfigureNonSecret persisted a synthetic credential")
+		}
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(persisted, &fields); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"token", "agent_token", "user_token", "api_key", "provider_api_key", "codex_api_key", "anthropic_api_key", "credentials", "secrets"} {
+		if _, exists := fields[name]; exists {
+			t.Fatal("ConfigureNonSecret persisted a credential field")
+		}
 	}
 	agentConfigEqual(t, config, want)
 	loaded, _, err := loadConfig(agentConfigEnvironment(path, nil))
