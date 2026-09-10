@@ -188,6 +188,13 @@ Provider 镜像。
 
 ## 本地校验
 
+构建或校验 Runtime 原生包需要 Node.js 和 `go.mod` 指定的 Go 版本。构建工具以
+`GOWORK=off` 解析 `go.mod`/`go.sum` 中固定的 Agent Node 模块，验证 checksum
+与模块缓存，再读取其中唯一的 `openlinker.agent-host.v1` 契约；不读取兄弟工作树，
+也不维护协议副本。这仅是构建依赖：安装后的原生包与最终 Provider 镜像不新增 Go
+工具链或 Agent Node 服务要求。Codex schema 更新归 Agent Node 仓库，本仓库的
+生成器命令仅支持针对固定模块执行 `--check`。
+
 ```bash
 npm test
 npm run test:go

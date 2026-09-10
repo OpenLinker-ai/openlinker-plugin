@@ -7,8 +7,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -79,7 +81,7 @@ func TestProviderPrivilegeDropBlocksAgentState(t *testing.T) {
 		t.Fatalf("privilege helper failed: %v: %s", err, output)
 	}
 	text := string(output)
-	for _, want := range []string{"uid=10002", "gid=10002", "caps=0000000000000000", "secret=blocked"} {
+	for _, want := range []string{"uid=10002", "gid=10002", "caps=0000000000000000", "secret=blocked", "provider-user=verified"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("privilege helper missing %q: %s", want, text)
 		}
@@ -116,9 +118,30 @@ func TestProviderPrivilegeDropHelper(t *testing.T) {
 	if os.Getenv("OPENLINKER_PROVIDER_DROP_HELPER") != "1" {
 		t.Skip("helper subprocess only")
 	}
+	// Warm os/user's Current cache before dropping UID; USER must still be
+	// derived from the new effective identity, not this cached Worker identity.
+	_, _ = user.Current()
+	environment := append(os.Environ(), "USER=forged-worker-identity", "USER=forged-caller-identity")
 	runtime.LockOSThread()
-	if err := dropProviderPrivileges(); err != nil {
+	environment, err := dropProviderPrivilegesAndRefreshEnvironment(environment)
+	if err != nil {
 		t.Fatal(err)
+	}
+	wantUsername := ""
+	if account, err := user.LookupId(strconv.Itoa(providerUID)); err == nil {
+		wantUsername = account.Username
+	}
+	usernameCount := 0
+	for _, item := range environment {
+		if username, ok := strings.CutPrefix(item, "USER="); ok {
+			usernameCount++
+			if username != wantUsername || username == "" {
+				t.Fatal("Provider inherited a username other than its effective OS identity")
+			}
+		}
+	}
+	if (wantUsername != "" && usernameCount != 1) || (wantUsername == "" && usernameCount != 0) {
+		t.Fatal("Provider username was absent, duplicated, or fabricated")
 	}
 	caps := "missing"
 	// Capabilities are per-thread. The launcher locks this goroutine to the OS
@@ -135,5 +158,5 @@ func TestProviderPrivilegeDropHelper(t *testing.T) {
 	if raw, err := os.ReadFile(os.Getenv("OPENLINKER_PROVIDER_DROP_SECRET")); err == nil {
 		secretState = "leaked:" + string(raw)
 	}
-	fmt.Printf("uid=%d gid=%d caps=%s secret=%s\n", os.Geteuid(), os.Getegid(), caps, secretState)
+	fmt.Printf("uid=%d gid=%d caps=%s secret=%s provider-user=verified\n", os.Geteuid(), os.Getegid(), caps, secretState)
 }

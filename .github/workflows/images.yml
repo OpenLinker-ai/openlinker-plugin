@@ -19,6 +19,7 @@ on:
       - "shared/cli-lock.json"
       - "scripts/download-pinned-cli.mjs"
       - "scripts/build-agent-runtime-packages.mjs"
+      - "scripts/resolve-agent-node-module.mjs"
       - "shared/skills/use-isolated-browser/**"
       - "platforms/claude/openlinker/commands/use-isolated-browser.md"
       - "package.json"

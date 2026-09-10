@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/providersession"
 	openlinker "github.com/OpenLinker-ai/openlinker-go"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserclient"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserplugin"
@@ -69,10 +70,17 @@ type browserRunLease struct {
 	closed       bool
 }
 
+// Browser root locking remains Plugin policy; it is not the Provider session
+// file/key lock maintained by the shared session leaf.
+type browserRootLockEntry struct {
+	mu   sync.Mutex
+	refs int
+}
+
 var browserRootLocks = struct {
 	sync.Mutex
-	entries map[string]*sessionLockEntry
-}{entries: map[string]*sessionLockEntry{}}
+	entries map[string]*browserRootLockEntry
+}{entries: map[string]*browserRootLockEntry{}}
 
 func newBrowserExecutionProvider(base Provider, config ProviderConfig) (Provider, error) {
 	for label, value := range map[string]string{
@@ -959,7 +967,7 @@ func readPrivateBrowserFile(path string, limit int64) ([]byte, error) {
 	if info.Mode()&os.ModeSymlink != 0 ||
 		!info.Mode().IsRegular() ||
 		info.Mode().Perm()&0o077 != 0 ||
-		!sessionFileOwnedByCurrentUser(info) ||
+		!providersession.OwnedByCurrentUser(info) ||
 		info.Size() <= 0 ||
 		info.Size() > limit {
 		return nil, errors.New("Browser state file must be an owner-only regular non-symlink file")
@@ -990,7 +998,7 @@ func writePrivateBrowserJSON(path string, value any) error {
 		if info.Mode()&os.ModeSymlink != 0 ||
 			!info.Mode().IsRegular() ||
 			info.Mode().Perm()&0o077 != 0 ||
-			!sessionFileOwnedByCurrentUser(info) {
+			!providersession.OwnedByCurrentUser(info) {
 			return errors.New("Browser state destination is not an owner-only regular file")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -1020,7 +1028,7 @@ func writePrivateBrowserJSON(path string, value any) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if err := replaceFileAtomic(temporaryPath, path); err != nil {
+	if err := providersession.ReplaceAtomic(temporaryPath, path); err != nil {
 		return err
 	}
 	keep = true
@@ -1038,7 +1046,7 @@ func ensurePrivateBrowserDirectory(path string) error {
 	if info.Mode()&os.ModeSymlink != 0 ||
 		!info.IsDir() ||
 		info.Mode().Perm()&0o077 != 0 ||
-		!sessionFileOwnedByCurrentUser(info) {
+		!providersession.OwnedByCurrentUser(info) {
 		return errors.New("Browser state directory must be owner-only and not a symlink")
 	}
 	return nil
@@ -1054,7 +1062,7 @@ func removePrivateBrowserFile(path string) error {
 	}
 	if info.Mode()&os.ModeSymlink != 0 ||
 		!info.Mode().IsRegular() ||
-		!sessionFileOwnedByCurrentUser(info) {
+		!providersession.OwnedByCurrentUser(info) {
 		return errors.New("refusing to remove an unowned Browser state path")
 	}
 	return os.Remove(path)
@@ -1098,7 +1106,7 @@ func lockBrowserRoot(root string) func() {
 	browserRootLocks.Lock()
 	entry := browserRootLocks.entries[key]
 	if entry == nil {
-		entry = &sessionLockEntry{}
+		entry = &browserRootLockEntry{}
 		browserRootLocks.entries[key] = entry
 	}
 	entry.refs++

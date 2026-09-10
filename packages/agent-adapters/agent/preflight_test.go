@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agenthost"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agenthost"
 )
 
 func TestDoctorAndWorkerStartupRejectMissingCodexAppServer(t *testing.T) {

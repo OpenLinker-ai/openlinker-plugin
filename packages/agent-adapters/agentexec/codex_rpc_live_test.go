@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexrpc"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexrpc"
 )
 
 // Exercises the installed official binary against a local fake Responses API.

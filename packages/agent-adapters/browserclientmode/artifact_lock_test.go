@@ -16,6 +16,9 @@ func TestProviderImageBuildsAgentRuntimePluginFromSameSource(t *testing.T) {
 	text := string(dockerfile)
 	for _, required := range []string{
 		"COPY scripts/build-agent-runtime-packages.mjs",
+		"COPY scripts/resolve-agent-node-module.mjs",
+		"COPY --from=go-source /go/pkg/mod /go/pkg/mod",
+		"GOWORK=off GOFLAGS=-mod=readonly GOPROXY=off",
 		"COPY shared/skills/use-isolated-browser",
 		"node scripts/build-agent-runtime-packages.mjs --out /out",
 		"COPY --from=agent-runtime-plugin /out/codex-marketplace /opt/openlinker/agent-runtime-plugin/codex",
@@ -35,6 +38,7 @@ func TestProviderImageBuildsAgentRuntimePluginFromSameSource(t *testing.T) {
 		"github.com/OpenLinker-ai/openlinker-plugin/releases/download",
 		"./cmd/openlinker ",
 		"../openlinker-cli",
+		"COPY packages/agent-adapters/agenthost/contract.json",
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("Provider Dockerfile reintroduced circular source/release dependency %q", forbidden)

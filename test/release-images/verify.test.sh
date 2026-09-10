@@ -46,6 +46,7 @@ require_workflow_value '      - "packages/browser-runtime/native-chrome/**"' 1
 require_workflow_value '      - "cmd/**"' 1
 require_workflow_value '      - "packages/**"' 1
 require_workflow_value '      - "scripts/download-pinned-cli.mjs"' 1
+require_workflow_value '      - "scripts/resolve-agent-node-module.mjs"' 1
 require_workflow_value '      - "shared/cli-lock.json"' 1
 require_workflow_value '          DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}' 1
 require_workflow_value "docker/setup-qemu-action@v3" 1

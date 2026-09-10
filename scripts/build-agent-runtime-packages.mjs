@@ -6,9 +6,9 @@ import {
   readFile,
   writeFile,
 } from "node:fs/promises";
-import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readAgentHostContract } from "./resolve-agent-node-module.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const canonicalSkillRoot = join(
@@ -37,9 +37,7 @@ async function packageVersion() {
   return JSON.parse(raw).version;
 }
 
-const hostContract = JSON.parse(readFileSync(join(repositoryRoot, "packages/agent-adapters/agenthost/contract.json"), "utf8"));
-
-function browserMCP(host) {
+function browserMCP(host, hostContract) {
   const server = {
     command: "/usr/local/bin/openlinker",
     args: [...hostContract.browser_proxy, host],
@@ -60,6 +58,7 @@ function browserMCP(host) {
 }
 
 export async function buildAgentRuntimePackages(outputRoot) {
+  const hostContract = readAgentHostContract();
   const root = resolve(outputRoot);
   const version = await packageVersion();
   const codexMarketplace = join(root, "codex-marketplace");
@@ -126,7 +125,7 @@ export async function buildAgentRuntimePackages(outputRoot) {
       },
     },
   );
-  await writeJSON(join(codexPlugin, ".mcp.json"), browserMCP("codex"));
+  await writeJSON(join(codexPlugin, ".mcp.json"), browserMCP("codex", hostContract));
 
   await writeJSON(
     join(claudePlugin, ".claude-plugin", "plugin.json"),
@@ -149,7 +148,7 @@ export async function buildAgentRuntimePackages(outputRoot) {
       commands: "./commands/",
     },
   );
-  await writeJSON(join(claudePlugin, ".mcp.json"), browserMCP("claude"));
+  await writeJSON(join(claudePlugin, ".mcp.json"), browserMCP("claude", hostContract));
 
   await Promise.all([
     copyCanonicalFile(

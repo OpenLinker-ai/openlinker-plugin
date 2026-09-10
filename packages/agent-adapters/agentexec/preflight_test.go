@@ -3,7 +3,7 @@ package agentexec
 import (
 	"context"
 	"fmt"
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexrpc"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexrpc"
 	"os"
 	"path/filepath"
 	"strings"

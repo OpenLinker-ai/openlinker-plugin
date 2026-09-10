@@ -39,9 +39,15 @@ RUN test "${TARGETOS}" = linux \
 # Build native Browser plugin assets from this checkout, not its own release.
 FROM --platform=$BUILDPLATFORM node:24.4.1-bookworm-slim@sha256:36ae19f59c91f3303c7a648f07493fe14c4bd91320ac8d898416327bacf1bbfa AS agent-runtime-plugin
 WORKDIR /src
+# Go is build-only: read the verified, exact Node module's canonical contract.
+# Nothing from this toolchain/cache is copied into final Provider images.
+COPY --from=go-source /usr/local/go /usr/local/go
+COPY --from=go-source /go/pkg/mod /go/pkg/mod
+COPY --from=go-source /src/go.mod /src/go.sum ./
+ENV PATH=/usr/local/go/bin:$PATH GOWORK=off GOFLAGS=-mod=readonly GOPROXY=off
 COPY package.json LICENSE ./
 COPY scripts/build-agent-runtime-packages.mjs ./scripts/build-agent-runtime-packages.mjs
-COPY packages/agent-adapters/agenthost/contract.json ./packages/agent-adapters/agenthost/contract.json
+COPY scripts/resolve-agent-node-module.mjs ./scripts/resolve-agent-node-module.mjs
 COPY shared/skills/use-isolated-browser ./shared/skills/use-isolated-browser
 COPY platforms/claude/openlinker/commands/use-isolated-browser.md ./platforms/claude/openlinker/commands/use-isolated-browser.md
 RUN node scripts/build-agent-runtime-packages.mjs --out /out \
@@ -55,8 +61,6 @@ FROM agent-runtime-plugin AS cli-artifact
 ARG TARGETOS
 ARG TARGETARCH
 ARG OPENLINKER_GO_VERSION
-COPY --from=go-source /usr/local/go /usr/local/go
-ENV PATH=/usr/local/go/bin:$PATH
 COPY shared/cli-lock.json ./shared/cli-lock.json
 COPY scripts/download-pinned-cli.mjs ./scripts/download-pinned-cli.mjs
 RUN node scripts/download-pinned-cli.mjs \

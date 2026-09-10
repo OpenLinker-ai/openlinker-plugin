@@ -16,7 +16,7 @@
     "lock:cli": "node scripts/generate-cli-lock.mjs",
     "test:cli": "node test/cli/resolve-openlinker-cli.test.mjs",
     "test:installer": "node test/cli/install-openlinker-cli.test.mjs",
-    "test:agent-runtime": "node --test test/agent-runtime-packages.test.mjs test/agent-runtime-sbom.test.mjs",
+    "test:agent-runtime": "node --test test/agent-node-module.test.mjs test/agent-runtime-packages.test.mjs test/agent-runtime-sbom.test.mjs",
     "test": "npm run check:manifests && npm run check:skills && npm run check:packages && npm run check:docs && npm run check:secrets && npm run check:publication && node --test test/publication-boundary.test.mjs && npm run check:chatgpt && npm run test:agent-runtime && npm run test:cli && npm run test:installer && npm run test:provider-cli",
     "release:check": "npm test && npm run check:release-lock",
     "test:go": "GOWORK=off go test -race ./...",
