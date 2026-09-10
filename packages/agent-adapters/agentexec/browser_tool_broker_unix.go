@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/providersession"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserplugin"
 )
 
@@ -57,7 +58,7 @@ func startBrowserToolBroker(
 		!rootInfo.IsDir() ||
 		rootInfo.Mode().Perm()&0o007 != 0 ||
 		rootInfo.Mode().Perm()&0o020 != 0 ||
-		!sessionFileOwnedByCurrentUser(rootInfo) {
+		!providersession.OwnedByCurrentUser(rootInfo) {
 		return nil, errors.New("Browser tool broker root must be owner-controlled and not writable by group or other users")
 	}
 	socketPath := filepath.Join(root, "browser-"+lease.identity.RunID+".sock")

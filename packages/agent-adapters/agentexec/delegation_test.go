@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	openlinker "github.com/OpenLinker-ai/openlinker-go"
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agentdelegation"
+	openlinker "github.com/OpenLinker-ai/openlinker-go"
 )
 
 const nativeParentID = "11111111-1111-4111-8111-111111111111"
@@ -165,7 +165,7 @@ func TestNativeDelegationProviderHelper(t *testing.T) {
 		os.Exit(2)
 	}
 	if host == "codex" {
-		rpc.finish("continued after child review passed")
+		rpc.Finish("continued after child review passed")
 	} else {
 		fmt.Println(`{"type":"result","result":"continued after child review passed"}`)
 	}
