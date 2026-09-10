@@ -1,0 +1,238 @@
+{
+  "contract_id": "openlinker.agent-config.v1",
+  "baseline_commit": "610bb66d082dc14eb379feb70271540eb3b16d78",
+  "source_sha256": {
+    "packages/agent-adapters/agent/config.go": "7870596cb4fc8e7919e4e9eaac52e299538455bbf91e7ab8292219e504939c15",
+    "packages/agent-adapters/agent/configure.go": "7cec6ca2c9c92e80baa6bbdbb1904dca1486023a70a5c31fc8b1163d88f9a152",
+    "packages/agent-adapters/agent/application.go": "c729f3b1469c2f5926683c26748893c3762f2ced2e6ae37e64c209a5a09295a7",
+    "packages/agent-adapters/agent/files.go": "e6f0d7c5c02f6639b6d00b54590e67000fec6d233ed1a121ef92b75e9b539d55"
+  },
+  "schema": [
+    {
+      "name": "DelegationTargets",
+      "type": "[]string",
+      "json_tag": "delegation_targets,omitempty"
+    },
+    {
+      "name": "DelegationProxyBin",
+      "type": "string",
+      "json_tag": "delegation_proxy_bin,omitempty"
+    },
+    {
+      "name": "DelegationBrokerRoot",
+      "type": "string",
+      "json_tag": "delegation_broker_root,omitempty"
+    },
+    {
+      "name": "Version",
+      "type": "int",
+      "json_tag": "version"
+    },
+    {
+      "name": "Enabled",
+      "type": "bool",
+      "json_tag": "enabled"
+    },
+    {
+      "name": "Provider",
+      "type": "string",
+      "json_tag": "provider"
+    },
+    {
+      "name": "OpenLinkerURL",
+      "type": "string",
+      "json_tag": "openlinker_url,omitempty"
+    },
+    {
+      "name": "AgentID",
+      "type": "string",
+      "json_tag": "agent_id"
+    },
+    {
+      "name": "Workspace",
+      "type": "string",
+      "json_tag": "workspace"
+    },
+    {
+      "name": "StateDir",
+      "type": "string",
+      "json_tag": "state_dir,omitempty"
+    },
+    {
+      "name": "ProviderBin",
+      "type": "string",
+      "json_tag": "provider_bin,omitempty"
+    },
+    {
+      "name": "Model",
+      "type": "string",
+      "json_tag": "model,omitempty"
+    },
+    {
+      "name": "Transport",
+      "type": "string",
+      "json_tag": "transport,omitempty"
+    },
+    {
+      "name": "Capacity",
+      "type": "int64",
+      "json_tag": "capacity"
+    },
+    {
+      "name": "TimeoutSeconds",
+      "type": "int",
+      "json_tag": "timeout_seconds"
+    },
+    {
+      "name": "SessionReuse",
+      "type": "bool",
+      "json_tag": "session_reuse"
+    },
+    {
+      "name": "WebSearch",
+      "type": "bool",
+      "json_tag": "web_search"
+    },
+    {
+      "name": "CodexBaseURL",
+      "type": "string",
+      "json_tag": "codex_base_url,omitempty"
+    },
+    {
+      "name": "CodexSandbox",
+      "type": "string",
+      "json_tag": "codex_sandbox,omitempty"
+    },
+    {
+      "name": "CodexApproval",
+      "type": "string",
+      "json_tag": "codex_approval,omitempty"
+    },
+    {
+      "name": "ClaudePermission",
+      "type": "string",
+      "json_tag": "claude_permission,omitempty"
+    },
+    {
+      "name": "AllowedTools",
+      "type": "[]string",
+      "json_tag": "allowed_tools,omitempty"
+    },
+    {
+      "name": "ExecutionProfile",
+      "type": "string",
+      "json_tag": "execution_profile,omitempty"
+    },
+    {
+      "name": "BrowserInteractionPolicy",
+      "type": "string",
+      "json_tag": "browser_interaction_policy,omitempty"
+    },
+    {
+      "name": "BrowserClientMode",
+      "type": "string",
+      "json_tag": "browser_client_mode,omitempty"
+    },
+    {
+      "name": "BrowserPluginBin",
+      "type": "string",
+      "json_tag": "browser_plugin_bin,omitempty"
+    },
+    {
+      "name": "BrowserNativePlugin",
+      "type": "string",
+      "json_tag": "browser_native_plugin,omitempty"
+    },
+    {
+      "name": "BrowserSocket",
+      "type": "string",
+      "json_tag": "browser_socket,omitempty"
+    },
+    {
+      "name": "BrowserCredentialFile",
+      "type": "string",
+      "json_tag": "browser_credential_file,omitempty"
+    },
+    {
+      "name": "BrowserLeaseRoot",
+      "type": "string",
+      "json_tag": "browser_lease_root,omitempty"
+    },
+    {
+      "name": "BrowserBrokerRoot",
+      "type": "string",
+      "json_tag": "browser_broker_root,omitempty"
+    }
+  ],
+  "defaults": {
+    "DelegationTargets": null,
+    "DelegationProxyBin": "",
+    "DelegationBrokerRoot": "",
+    "Version": 1,
+    "Enabled": false,
+    "Provider": "",
+    "OpenLinkerURL": "",
+    "AgentID": "",
+    "Workspace": "",
+    "StateDir": "",
+    "ProviderBin": "",
+    "Model": "",
+    "Transport": "auto",
+    "Capacity": 1,
+    "TimeoutSeconds": 1800,
+    "SessionReuse": true,
+    "WebSearch": false,
+    "CodexBaseURL": "",
+    "CodexSandbox": "read-only",
+    "CodexApproval": "never",
+    "ClaudePermission": "dontAsk",
+    "AllowedTools": null,
+    "ExecutionProfile": "standard",
+    "BrowserInteractionPolicy": "restricted",
+    "BrowserClientMode": "",
+    "BrowserPluginBin": "",
+    "BrowserNativePlugin": "",
+    "BrowserSocket": "",
+    "BrowserCredentialFile": "",
+    "BrowserLeaseRoot": "",
+    "BrowserBrokerRoot": ""
+  },
+  "portable_config": {
+    "delegation_targets": [
+      "22222222-2222-4222-8222-222222222222"
+    ],
+    "delegation_proxy_bin": "synthetic-delegation-proxy",
+    "delegation_broker_root": "${TEST_ROOT}/delegation",
+    "version": 1,
+    "enabled": true,
+    "provider": "claude",
+    "openlinker_url": "https://core.example.invalid",
+    "agent_id": "11111111-1111-4111-8111-111111111111",
+    "workspace": "${TEST_ROOT}",
+    "state_dir": "${TEST_ROOT}/state",
+    "provider_bin": "synthetic-claude",
+    "model": "synthetic-model",
+    "transport": "pull",
+    "capacity": 3,
+    "timeout_seconds": 75,
+    "session_reuse": false,
+    "web_search": true,
+    "codex_base_url": "https://router.example.invalid/v1",
+    "codex_sandbox": "workspace-write",
+    "codex_approval": "on-request",
+    "claude_permission": "plan",
+    "allowed_tools": [
+      "Read",
+      "WebSearch"
+    ],
+    "execution_profile": "standard",
+    "browser_interaction_policy": "restricted",
+    "browser_client_mode": "isolated-mcp",
+    "browser_plugin_bin": "synthetic-browser-proxy",
+    "browser_native_plugin": "${TEST_ROOT}/native-plugin",
+    "browser_socket": "${TEST_ROOT}/browser.sock",
+    "browser_credential_file": "${TEST_ROOT}/synthetic-channel-path",
+    "browser_lease_root": "${TEST_ROOT}/leases",
+    "browser_broker_root": "${TEST_ROOT}/broker"
+  }
+}

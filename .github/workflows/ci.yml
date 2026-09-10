@@ -48,6 +48,8 @@ jobs:
           node-version: 22
       - run: node scripts/generate-codex-rpc.mjs --check
       - run: npm run test:go
+      - name: Verify frozen app configuration and storage contracts
+        run: GOWORK=off go test -mod=readonly -count=1 -run '^Test(AgentConfigContract|SharedApp)' ./packages/agent-adapters/agent
       - name: Test pinned Codex tool execution without model credentials
         env:
           OPENLINKER_TEST_CODEX_RPC_LOCAL_MODEL: "1"

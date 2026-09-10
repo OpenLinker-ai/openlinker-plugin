@@ -4,11 +4,12 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/appfiles"
 )
 
 const configVersion = 1
@@ -209,36 +210,7 @@ func resolveSecret(getenv func(string) string, directName, fileName string, requ
 }
 
 func readPrivateSecret(path string) (string, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return "", err
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return "", errors.New("secret path must be a regular file and not a symlink")
-	}
-	if info.Mode().Perm()&0o077 != 0 {
-		return "", errors.New("secret file must not be accessible by group or other users")
-	}
-	if !secretFileOwnedByCurrentUser(info) {
-		return "", errors.New("secret file must be owned by the current user")
-	}
-	if info.Size() <= 0 || info.Size() > 64<<10 {
-		return "", errors.New("secret file size is invalid")
-	}
-	file, err := os.Open(path) // #nosec G304 -- operator-selected secret path is validated above.
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	raw, err := io.ReadAll(io.LimitReader(file, (64<<10)+1))
-	if err != nil {
-		return "", err
-	}
-	value := strings.TrimSpace(string(raw))
-	if value == "" {
-		return "", errors.New("secret file is empty")
-	}
-	return value, nil
+	return appfiles.ReadPrivateSecret(path)
 }
 
 func envValue(getenv func(string) string, key string) string {

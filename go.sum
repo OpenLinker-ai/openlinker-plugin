@@ -46,5 +46,5 @@ google.golang.org/grpc v1.82.1 h1:NnAxzGRA0677vCa4BUkOAnO5+FfQqVl9iUXeD0IqcGE=
 google.golang.org/grpc v1.82.1/go.mod h1:yzTZ1TB1Z3SG+LIYaI+WiE8D5+PZ3ArnrSp8zF3+/ZA=
 google.golang.org/protobuf v1.36.11 h1:fV6ZwhNocDyBLK0dj+fg8ektcVegBBuEolpbTQyBNVE=
 google.golang.org/protobuf v1.36.11/go.mod h1:HTf+CrKn2C3g5S8VImy6tdcUvCska2kB7j23XfzDpco=
-github.com/OpenLinker-ai/openlinker-agent-node v0.1.57-0.20260910053511-0db09bf8cb3d h1:6OySUuYonimSwE6wXcK8tWKsIjV03r0aCSLZp8DRiXk=
-github.com/OpenLinker-ai/openlinker-agent-node v0.1.57-0.20260910053511-0db09bf8cb3d/go.mod h1:qRJ40XqLsqQ3fVfRMrHu4bbw5jln2UtnNoqeSbxB24E=
+github.com/OpenLinker-ai/openlinker-agent-node v0.1.57-0.20260910171739-f20fe4e687dc h1:Z6iCo1WtcTbcslahtgnac4cb4vuOoO8bHOKu31lzNU4=
+github.com/OpenLinker-ai/openlinker-agent-node v0.1.57-0.20260910171739-f20fe4e687dc/go.mod h1:qRJ40XqLsqQ3fVfRMrHu4bbw5jln2UtnNoqeSbxB24E=
