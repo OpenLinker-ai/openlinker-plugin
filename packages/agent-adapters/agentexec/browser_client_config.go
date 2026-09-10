@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agenthost"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agenthost"
 )
 
 var browserEnvironmentNames = []string{

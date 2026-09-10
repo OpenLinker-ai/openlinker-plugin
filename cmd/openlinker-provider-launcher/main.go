@@ -5,13 +5,14 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexhome"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
 	"syscall"
 
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexhome"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/providerprocess"
 	"golang.org/x/sys/unix"
 )
 
@@ -56,7 +57,8 @@ func main() {
 		}
 	}
 	runtime.LockOSThread()
-	if err := dropProviderPrivileges(); err != nil {
+	environment, err = dropProviderPrivilegesAndRefreshEnvironment(environment)
+	if err != nil {
 		fatal(err)
 	}
 	if strings.EqualFold(fixedProvider, "codex") && environmentValue(environment, codexhome.PrepareEnvironment) == "1" {
@@ -89,7 +91,8 @@ func runProviderExecStage() {
 	}
 	environment := removeEnvironment(os.Environ(), providerExecStageEnv)
 	runtime.LockOSThread()
-	if err := dropProviderPrivileges(); err != nil {
+	environment, err = dropProviderPrivilegesAndRefreshEnvironment(environment)
+	if err != nil {
 		fatal(err)
 	}
 	argv := append([]string{target}, os.Args[1:]...)
@@ -133,6 +136,15 @@ func fixedProviderBinary(provider string) (string, error) {
 	default:
 		return "", errors.New("launcher Provider is not fixed at image build time")
 	}
+}
+
+// Both launch paths derive USER only after changing the effective OS identity.
+// A cached Worker login name or a caller-supplied USER must not reach Provider.
+func dropProviderPrivilegesAndRefreshEnvironment(environment []string) ([]string, error) {
+	if err := dropProviderPrivileges(); err != nil {
+		return nil, err
+	}
+	return providerprocess.WithIdentity(environment), nil
 }
 
 func dropProviderPrivileges() error {

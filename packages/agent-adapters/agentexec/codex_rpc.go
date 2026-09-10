@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexhome"
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexrpc"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexhome"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexrpc"
 )
 
 var errCodexSessionMissing = errors.New("Codex native session no longer exists")
@@ -201,7 +201,7 @@ func runCodexRPC(ctx context.Context, bin, workspace, sandbox, sessionID, prompt
 				safeSource["type"] = "web_search"
 			}
 			raw, _ = json.Marshal(map[string]any{"type": strings.ReplaceAll(event.Method, "/", "."), "item": safeSource})
-			observe.observeLine(raw)
+			observe.ObserveLine(raw)
 		case "error":
 			var failure codexrpc.ErrorNotification
 			if json.Unmarshal(event.Params, &failure) != nil {

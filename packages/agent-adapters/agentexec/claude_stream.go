@@ -1,79 +1,14 @@
 package agentexec
 
-import "strings"
+import "github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/providerstream"
 
 func newClaudeJSONLObserver(emit func(string, any) error, suppressBrowser bool) *jsonlObserver {
-	active := map[string]string{}
-	return &jsonlObserver{emit: emit, progress: func(event map[string]any) []map[string]any {
-		var payloads []map[string]any
-		progress := func(phase, kind string) {
-			payloads = append(payloads, map[string]any{
-				"provider": "claude", "status": "provider_tool_" + phase,
-				"phase": phase, "tool_kind": kind,
-			})
+	// Browser event policy belongs to the deep Plugin, not the shared parser.
+	var suppressTool func(string) bool
+	if suppressBrowser {
+		suppressTool = func(name string) bool {
+			return name == "mcp__openlinker_browser__browser_session"
 		}
-		block := func(content map[string]any) {
-			switch stringValue(content["type"]) {
-			case "tool_use":
-				id, name := stringValue(content["id"]), stringValue(content["name"])
-				if id == "" || active[id] != "" || len(active) >= 512 {
-					return
-				}
-				kind := "tool"
-				switch {
-				case name == "Bash":
-					kind = "command"
-				case name == "WebSearch" || name == "WebFetch":
-					kind = "web_search"
-				case strings.HasPrefix(name, "mcp__"):
-					kind = "mcp_tool"
-				}
-				if suppressBrowser && name == "mcp__openlinker_browser__browser_session" {
-					kind = "suppressed"
-				}
-				active[id] = kind
-				if kind != "suppressed" {
-					progress("started", kind)
-				}
-			case "tool_result":
-				id := stringValue(content["tool_use_id"])
-				kind := active[id]
-				if kind == "" {
-					return
-				}
-				delete(active, id)
-				if kind == "suppressed" {
-					return
-				}
-				phase := "completed"
-				if failed, _ := content["is_error"].(bool); failed {
-					phase = "failed"
-				}
-				progress(phase, kind)
-			}
-		}
-		switch stringValue(event["type"]) {
-		case "stream_event":
-			nested, _ := event["event"].(map[string]any)
-			switch stringValue(nested["type"]) {
-			case "message_start":
-				payloads = append(payloads, map[string]any{"provider": "claude", "status": "provider_processing", "phase": "started"})
-			case "content_block_start":
-				content, _ := nested["content_block"].(map[string]any)
-				block(content)
-			}
-		case "assistant", "user":
-			message, _ := event["message"].(map[string]any)
-			contents, _ := message["content"].([]any)
-			for _, content := range contents {
-				value, _ := content.(map[string]any)
-				block(value)
-			}
-		case "system":
-			if event["subtype"] == "api_retry" {
-				payloads = append(payloads, map[string]any{"provider": "claude", "status": "provider_retrying", "phase": "retrying"})
-			}
-		}
-		return payloads
-	}}
+	}
+	return providerstream.NewClaudeObserver(emit, suppressTool)
 }

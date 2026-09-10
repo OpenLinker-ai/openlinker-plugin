@@ -202,6 +202,16 @@ container and is never bundled into the Provider image.
 
 ## Local validation
 
+Building or validating native Runtime packages requires Node.js and the Go
+version in `go.mod`. Build tools resolve the exact Agent Node module in
+`go.mod`/`go.sum` with `GOWORK=off`, verify its checksum and module cache, and
+read its canonical `openlinker.agent-host.v1` contract. They do not use a sibling
+checkout or copied protocol definition. This is a build-only dependency:
+installed native packages and final Provider images gain no Go toolchain or
+Agent Node service requirement. Codex schema refresh now belongs to the Agent
+Node repository; this repository's generator command only supports `--check`
+against its pinned module.
+
 ```bash
 npm test
 npm run test:go

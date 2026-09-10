@@ -3,7 +3,7 @@ package agentexec
 import (
 	"context"
 	"fmt"
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexhome"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexhome"
 	"os"
 	"os/exec"
 	"regexp"

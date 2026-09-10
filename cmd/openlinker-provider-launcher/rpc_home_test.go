@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexhome"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexhome"
 )
 
 func TestRPCHomePreparedUnderProviderIdentity(t *testing.T) {

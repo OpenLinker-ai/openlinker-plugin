@@ -14,7 +14,7 @@ import (
 	"time"
 
 	openlinker "github.com/OpenLinker-ai/openlinker-go"
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentdelegation"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agentdelegation"
 )
 
 const nativeParentID = "11111111-1111-4111-8111-111111111111"

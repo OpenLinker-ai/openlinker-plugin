@@ -67,7 +67,7 @@ func (s *claudeResultStream) consume() error {
 		if event.Type == "result" {
 			s.result, s.found = event, true
 		} else if s.observer != nil {
-			s.observer.observeLine(line)
+			s.observer.ObserveLine(line)
 		}
 	}
 	s.pending = s.pending[:0]

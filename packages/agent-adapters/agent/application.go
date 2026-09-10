@@ -10,9 +10,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentdelegation"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agentdelegation"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentexec"
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agenthost"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agenthost"
 )
 
 type Diagnostic struct {

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/codexrpc"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexrpc"
 )
 
 const fixtureThread = "11111111-1111-4111-8111-111111111111"
