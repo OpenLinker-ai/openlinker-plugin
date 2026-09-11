@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -23,11 +24,17 @@ type brokerTestEngine struct {
 }
 
 func (engine brokerTestEngine) Execute(
-	_ context.Context,
+	ctx context.Context,
 	identity browserprotocol.Identity,
 	action browserprotocol.Action,
 ) (browserprotocol.Observation, *browserprotocol.Failure) {
-	engine.actions <- action.Kind
+	select {
+	case engine.actions <- action.Kind:
+	case <-ctx.Done():
+		return browserprotocol.Observation{}, browserprotocol.NewFailure(
+			browserprotocol.ErrorDeadlineExceeded, "test engine action recording timed out", false,
+		)
+	}
 	if action.Kind == browserprotocol.ActionClose {
 		return browserprotocol.Observation{
 			PageStateID: "closed-" + identity.AttachmentID,
@@ -78,6 +85,9 @@ func (provider *brokerMCPProvider) Run(
 		return openlinker.RuntimeResult{}, err
 	}
 	defer connection.Close()
+	if err := connection.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		return openlinker.RuntimeResult{}, err
+	}
 	for _, request := range []map[string]any{
 		{
 			"jsonrpc": "2.0",
@@ -112,36 +122,67 @@ func (provider *brokerMCPProvider) Run(
 			return openlinker.RuntimeResult{}, err
 		}
 	}
-	_ = connection.SetReadDeadline(time.Now().Add(2 * time.Second))
 	scanner := bufio.NewScanner(connection)
+	received := make(map[int]bool, 3)
+	observations := 0
+	evidenceResponses := 0
 	for scanner.Scan() {
-		var response map[string]any
+		var response struct {
+			ID     int             `json:"id"`
+			Result json.RawMessage `json:"result"`
+			Error  json.RawMessage `json:"error"`
+		}
 		if err := json.Unmarshal(scanner.Bytes(), &response); err != nil {
 			return openlinker.RuntimeResult{}, err
 		}
-		if response["id"] == float64(1) {
-			result, _ := response["result"].(map[string]any)
-			serverInfo, _ := result["serverInfo"].(map[string]any)
-			provider.serverVersion, _ = serverInfo["version"].(string)
+		if response.ID < 1 || response.ID > 3 || received[response.ID] {
+			return openlinker.RuntimeResult{}, fmt.Errorf("unexpected or duplicate MCP response ID: %d", response.ID)
 		}
-		if response["id"] != float64(2) && response["id"] != float64(3) {
-			continue
+		if len(response.Error) != 0 && string(response.Error) != "null" {
+			return openlinker.RuntimeResult{}, fmt.Errorf("MCP request %d failed", response.ID)
 		}
-		raw := string(scanner.Bytes())
-		if strings.Contains(raw, "page-state-1") &&
-			strings.Contains(raw, "https://example.com") &&
-			strings.Contains(raw, `"type":"image"`) &&
-			strings.Contains(raw, `"attachment_evidence"`) &&
-			!strings.Contains(raw, `"browser_version"`) {
-			provider.observed = true
+		received[response.ID] = true
+		if response.ID == 1 {
+			var result struct {
+				ServerInfo struct {
+					Version string `json:"version"`
+				} `json:"serverInfo"`
+			}
+			if err := json.Unmarshal(response.Result, &result); err != nil {
+				return openlinker.RuntimeResult{}, err
+			}
+			provider.serverVersion = result.ServerInfo.Version
+		} else {
+			raw := string(response.Result)
+			if strings.Contains(raw, "page-state-1") &&
+				strings.Contains(raw, "https://example.com") &&
+				strings.Contains(raw, `"type":"image"`) &&
+				!strings.Contains(raw, `"browser_version"`) {
+				observations++
+			} else {
+				return openlinker.RuntimeResult{}, fmt.Errorf("MCP request %d did not return the expected Browser observation", response.ID)
+			}
+			if strings.Contains(raw, `"attachment_evidence"`) {
+				evidenceResponses++
+			}
 		}
-		if response["id"] == float64(3) {
+		// Responses are concurrent; ID 3 can arrive before ID 1 or ID 2.
+		if len(received) == 3 {
 			break
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return openlinker.RuntimeResult{}, err
 	}
+	if len(received) != 3 {
+		return openlinker.RuntimeResult{}, fmt.Errorf("MCP closed before all responses arrived: received %v", received)
+	}
+	// Attachment evidence is emitted once per session/control epoch, whichever
+	// observation completes first. Both observations must still succeed.
+	if evidenceResponses != 1 {
+		return openlinker.RuntimeResult{}, fmt.Errorf("attachment evidence returned %d times, want once", evidenceResponses)
+	}
+	provider.observed = observations == 2
 	return openlinker.RuntimeResult{
 		Status: "success",
 		Output: map[string]any{"observed": provider.observed},
@@ -176,9 +217,19 @@ func TestBrowserToolBrokerKeepsAuthorityOutOfProviderProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 	runtimeContext, stopRuntime := context.WithCancel(context.Background())
-	defer stopRuntime()
 	runtimeDone := make(chan error, 1)
 	go func() { runtimeDone <- runtimeServer.Serve(runtimeContext) }()
+	t.Cleanup(func() {
+		stopRuntime()
+		select {
+		case err := <-runtimeDone:
+			if err != nil {
+				t.Error(err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Error("Browser Runtime did not stop after cancellation")
+		}
+	})
 	waitForUnixSocket(t, socketPath)
 
 	base := &brokerMCPProvider{}
@@ -199,7 +250,9 @@ func TestBrowserToolBrokerKeepsAuthorityOutOfProviderProcess(t *testing.T) {
 		}
 		return nil
 	}
-	if _, err := provider.Run(context.Background(), run); err != nil {
+	runContext, stopRun := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stopRun()
+	if _, err := provider.Run(runContext, run); err != nil {
 		t.Fatal(err)
 	}
 	if !base.observed {
@@ -208,17 +261,18 @@ func TestBrowserToolBrokerKeepsAuthorityOutOfProviderProcess(t *testing.T) {
 	if base.serverVersion != config.Version {
 		t.Fatalf("Browser MCP server version = %q, want embedding version %q", base.serverVersion, config.Version)
 	}
-	if first, second, third, fourth := <-actions, <-actions, <-actions, <-actions; first != browserprotocol.ActionPreflight ||
-		second != browserprotocol.ActionScreenshot ||
-		third != browserprotocol.ActionScreenshot ||
-		fourth != browserprotocol.ActionClose {
-		t.Fatalf(
-			"Browser actions = [%s %s %s %s], want preflight, screenshot, screenshot, close",
-			first,
-			second,
-			third,
-			fourth,
-		)
+	wanted := []browserprotocol.ActionKind{browserprotocol.ActionPreflight, browserprotocol.ActionScreenshot, browserprotocol.ActionScreenshot, browserprotocol.ActionClose}
+	var recorded []browserprotocol.ActionKind
+	for _, want := range wanted {
+		select {
+		case action := <-actions:
+			recorded = append(recorded, action)
+			if action != want {
+				t.Fatalf("Browser actions = %v, want %v", recorded, wanted)
+			}
+		case <-runContext.Done():
+			t.Fatalf("Browser actions incomplete: got %v, want %v: %v", recorded, wanted, runContext.Err())
+		}
 	}
 	if len(progress) != 1 ||
 		progress[0]["status"] != "provider_tool_started" ||
@@ -226,10 +280,6 @@ func TestBrowserToolBrokerKeepsAuthorityOutOfProviderProcess(t *testing.T) {
 		progress[0]["phase"] != "started" ||
 		progress[0]["tool_kind"] != "mcp_tool" {
 		t.Fatalf("bounded Browser progress = %#v", progress)
-	}
-	stopRuntime()
-	if err := <-runtimeDone; err != nil {
-		t.Fatal(err)
 	}
 }
 
