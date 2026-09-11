@@ -13,6 +13,7 @@ export function validateHostLock(lock) {
   assert.equal(lock.surface_version, "openlinker.plugin-host.v1");
   assert.match(lock.version, /^v\d+\.\d+\.\d+(?:-rc\.\d+)?$/);
   assert.match(lock.plugin_commit, /^[a-f0-9]{40}$/);
+  assert.match(lock.source_tree_sha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(lock.capabilities, hostCapabilities);
   assert.deepEqual(Object.keys(lock.assets).sort(), platforms);
   for (const target of platforms) {

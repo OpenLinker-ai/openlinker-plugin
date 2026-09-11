@@ -100,3 +100,19 @@ jobs:
               exit 1
             }
           }
+
+  validate-marketplace-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-14, windows-2025]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Verify locked host source and delivery copies
+        run: node scripts/check-host-lock.mjs
+      - name: Install public host from Git marketplace package and exercise native MCP
+        run: node scripts/verify-marketplace-host.mjs

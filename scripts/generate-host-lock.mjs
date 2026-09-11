@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { download, sha256 } from "../platforms/codex/openlinker/scripts/install-openlinker-cli.mjs";
 import { platforms, hostCapabilities, binaryName, validateHostLock } from "../platforms/codex/openlinker/scripts/plugin-host-lock.mjs";
+import { hostSourceDigest } from "./plugin-host-source.mjs";
 
 const tag = process.argv[2];
 assert.match(tag ?? "", /^v\d+\.\d+\.\d+(?:-rc\.\d+)?$/);
@@ -12,7 +13,7 @@ assert.ok(process.argv.slice(3).every(arg => arg === "--write"), "usage: generat
 const repository = "OpenLinker-ai/openlinker-plugin";
 const root = resolve(import.meta.dirname, "..");
 const commit = execFileSync("git", ["rev-parse", `${tag}^{commit}`], { cwd: root, encoding: "utf8" }).trim();
-const lock = { schema_version: 1, repository, version: tag, plugin_commit: commit, surface_version: "openlinker.plugin-host.v1", capabilities: hostCapabilities, assets: {} };
+const lock = { schema_version: 1, repository, version: tag, plugin_commit: commit, source_tree_sha256: hostSourceDigest(tag), surface_version: "openlinker.plugin-host.v1", capabilities: hostCapabilities, assets: {} };
 const work = await mkdtemp(join(tmpdir(), "openlinker-host-lock-"));
 try {
   for (const target of platforms) {
@@ -23,12 +24,12 @@ try {
     await download(`${url}.sha256`, `${path}.sha256`);
     const digest = await sha256(path);
     assert.equal((await readFile(`${path}.sha256`, "utf8")).trim(), `${digest}  ${archive}`);
-    const metadata = JSON.parse(execFileSync("tar", ["-xOzf", path, "host-build-info.json"], { encoding: "utf8" }));
+    const metadata = JSON.parse(execFileSync("tar", ["-xOzf", archive, "host-build-info.json"], { encoding: "utf8", cwd: work }));
     assert.equal(metadata.plugin_commit, commit);
     assert.equal(metadata.plugin_host_version, tag);
     assert.equal(metadata.host_platform, target);
     const { createHash } = await import("node:crypto");
-    const binary = execFileSync("tar", ["-xOzf", path, binaryName(target)], { maxBuffer: 100 * 1024 * 1024 });
+    const binary = execFileSync("tar", ["-xOzf", archive, binaryName(target)], { maxBuffer: 100 * 1024 * 1024, cwd: work });
     assert.equal(createHash("sha256").update(binary).digest("hex"), metadata.plugin_host_sha256);
     lock.assets[target] = { archive, archive_url: url, checksum_url: `${url}.sha256`, sha256: digest, binary_sha256: metadata.plugin_host_sha256, executable_path: binaryName(target), metadata_path: "host-build-info.json" };
   }

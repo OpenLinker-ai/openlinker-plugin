@@ -198,14 +198,17 @@ export async function sha256(path) {
 
 export async function extractExecutable(archive, asset, target, destination) {
   const isZip = asset.archive.endsWith(".zip");
-  const list = spawnSync(isZip ? "unzip" : "tar", isZip ? ["-Z1", archive] : ["-tzf", archive], { encoding: "utf8" });
+  // GNU tar treats C: as a remote host; a basename plus cwd also works on Windows.
+  const archiveName = basename(archive);
+  const archiveDirectory = dirname(archive);
+  const list = spawnSync(isZip ? "unzip" : "tar", isZip ? ["-Z1", archiveName] : ["-tzf", archiveName], { encoding: "utf8", cwd: archiveDirectory });
   if (list.status !== 0) fail(`cannot inspect ${asset.archive}: ${list.stderr.trim()}`);
   const entries = list.stdout.split(/\r?\n/).filter(Boolean);
   if (entries.filter((entry) => entry === asset.executable_path).length !== 1) {
     fail(`archive does not contain exactly one ${asset.executable_path}`);
   }
   if (!isZip) {
-    const verbose = spawnSync("tar", ["-tvzf", archive, asset.executable_path], { encoding: "utf8" });
+    const verbose = spawnSync("tar", ["-tvzf", archiveName, asset.executable_path], { encoding: "utf8", cwd: archiveDirectory });
     if (verbose.status !== 0 || !verbose.stdout.trimStart().startsWith("-")) {
       fail("archive executable entry is not a regular file");
     }
@@ -214,8 +217,8 @@ export async function extractExecutable(archive, asset, target, destination) {
   try {
     const result = spawnSync(
       isZip ? "unzip" : "tar",
-      isZip ? ["-p", archive, asset.executable_path] : ["-xOzf", archive, asset.executable_path],
-      { stdio: ["ignore", handle.fd, "pipe"], encoding: "utf8" },
+      isZip ? ["-p", archiveName, asset.executable_path] : ["-xOzf", archiveName, asset.executable_path],
+      { stdio: ["ignore", handle.fd, "pipe"], encoding: "utf8", cwd: archiveDirectory },
     );
     if (result.status !== 0) fail(`cannot extract CLI executable: ${result.stderr?.trim() || "archive command failed"}`);
   } finally {

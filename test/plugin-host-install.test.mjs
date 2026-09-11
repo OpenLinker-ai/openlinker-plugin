@@ -26,10 +26,10 @@ async function fixture(t, { omittedMetadata = false, linkedBinary = false, wrong
   const metadata = { source_contract_id: "openlinker.plugin-host-sources.v1", host_platform: target.key, plugin_commit: wrongSource ? "2".repeat(40) : commit, plugin_host_version: version, plugin_host_sha256: binaryHash };
   if (!omittedMetadata) await writeFile(join(source, "host-build-info.json"), JSON.stringify(metadata));
   const archivePath = join(root, "release.tar.gz");
-  const archived = spawnSync("tar", ["-czf", archivePath, "-C", source, binaryName(target.key), ...(omittedMetadata ? [] : ["host-build-info.json"])]);
+  const archived = spawnSync("tar", ["-czf", "release.tar.gz", "-C", source, binaryName(target.key), ...(omittedMetadata ? [] : ["host-build-info.json"])], { cwd: root });
   assert.equal(archived.status, 0, archived.stderr?.toString());
   const archiveBytes = await readFile(archivePath), archiveHash = createHash("sha256").update(archiveBytes).digest("hex");
-  const lock = { schema_version: 1, repository: "OpenLinker-ai/openlinker-plugin", surface_version: context.surface_version, version, plugin_commit: commit, capabilities: hostCapabilities, assets: {} };
+  const lock = { schema_version: 1, repository: "OpenLinker-ai/openlinker-plugin", surface_version: context.surface_version, version, plugin_commit: commit, source_tree_sha256: "1".repeat(64), capabilities: hostCapabilities, assets: {} };
   for (const platform of platforms) {
     const archive = `openlinker-plugin-host-${version}-${platform}.tar.gz`;
     const url = `https://github.com/${lock.repository}/releases/download/${version}/${archive}`;
