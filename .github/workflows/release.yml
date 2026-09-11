@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_native:
-        description: Publish native packages after the compatible CLI release exists (select its immutable Plugin tag)
+        description: Publish native packages with the Plugin-owned host (select an immutable Plugin tag)
         required: true
         default: false
         type: boolean
@@ -52,9 +52,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Verify downstream CLI artifact compatibility
-        run: npm run check:provider-cli -- --expected-sdk "$(GOWORK=off go list -m -f '{{.Version}}' github.com/OpenLinker-ai/openlinker-go)"
-
       - name: Validate release contract
         shell: bash
         run: |
@@ -76,6 +73,7 @@ jobs:
           mkdir -p dist
           runtime_package_root="${RUNNER_TEMP}/openlinker-agent-runtime"
           node scripts/build-agent-runtime-packages.mjs --out "${runtime_package_root}"
+          node scripts/package-native-hosts.mjs "dist/native" "${GITHUB_REF_NAME}"
           codex_archive="openlinker-codex-plugin-${GITHUB_REF_NAME}.tar.gz"
           claude_archive="openlinker-claude-plugin-${GITHUB_REF_NAME}.tar.gz"
           skills_archive="openlinker-skills-${GITHUB_REF_NAME}.tar.gz"
@@ -83,8 +81,8 @@ jobs:
           claude_runtime_archive="openlinker-agent-runtime-claude-plugin-${GITHUB_REF_NAME}.tar.gz"
           codex_runtime_sbom="${codex_runtime_archive}.spdx.json"
           claude_runtime_sbom="${claude_runtime_archive}.spdx.json"
-          tar -C platforms/codex -czf "dist/${codex_archive}" openlinker
-          tar -C platforms/claude -czf "dist/${claude_archive}" openlinker
+          tar -C dist/native/codex -czf "dist/${codex_archive}" openlinker
+          tar -C dist/native/claude -czf "dist/${claude_archive}" openlinker
           tar -C shared -czf "dist/${skills_archive}" skills
           node scripts/create-deterministic-tar-gz.mjs \
             --root "${runtime_package_root}/codex-marketplace" \

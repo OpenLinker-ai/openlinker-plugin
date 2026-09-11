@@ -12,7 +12,7 @@ OpenLinker 官方 Codex 与 Claude Code 双向原生插件。
 | Agent Mode（被调用模式） | OpenLinker → Codex 或 Claude Code | 把当前宿主变成可调用 Agent，并私有复用 Provider Session。 |
 | Browser Agent | OpenLinker → Codex 或 Claude Code → 隔离 Browser | 为显式启用的 Agent 提供客户端 Browser 工具，不使用 Provider computer API。 |
 
-插件会启动本地 stdio MCP bridge；这些 bridge 由校验和锁定版本的 `openlinker` CLI
+插件会启动本地 stdio MCP bridge；这些 bridge 由校验后的 `openlinker-plugin-host`
 和官方 OpenLinker SDK 提供能力。Agent Mode 默认关闭，不依赖 OpenLinker Agent
 Node。Browser 入口在隔离 Browser Runtime 和权威 Attachment 都存在之前同样不会工作。
 
@@ -22,8 +22,8 @@ Node。Browser 入口在隔离 Browser Runtime 和权威 Attachment 都存在之
 `github.com/OpenLinker-ai/openlinker-plugin`。`packages/agent-adapters` 管理
 Provider/Session 执行和 SDK 应用装配；`packages/browser-runtime` 管理纯 Browser
 协议、服务、engine、native assets 与 egress。SDK 仍是 Runtime Worker 的唯一实现。
-CLI 依赖这些包并保持单可执行文件；Plugin Go 包不得反向依赖 CLI/Cobra，纯 Browser
-包不得传递依赖 SDK。独立 Agent 不要求安装原生 Plugin，Browser 仍独立进程/镜像。
+Plugin 宿主消费这些包，CLI 只负责平台调用；Plugin 不得反向依赖 CLI，Cobra 仅用于
+宿主组合入口，纯 Browser 包不得传递依赖 SDK。独立 Agent 不要求安装原生 Plugin，Browser 仍独立进程/镜像。
 
 Dockerfiles、便携 [compose](./deploy/compose.providers.yml) 和回归门禁由本仓库维护。
 原生安装 archive 不携带 Go 源码/浏览器二进制；宿主凭据、卷、Profile 格式和身份不变。
@@ -31,6 +31,12 @@ Dockerfiles、便携 [compose](./deploy/compose.providers.yml) 和回归门禁�
 ## 五分钟开始
 
 ### 1. 安装
+
+新原生发布包自带六平台 Plugin 宿主、SHA-256 和构建信息，详见 [HOST.md](./HOST.md)。
+旧发布包仍配旧 CLI。Git marketplace/source 安装须另外提供已打包宿主及相邻元数据，
+通过 `OPENLINKER_PLUGIN_HOST_BIN` 选择；可在干净提交上运行
+`node scripts/package-native-hosts.mjs dist/native` 生成完整包。
+任务运行时不会隐式下载或编译。宿主解析器需要 Node.js 20+。
 
 Codex：
 
@@ -210,20 +216,11 @@ claude plugin validate .
 
 ## 发布顺序
 
-先发布不可变 Plugin Go module，其 tag CI 不依赖新的 CLI artifact。CLI 固定该 module
-并发布后，再生成六平台 CLI lock，选择已有 release tag 显式触发 native 包与镜像发布。
-Provider 镜像验证 archive checksum、Plugin/SDK build-info 与真实 CLI VCS revision；
-旧 lock 在新 CLI 发布前明确失败。同树生成最小 Runtime native 包，不下载自己的未发布
-release。原生包发布前运行：
-
-```bash
-npm run lock:cli -- <published-cli-version> --write
-npm run release:check
-```
-
-安装器只跟随获准的公开 GitHub Release Host，通过 curl 遵循标准 HTTP/HTTPS 代理，
-同时校验相邻 checksum 与 `cli-lock.json` 中固定的摘要；它只解压预期可执行文件、
-验证 JSON capability surface、拒绝符号链接目标，并原子替换旧版本。
+Node 协议模块先公开，Plugin 固定真实版本与 checksum。Plugin module 不依赖 CLI，
+原生发布从干净 tag 构建六平台宿主并随包分发；Provider 镜像从同一归档源码构建宿主。
+镜像要求 `OPENLINKER_PLUGIN_COMMIT` 构建参数，记录可由 Worker UID 读取的
+`/opt/openlinker/host-build-info.json`。CLI lock 只用于独立调用类 Skill。
+完整门禁、来源校验与回滚要求见 [RELEASE.zh-CN.md](./RELEASE.zh-CN.md)。
 
 ## 本地 Marketplace 测试
 

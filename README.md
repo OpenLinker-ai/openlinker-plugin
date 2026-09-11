@@ -1,5 +1,8 @@
 # OpenLinker Plugin
 
+Native MCP and Agent/Browser execution are delivered by the Plugin-owned
+[`openlinker-plugin-host`](./HOST.md). The platform CLI is a separate caller tool.
+
 [简体中文](./README.zh-CN.md)
 
 Official bidirectional OpenLinker plugins for Codex and Claude Code.
@@ -12,8 +15,8 @@ Install one native plugin to use either direction:
 | Agent Mode | OpenLinker → Codex or Claude Code | Make this host a callable Agent with private provider-session reuse. |
 | Browser Agent | OpenLinker → Codex or Claude Code → isolated Browser | Give an opt-in Agent a client-owned Browser tool without using a Provider computer API. |
 
-The plugin starts local stdio MCP bridges backed by a checksum-pinned
-`openlinker` CLI and the official OpenLinker SDK. Agent Mode is disabled by
+The plugin starts local stdio MCP bridges in its checksum-verified
+`openlinker-plugin-host`, using the official OpenLinker SDK. Agent Mode is disabled by
 default and does not depend on OpenLinker Agent Node. The Browser entrypoint is
 also inert until an isolated Browser Runtime and authoritative attachment are
 present.
@@ -24,18 +27,27 @@ This repository owns both small native host packages and the reusable Go module
 `github.com/OpenLinker-ai/openlinker-plugin`. `packages/agent-adapters` contains
 Provider/session execution and SDK application composition; `packages/browser-runtime`
 contains pure Browser protocols/services, engine/native assets, and egress.
-The SDK remains the only Runtime Worker implementation. CLI consumes these
-packages while remaining one executable. Plugin Go packages cannot depend on
-CLI/Cobra; pure Browser packages cannot transitively depend on SDK. Standalone
+The SDK remains the only Runtime Worker implementation. The Plugin host consumes
+these packages; CLI has no execution dependency on Plugin. Plugin cannot depend on
+CLI, and Cobra stays in the host composition root; pure Browser packages cannot
+transitively depend on SDK. Standalone
 Agents need no native plugin installation; Browser stays a separate process/image.
 
 Dockerfiles, portable [compose](./deploy/compose.providers.yml), and regression gates
-are owned here. Native installation archives do not contain Go sources or browser
-binaries. Credentials, volumes, Profile formats, and identities remain unchanged.
+are owned here. Native installation archives contain verified Plugin host binaries, but no Go
+sources or Browser engine binaries. Credentials, volumes, Profile formats, and identities remain unchanged.
 
 ## Five-minute start
 
 ### 1. Install
+
+Use a native package from a release built with the Plugin host (see [HOST.md](./HOST.md));
+it includes binaries for all supported platforms. Existing older releases still
+use their pinned full CLI. Git marketplace/source installations need a separately
+packaged host and adjacent metadata selected by `OPENLINKER_PLUGIN_HOST_BIN`;
+build a clean checkout with `node scripts/package-native-hosts.mjs dist/native`.
+Source installs do not implicitly compile or download executables at task time.
+Node.js 20+ is required by the host resolver.
 
 For Codex:
 
@@ -228,14 +240,13 @@ Go consumer against their actual manifests, Skills, and Browser wiring.
 
 ## Release ordering
 
-Release the immutable Plugin Go module first; its tag CI does not require a
-new CLI artifact. CLI then pins and releases that module. Only afterwards,
-regenerate the immutable six-platform CLI lock and explicitly dispatch native
-package/image publication from the selected release tag. Provider image builds
-verify the CLI archive checksum, Plugin/SDK module build info, and real CLI VCS
-revision; old locks fail until a migrated CLI is published. Minimal Runtime
-native packages are generated from the same checkout, not downloaded from its
-own release. Before native publication, run:
+Publish the Node protocol module before consuming its exact pin. The Plugin tag
+builds/tests its module independently of CLI. Native publication builds six Plugin
+host binaries from the clean tag, verifies SDK/Node module checksums and target
+metadata, and bundles them in both native packages. Provider images build the same
+host from an explicitly identified Plugin archive and expose host build evidence.
+CLI release locks are only for caller Skills, not the MCP/Worker executable.
+Before native publication, run:
 
 ```bash
 npm run lock:cli -- <published-cli-version> --write

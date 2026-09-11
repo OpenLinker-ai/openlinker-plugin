@@ -48,7 +48,7 @@ func main() {
 	if err := configure(provider, "/runtime", "/workspace", true); err != nil {
 		fatal(err.Error())
 	}
-	if err := runCLI("/usr/local/bin/openlinker", provider); err != nil {
+	if err := runPluginHost("/usr/local/bin/openlinker-plugin-host", provider); err != nil {
 		fatal(err.Error())
 	}
 }
@@ -167,7 +167,7 @@ func configure(provider, runtimeDir, workspace string, requireMount bool) error 
 	}
 	if browserProfile {
 		values["OPENLINKER_AGENT_EXECUTION_PROFILE"] = "browser"
-		values["OPENLINKER_BROWSER_PLUGIN_BIN"] = "/usr/local/bin/openlinker"
+		values["OPENLINKER_BROWSER_PLUGIN_BIN"] = "/usr/local/bin/openlinker-plugin-host"
 		values["OPENLINKER_BROWSER_SOCKET"] = filepath.Join(officialBrowserControlRoot, "openlinker.browser.sock")
 		values["OPENLINKER_BROWSER_CHANNEL_CREDENTIAL_FILE"] = filepath.Join(officialBrowserControlRoot, "channel-credential")
 		values["OPENLINKER_BROWSER_LEASE_ROOT"] = filepath.Join(officialBrowserControlRoot, "leases")
@@ -537,7 +537,7 @@ func isMountPoint(path string) bool {
 	return false
 }
 
-func runCLI(binary, provider string) error {
+func runPluginHost(binary, provider string) error {
 	cmd := exec.Command(binary, "agent", "serve", "--provider", provider) // #nosec G204 -- fixed image binary and provider.
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

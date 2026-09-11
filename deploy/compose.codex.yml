@@ -32,6 +32,8 @@ services:
       context: ..
       dockerfile: Dockerfile.providers
       target: codex
+      args:
+        OPENLINKER_PLUGIN_COMMIT: ${OPENLINKER_PLUGIN_COMMIT:-}
     image: openlinker-agent-codex:dev
     depends_on:
       - openlinker-egress-gateway

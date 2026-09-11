@@ -133,7 +133,7 @@ test("Agent Runtime packages expose only the Browser-native surface", async () =
     codexMCP.mcpServers.openlinker_browser,
     claudeMCP.mcpServers.openlinker_browser,
   ]) {
-    assert.equal(server.command, "/usr/local/bin/openlinker");
+    assert.equal(server.command, "/usr/local/bin/openlinker-plugin-host");
     assert.deepEqual(server.args.slice(0, 2), ["plugin", "browser-proxy"]);
     assert.equal(server.args.includes("serve"), false);
   }

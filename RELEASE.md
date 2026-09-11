@@ -1,86 +1,34 @@
 # Release Process
 
-Chinese documentation: [RELEASE.zh-CN.md](./RELEASE.zh-CN.md)
+Native MCP and deep Agent/Browser execution are built as `openlinker-plugin-host`.
+See [HOST.md](./HOST.md) for compatibility and installation.
 
-Plugin owns a reusable Go module, small native host archives, and separate
-Provider/Browser images. These are different release stages. The private npm
-package is repository tooling, not an npm publication.
+1. Publish the immutable Node protocol module before consuming its exact version/checksums.
+2. Test and tag Plugin source; module CI remains independent of CLI artifacts.
+3. Dispatch Release on that clean immutable tag with `publish_native`. It builds
+   six host binaries, validates their SDK/Node dependencies, entry point and target,
+   records source/version/SHA-256/build info, and bundles them in both native archives.
+4. Provider images build the host from the same archived Plugin checkout. Pass
+   `OPENLINKER_PLUGIN_COMMIT` bound to that archive. The image exposes root-owned,
+   Worker-readable `/opt/openlinker/host-build-info.json`. No CLI artifact is downloaded.
+5. Caller Skills retain the independent, checksum-pinned CLI installer. Update its
+   three CLI lock copies only from a real published CLI release, never move an existing tag.
 
-## Release order
+Run `npm test`, `npm run test:go`, `npm run check:go-boundaries`,
+`npm run check:agent-runtime-integration`, `GOWORK=off go mod verify`, and
+`npm run release:check` before publication. From a clean committed checkout,
+`node scripts/package-native-hosts.mjs dist/native <tag>` verifies all six targets.
+Archives include host binaries and metadata, manifests/Skills/commands; exclude
+credentials, state, Go source and Browser engine binaries. Git/source installations
+need a separately built/verified host; there is no task-time download or CLI fallback.
 
-1. Test the Go module with `GOWORK=off`, run the transitive dependency gate,
-   and publish an immutable Plugin module tag. This source/module stage must
-   not depend on a new downstream CLI archive.
-2. Pin that published module and real checksums in CLI. Run its standalone
-   tests and all six release targets, then publish the CLI archives.
-3. Update `shared/cli-lock.json` and both host copies from that published CLI.
-   Commit the lock in a subsequent native-package release tag; never move an
-   existing module tag to insert the new lock.
-4. Explicitly dispatch the Release workflow on the chosen immutable tag with
-   `publish_native`. It verifies the CLI artifact before native packaging.
-   Explicitly dispatch Provider images with both `run_live_provider` and
-   `publish_images` only after all credential-backed/image gates pass.
+Before publishing images, run engine/native tests, Linux Browser/Egress isolation,
+real Provider session/cancellation and Codex/Claude Browser gates, SBOM/provenance.
+Keep `run_live_provider` and `publish_images` release checks; missing credentials
+or artifacts are unverified, never passing evidence. Published tags must be immutable.
+No local replacements, temporary module proxies or fabricated checksums are release evidence.
 
-The tag-triggered `go-module` job is independent of native CLI-lock readiness.
-A local workspace or temporary module proxy validates local source only. It
-does not prove the Plugin dependency is publicly available. Do not release
-relative `replace` directives, invented checksums, or unverified candidates.
-
-## Artifact gates
-
-Run these source checks before tagging:
-
-```bash
-npm test
-npm run test:go
-npm run check:go-boundaries
-npm run check:agent-runtime-integration
-GOWORK=off go mod verify
-GOWORK=off go build ./cmd/...
-```
-
-After the compatible CLI artifacts exist:
-
-```bash
-npm run lock:cli -- v0.x.y --write
-npm run release:check
-npm run check:provider-cli -- --expected-sdk v0.2.0-rc7
-```
-
-Replace the example CLI version with the actual published release. The
-Provider CLI gate verifies the archive SHA-256 from the shared lock, target
-OS/architecture, immutable Plugin and SDK module versions/checksums, absence
-of replacement modules, and the CLI binary's real 40-character `vcs.revision`
-from a clean Git checkout (`vcs.modified=false`).
-Old CLI locks fail until a migrated CLI is released. Images record the verified
-`cli_commit`, `cli_release`, `cli_archive_sha256`, `plugin_module_version`,
-and `openlinker_go_version` in `/opt/openlinker/cli-build-info.json`.
-
-Provider images download the locked CLI, not CLI source. Their minimal native
-Browser packages are built deterministically from the same Plugin checkout,
-without downloading this repository's own unpublished release. Native host
-archives stay limited to manifests, Skills, commands, and CLI resolvers; do not
-include Go sources, browser executables, private state, or credentials.
-
-## Acceptance and rollback
-
-Validate native manifests/parity/installers, engine and Native Messaging tests,
-Provider sessions/cancellation, Browser identity/Profile contracts, composed
-service topology, network isolation, live Codex/Claude Browser runs, SBOMs and
-provenance before image publication. Missing credentials or unavailable immutable
-artifacts are blockers, not passing acceptance.
-
-Do not deploy twv1 from this repository's release workflow. Host-specific
-acceptance and deployment are root operations and require separate authorization.
-Source pull requests run real Browser/Egress acceptance without requiring a
-downstream CLI artifact. Provider image builds run on explicit workflow dispatch;
-publication additionally requires an immutable tag and a successful live gate.
-Keep the previous immutable CLI/Plugin/image set available for rollback.
-Never migrate, re-key, delete, or recreate runtime volumes as part of this
-source ownership change.
-
-## Tagging
-
-Publishing is an explicit maintainer action. Use immutable semantic-version
-tags; native-package tags must match the version contract enforced by repository
-checks. Document pre-1.0 breaking changes in `CHANGELOG.md`.
+Deploying twv1 and cutting over a running Worker remain root operations. Drain/stop
+the old Worker before changing executable, retain identities/session/Profile/spool
+and credentials, and keep previous immutable artifacts for rollback. Old native
+packages require their old full CLI; upgrade the Plugin package/host together.

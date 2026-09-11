@@ -23,9 +23,11 @@ func TestProviderImageBuildsAgentRuntimePluginFromSameSource(t *testing.T) {
 		"node scripts/build-agent-runtime-packages.mjs --out /out",
 		"COPY --from=agent-runtime-plugin /out/codex-marketplace /opt/openlinker/agent-runtime-plugin/codex",
 		"COPY --from=agent-runtime-plugin /out/claude-plugin/openlinker /opt/openlinker/agent-runtime-plugin/claude",
-		"COPY shared/cli-lock.json",
-		"node scripts/download-pinned-cli.mjs",
-		"COPY --from=cli-artifact /out/openlinker /usr/local/bin/openlinker",
+		"COPY --from=go-source /src /src",
+		"node scripts/build-plugin-host.mjs",
+		"OPENLINKER_PLUGIN_COMMIT",
+		"COPY --from=plugin-host /out/openlinker-plugin-host /usr/local/bin/openlinker-plugin-host",
+		"/opt/openlinker/host-build-info.json",
 		"stat -c '%U:%G %a'",
 		"root:root 555",
 	} {
@@ -37,6 +39,8 @@ func TestProviderImageBuildsAgentRuntimePluginFromSameSource(t *testing.T) {
 		"agent-runtime-plugin.lock.json",
 		"github.com/OpenLinker-ai/openlinker-plugin/releases/download",
 		"./cmd/openlinker ",
+		"scripts/download-pinned-cli.mjs",
+		"COPY shared/cli-lock.json",
 		"../openlinker-cli",
 		"COPY packages/agent-adapters/agenthost/contract.json",
 	} {

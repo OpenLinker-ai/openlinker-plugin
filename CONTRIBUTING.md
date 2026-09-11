@@ -3,7 +3,7 @@
 Chinese documentation: [CONTRIBUTING.zh-CN.md](./CONTRIBUTING.zh-CN.md)
 
 This repository owns native Codex/Claude packages and the reusable Provider and
-Browser execution implementation. Keep native installation archives small.
+Browser execution implementation. Native archives include verified Plugin host binaries.
 
 ## Development setup
 
@@ -30,8 +30,8 @@ release artifacts are unavailable.
   Profiles, engine/native assets, Browser services, network policy, and egress.
 - Native manifests, canonical Skills, small packages, locked CLI resolution,
   Dockerfiles, portable compose, and image/Provider regression gates belong here.
-- CLI owns Cobra, user commands, CLI IO, and MCP application composition.
-  Plugin Go packages must never import CLI or Cobra, including transitively.
+- Plugin owns native MCP/Agent/Browser command composition in `internal/pluginhost`;
+  Cobra is confined there. Plugin must never import CLI; the platform CLI has no execution adapters.
 - Pure Browser packages/services must not transitively import SDK. Keep the
   existing SDK Runtime Worker as the sole delivery/recovery implementation.
 - Core/Cloud behavior, Agent Node application changes, and twv1 operations do
@@ -52,9 +52,8 @@ directives. Describe release order and compatibility impact explicitly.
 
 ## Release checks
 
-Follow [RELEASE.md](./RELEASE.md). Module CI/release precedes the CLI release and
-does not require its new archive. Native/image publication follows a compatible
-CLI lock and real build-info verification. Credentials or unavailable artifacts
+Follow [RELEASE.md](./RELEASE.md). Module CI/release is independent of CLI. Native/image publication verifies the Plugin
+host, exact SDK/Node module checksums, platform and source evidence. Credentials or unavailable artifacts
 must be reported as unrun/blocked acceptance, never as passing evidence.
 
 ## Security and license

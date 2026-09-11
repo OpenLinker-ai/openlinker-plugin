@@ -1,6 +1,6 @@
 ---
 name: setup-openlinker-cli
-description: "Verify or explicitly install the OpenLinker CLI version required by the OpenLinker Plugin. Use when the Plugin reports that openlinker is missing, incompatible, lacks a required capability, or when a user asks to set up or repair the local OpenLinker CLI integration."
+description: "Verify or explicitly install the OpenLinker CLI version used by standalone caller Skills. Use when the Plugin reports that openlinker is missing, incompatible, lacks a required capability, or when a user asks to set up or repair the local OpenLinker CLI integration."
 ---
 
 # Set Up the OpenLinker CLI

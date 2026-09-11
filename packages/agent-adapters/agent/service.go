@@ -239,7 +239,7 @@ func (service *Service) Enable(parent context.Context, providerOverride string) 
 	worker, err := openlinker.NewRuntimeWorker(openlinker.RuntimeWorkerConfig{
 		PlatformURL: resolved.url, RuntimeURL: resolved.runtimeURL,
 		Transport: openlinker.RuntimeTransportMode(resolved.config.Transport),
-		NodeID:    resolved.nodeID, NodeVersion: "openlinker-cli/" + service.version,
+		NodeID:    resolved.nodeID, NodeVersion: "openlinker-plugin-host/" + service.version,
 		AgentID: resolved.config.AgentID, AgentToken: resolved.agentToken,
 		RequireTokenOnly: true,
 		DataDir:          filepath.Join(resolved.stateDir, "runtime"), Capacity: resolved.config.Capacity,

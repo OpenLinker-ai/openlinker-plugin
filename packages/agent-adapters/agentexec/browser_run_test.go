@@ -281,7 +281,7 @@ func TestBrowserClientConfigurationIsOptInAndSecretFree(t *testing.T) {
 
 func TestBrowserClientModesExposeExactlyOneProviderSurface(t *testing.T) {
 	run := &BrowserRunContext{
-		PluginBin:  "/usr/local/bin/openlinker",
+		PluginBin:  "/usr/local/bin/openlinker-plugin-host",
 		ToolSocket: "/browser/tool.sock",
 	}
 	native := providerConfigForBrowserRun(ProviderConfig{
@@ -359,7 +359,7 @@ func TestBrowserClientConfigurationRejectsUnboundedFallback(t *testing.T) {
 		Provider:              "codex",
 		ExecutionProfile:      "browser",
 		BrowserClientMode:     "mcp",
-		BrowserPluginBin:      "/usr/local/bin/openlinker",
+		BrowserPluginBin:      "/usr/local/bin/openlinker-plugin-host",
 		BrowserSocket:         "/browser/control.sock",
 		BrowserCredentialFile: "/browser/channel",
 		BrowserLeaseRoot:      "/browser/leases",

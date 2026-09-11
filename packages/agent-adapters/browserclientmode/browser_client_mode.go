@@ -348,7 +348,7 @@ func validateBrowserOnlyMCP(path, provider string) error {
 			EnvVars []string `json:"env_vars"`
 		}
 		if err := decodeStrictBrowserClientJSON(serverRaw, &server); err != nil ||
-			server.Command != "/usr/local/bin/openlinker" ||
+			server.Command != "/usr/local/bin/openlinker-plugin-host" ||
 			server.Cwd != "/workspace" ||
 			!equalStrings(server.Args, agenthost.BrowserProxyArguments("codex")) ||
 			!equalStrings(server.EnvVars, []string{"OPENLINKER_BROWSER_TOOL_SOCKET"}) {
@@ -362,7 +362,7 @@ func validateBrowserOnlyMCP(path, provider string) error {
 		Env     map[string]string `json:"env"`
 	}
 	if err := decodeStrictBrowserClientJSON(serverRaw, &server); err != nil ||
-		server.Command != "/usr/local/bin/openlinker" ||
+		server.Command != "/usr/local/bin/openlinker-plugin-host" ||
 		!equalStrings(server.Args, agenthost.BrowserProxyArguments("claude")) ||
 		len(server.Env) != 1 ||
 		server.Env["OPENLINKER_BROWSER_TOOL_SOCKET"] != "${OPENLINKER_BROWSER_TOOL_SOCKET}" {

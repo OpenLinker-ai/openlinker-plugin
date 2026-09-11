@@ -13,7 +13,7 @@ func TestNativeBrowserManifestKeepsAgentHostV1ProxyArguments(t *testing.T) {
 			// Literal installed v1 contract: deriving expected argv from the new
 			// leaf would let both sides silently change together and still pass.
 			server := map[string]any{
-				"command": "/usr/local/bin/openlinker",
+				"command": "/usr/local/bin/openlinker-plugin-host",
 				"args":    []string{"plugin", "browser-proxy", "--host", provider},
 			}
 			if provider == "codex" {

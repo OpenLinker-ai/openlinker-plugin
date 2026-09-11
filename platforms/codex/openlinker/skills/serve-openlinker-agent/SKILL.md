@@ -6,7 +6,7 @@ description: "Configure, diagnose, enable, disable, or explain OpenLinker Agent 
 # Serve This Host as an OpenLinker Agent
 
 Agent Mode is disabled by default. Use the local Agent-control MCP tools inside
-the Plugin. For a standalone installation use `openlinker agent` commands.
+the Plugin. For a standalone installation use `openlinker-plugin-host agent` commands.
 
 ## Configure Without Secrets
 
@@ -22,12 +22,12 @@ Collect and save only:
   which requires capacity 1, session reuse, and private Runtime paths;
 - for that Browser Agent, the local declaration
   `browser_interaction_policy: restricted|full`. Configure it through
-  `configure_agent_mode`, `openlinker agent configure
+  `configure_agent_mode`, `openlinker-plugin-host agent configure
   --browser-interaction-policy`, or `OPENLINKER_BROWSER_INTERACTION_POLICY`;
 - for Codex only, an optional validated OpenAI-compatible `codex_base_url`
   without credentials, a query, or a fragment.
 
-Use `configure_agent_mode` or `openlinker agent configure`. Never accept an
+Use `configure_agent_mode` or `openlinker-plugin-host agent configure`. Never accept an
 Agent Token, Provider API key, secret file contents, or Provider session ID in
 tool arguments, prompts, config JSON, shell history, or Run metadata.
 
@@ -69,7 +69,7 @@ using Core-owned history.
 
 Local Plugin mode provides software boundaries and the host sandbox. For 24/7
 or strong network isolation, use the corresponding production image or supervise
-`openlinker agent serve --provider <provider>` with persistent private state.
+`openlinker-plugin-host agent serve --provider <provider>` with persistent private state.
 
 Browser is a client MCP tool of the child Codex or Claude process, not a
 Provider `computer` API. In the Browser profile, never ask the model for channel

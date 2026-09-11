@@ -37,7 +37,7 @@ async function providerMetadataGuard() {
 test("both Provider images precreate the traversable install directory before copying immutable metadata", async () => {
   const { dockerfile, base, guardOffset } = await providerMetadataGuard();
   const directory = base.indexOf("install -d -o root -g root -m 0555 /opt/openlinker\n");
-  const metadata = base.indexOf("COPY --from=cli-artifact --chown=root:root --chmod=0444 /out/cli-build-info.json /opt/openlinker/cli-build-info.json\n");
+  const metadata = base.indexOf("COPY --from=plugin-host --chown=root:root --chmod=0444 /out/host-build-info.json /opt/openlinker/host-build-info.json\n");
   assert.ok(directory >= 0 && metadata > directory && guardOffset > metadata);
   assert.match(dockerfile, /FROM provider-base AS codex\n/);
   assert.match(dockerfile, /FROM provider-base AS claude\n/);
@@ -51,7 +51,7 @@ test("the exact image metadata guard rejects wrong identity, inaccessible modes,
     uid: 10001, gid: 10001, directoryMode: 0o555, fileMode: 0o444,
     directoryUID: 0, directoryGID: 0, fileUID: 0, fileGID: 0,
     directoryType: true, fileType: true,
-    metadata: JSON.stringify({ cli_commit: revision, plugin_module_version: pluginVersion, openlinker_go_version: sdkVersion, cli_release: "v0.2.0-rc.6", cli_archive_sha256: "a".repeat(64) }),
+    metadata: JSON.stringify({ plugin_commit: revision, plugin_host_version: "v0.1.60", plugin_host_sha256: "a".repeat(64), openlinker_go_version: sdkVersion, agent_node_version: "v0.1.57", host_platform: "linux-amd64", source_contract_id: "openlinker.plugin-host-sources.v1" }),
   };
   function execute(overrides = {}) {
     const value = { ...defaults, ...overrides };
@@ -64,11 +64,11 @@ test("the exact image metadata guard rejects wrong identity, inaccessible modes,
         return {
           lstatSync(path) {
             if (path === "/opt/openlinker") return { isDirectory: () => value.directoryType, uid: value.directoryUID, gid: value.directoryGID, mode: value.directoryMode };
-            assert.equal(path, "/opt/openlinker/cli-build-info.json");
+            assert.equal(path, "/opt/openlinker/host-build-info.json");
             return { isFile: () => value.fileType, uid: value.fileUID, gid: value.fileGID, mode: value.fileMode };
           },
           readFileSync(path, encoding) {
-            assert.equal(path, "/opt/openlinker/cli-build-info.json");
+            assert.equal(path, "/opt/openlinker/host-build-info.json");
             assert.equal(encoding, "utf8");
             reads++;
             return value.metadata;

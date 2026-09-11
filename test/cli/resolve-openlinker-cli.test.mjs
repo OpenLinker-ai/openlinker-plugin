@@ -80,11 +80,8 @@ result = spawnSync(
     },
   },
 );
-assert.equal(result.status, 0, result.stderr);
-assert.equal(
-  result.stdout.trim(),
-  "COMMAND:plugin browser-proxy --host codex",
-);
+assert.notEqual(result.status, 0, "native Plugin must not fall back to the old full CLI");
+assert.match(result.stderr, /verified Plugin host unavailable/);
 
 const incompatible = await fakeCLI(join(root, "data", "bin"), {
   cli_version: "0.1.42",

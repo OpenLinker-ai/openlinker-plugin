@@ -39,7 +39,7 @@ async function packageVersion() {
 
 function browserMCP(host, hostContract) {
   const server = {
-    command: "/usr/local/bin/openlinker",
+    command: "/usr/local/bin/openlinker-plugin-host",
     args: [...hostContract.browser_proxy, host],
   };
   if (host === "codex") {
