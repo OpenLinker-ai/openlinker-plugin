@@ -34,20 +34,18 @@ transitively depend on SDK. Standalone
 Agents need no native plugin installation; Browser stays a separate process/image.
 
 Dockerfiles, portable [compose](./deploy/compose.providers.yml), and regression gates
-are owned here. Native installation archives contain verified Plugin host binaries, but no Go
-sources or Browser engine binaries. Credentials, volumes, Profile formats, and identities remain unchanged.
+are owned here. Native installation archives contain the pinned host installer, without Go
+sources, foreign-platform hosts or Browser engine binaries. Credentials, volumes, Profile formats, and identities remain unchanged.
 
 ## Five-minute start
 
 ### 1. Install
 
-Use a native package from a release built with the Plugin host (see [HOST.md](./HOST.md));
-it includes binaries for all supported platforms. Existing older releases still
-use their pinned full CLI. Git marketplace/source installations need a separately
-packaged host and adjacent metadata selected by `OPENLINKER_PLUGIN_HOST_BIN`;
-build a clean checkout with `node scripts/package-native-hosts.mjs dist/native`.
-Source installs do not implicitly compile or download executables at task time.
-Node.js 20+ is required by the host resolver.
+Git marketplace and release packages both include an explicit host installer and
+`host-lock.json`. Setup downloads only your platform's fixed GitHub release and
+checks its archive and binary SHA-256, source commit and capability metadata.
+Node.js 20+, curl and tar are required; Go, administrator rights and the platform
+CLI are not. Ordinary task/tool startup never downloads executables.
 
 For Codex:
 
@@ -69,23 +67,29 @@ claude plugin install openlinker@openlinker
 Run `/reload-plugins` in Claude Code after installation. Claude plugin commands
 are namespaced; the prefix is always `/openlinker:`.
 
-### 2. Verify or install the pinned CLI
+### 2. Install the pinned Plugin host
 
-Invoke the native setup workflow. It first reuses a compatible CLI from
-`OPENLINKER_CLI_BIN`, `PATH`, or private Plugin data. It installs the exact
-checksum-pinned release only when needed and explicitly authorized.
+After installing or updating the Plugin, run this setup Skill even if MCP reports
+that its host is missing. Skills and slash commands do not depend on MCP startup.
 
 Codex:
 
 ```text
-$setup-openlinker-cli Verify the CLI required by OpenLinker.
+$setup-plugin-host
 ```
 
 Claude Code:
 
 ```text
-/openlinker:openlinker-setup
+/openlinker:install-plugin-host
 ```
+
+The installer shows its version, release URL, platform and private destination.
+Reload plugins or start a new task after setup. For manual setup, run
+`node "<installed-plugin-root>/scripts/install-plugin-host.mjs" --plan`, then
+repeat without `--plan`. See [HOST.md](./HOST.md) for cache paths and repair.
+Standalone caller Skills can optionally install the platform CLI using
+`$setup-openlinker-cli` or `/openlinker:openlinker-setup`.
 
 ### 3. Initialize Use Mode
 
@@ -241,9 +245,10 @@ Go consumer against their actual manifests, Skills, and Browser wiring.
 ## Release ordering
 
 Publish the Node protocol module before consuming its exact pin. The Plugin tag
-builds/tests its module independently of CLI. Native publication builds six Plugin
-host binaries from the clean tag, verifies SDK/Node module checksums and target
-metadata, and bundles them in both native packages. Provider images build the same
+builds/tests its module independently of CLI. Host publication builds six per-platform archives from an immutable Plugin tag.
+Generate all three host locks from those publicly downloadable archives before
+merging the native installer update. Git marketplace and native packages share
+the same locks and install only the current platform. Provider images build their
 host from an explicitly identified Plugin archive and expose host build evidence.
 CLI release locks are only for caller Skills, not the MCP/Worker executable.
 Before native publication, run:

@@ -1,6 +1,6 @@
 {
   "name": "openlinker-plugin",
-  "version": "0.1.2",
+  "version": "0.1.58-rc.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,7 +17,7 @@
     "test:cli": "node test/cli/resolve-openlinker-cli.test.mjs",
     "test:installer": "node test/cli/install-openlinker-cli.test.mjs",
     "test:agent-runtime": "node --test test/agent-node-module.test.mjs test/agent-runtime-packages.test.mjs test/agent-runtime-sbom.test.mjs",
-    "test": "npm run check:manifests && npm run check:skills && npm run check:packages && npm run check:docs && npm run check:secrets && npm run check:publication && node --test test/publication-boundary.test.mjs && npm run check:chatgpt && npm run test:agent-runtime && npm run test:cli && npm run test:installer && npm run test:provider-cli && npm run test:host",
+    "test": "npm run check:manifests && npm run check:skills && npm run check:packages && npm run check:docs && npm run check:secrets && npm run check:publication && node --test test/publication-boundary.test.mjs && npm run check:chatgpt && npm run test:agent-runtime && npm run test:cli && npm run test:installer && npm run test:provider-cli && npm run test:host && npm run check:host-lock",
     "release:check": "npm test && npm run check:release-lock",
     "test:go": "GOWORK=off go test -race ./...",
     "check:go-boundaries": "node scripts/check-go-boundaries.mjs",
@@ -26,7 +26,9 @@
     "check:provider-cli": "node scripts/download-pinned-cli.mjs --platform linux-amd64 --out dist/release-check/openlinker",
     "test:browser-engine": "npm --prefix packages/browser-runtime/browser-engine run lint && npm --prefix packages/browser-runtime/browser-engine test",
     "test:native-chrome": "node --test packages/browser-runtime/native-chrome/test/*.test.mjs",
-    "test:host": "node --test test/plugin-host.test.mjs"
+    "test:host": "node --test test/plugin-host.test.mjs test/plugin-host-install.test.mjs",
+    "check:host-lock": "node scripts/check-host-lock.mjs",
+    "lock:host": "node scripts/generate-host-lock.mjs"
   },
   "engines": {
     "node": ">=20"

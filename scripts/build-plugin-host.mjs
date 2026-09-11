@@ -38,7 +38,7 @@ export function buildPluginHost({ output, platform, sourceCommit, version }) {
   }
   // Image builds use git-archive contexts. Their caller binds this commit to
   // the archived checkout; it is not represented as compiler vcs evidence.
-  assert.match(sourceCommit, /^[a-f0-9]{40}$/);
+  assert.match(sourceCommit ?? "", /^[a-f0-9]{40}$/, "OPENLINKER_PLUGIN_COMMIT must be the full archived Plugin commit; for a clean local checkout run: export OPENLINKER_PLUGIN_COMMIT=$(git rev-parse HEAD), then docker compose build");
   version ??= `sha-${sourceCommit.slice(0, 12)}`;
   assert.match(version, /^(?:v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?|sha-[a-f0-9]{12})$/);
   const manifest = JSON.parse(run(["mod", "edit", "-json"]));

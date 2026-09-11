@@ -11,6 +11,7 @@ const sharedSkills = [
   "inspect-openlinker-run",
   "serve-openlinker-agent",
   "setup-openlinker-cli",
+  "setup-plugin-host",
   "use-isolated-browser",
 ];
 

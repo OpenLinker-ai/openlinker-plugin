@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plugin_version": "0.1.2",
+  "plugin_version": "0.1.58-rc.1",
   "cli": {
     "surface_version": "openlinker.cli.v1",
     "version_range": ">=0.2.0-rc.1 <0.3.0"
@@ -8,63 +8,89 @@
   "operations": {
     "search_agents": {
       "cli_capability": "agents.search",
-      "cli_command": ["agents", "search"],
+      "cli_command": [
+        "agents",
+        "search"
+      ],
       "mcp_tool": "search_agents",
       "grant": "agents:read",
       "read_only": true
     },
     "get_agent": {
       "cli_capability": "agents.get",
-      "cli_command": ["agents", "get"],
+      "cli_command": [
+        "agents",
+        "get"
+      ],
       "mcp_tool": "get_agent",
       "grant": "agents:read",
       "read_only": true
     },
     "create_task": {
       "cli_capability": "tasks.create",
-      "cli_command": ["tasks", "create"],
+      "cli_command": [
+        "tasks",
+        "create"
+      ],
       "mcp_tool": "create_task",
       "grant": "tasks:create",
       "read_only": false
     },
     "run_agent": {
       "cli_capability": "runs.sync",
-      "cli_command": ["run"],
+      "cli_command": [
+        "run"
+      ],
       "mcp_tool": "run_agent",
       "grant": "agents:run",
       "read_only": false
     },
     "start_agent_run": {
       "cli_capability": "runs.async",
-      "cli_command": ["run", "--async"],
+      "cli_command": [
+        "run",
+        "--async"
+      ],
       "mcp_tool": "start_agent_run",
       "grant": "agents:run",
       "read_only": false
     },
     "get_run": {
       "cli_capability": "runs.get",
-      "cli_command": ["runs", "get"],
+      "cli_command": [
+        "runs",
+        "get"
+      ],
       "mcp_tool": "get_run",
       "grant": "runs:read",
       "read_only": true
     },
     "list_run_events": {
       "cli_capability": "runs.events",
-      "cli_command": ["runs", "events"],
+      "cli_command": [
+        "runs",
+        "events"
+      ],
       "mcp_tool": "list_run_events",
       "grant": "runs:read",
       "read_only": true
     },
     "list_run_artifacts": {
       "cli_capability": "runs.artifacts",
-      "cli_command": ["runs", "artifacts"],
+      "cli_command": [
+        "runs",
+        "artifacts"
+      ],
       "mcp_tool": "list_run_artifacts",
       "grant": "runs:read",
       "read_only": true
     },
     "cancel_run": {
       "cli_capability": "runs.cancel",
-      "cli_command": ["runs", "cancel"],
+      "cli_command": [
+        "runs",
+        "cancel"
+      ],
       "mcp_tool": "cancel_run",
       "grant": "runs:cancel",
       "read_only": false

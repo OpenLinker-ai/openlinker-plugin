@@ -4,17 +4,19 @@
 
 1. 先公开 Node 协议模块，再固定其不可变版本与真实 checksum。
 2. 测试并标记 Plugin 源码；module CI 不依赖 CLI artifact。
-3. 在干净不可变 tag 上运行 Release 并开启 `publish_native`，构建六平台宿主，
-   校验 SDK/Node 依赖、入口和目标平台，记录源码/version/SHA-256/build info，随两个原生包分发。
+3. 推送不可变 tag 后，宿主发布任务构建六个平台的独立归档及 SHA-256，验证 SDK/Node、源码和平台后发布，不覆盖已有资产。
+   首个宿主版本可先通过源码测试，再发布宿主；marketplace CI 必须等真实锁生成后通过。
+   对公开 Release 执行 `node scripts/generate-host-lock.mjs <tag> --write` 并提交三个锁，
+   实测两个 Git marketplace 包的安装和 MCP 启动后才合并。轻量原生包在后续不可变交付 tag 上用 `publish_native` 发布。
 4. Provider 镜像从相同 Plugin 归档源码构建宿主，传入与归档一致的 `OPENLINKER_PLUGIN_COMMIT`。
    `/opt/openlinker/host-build-info.json` 由 root 拥有，Worker 可读，不再下载 CLI。
 5. 调用类 Skill 保留独立 CLI 安装器；三个 CLI lock 只能从实际发布的 CLI 生成，不能移动旧 tag。
 
 发布前运行 `npm test`、`npm run test:go`、`npm run check:go-boundaries`、
 `npm run check:agent-runtime-integration`、`GOWORK=off go mod verify` 与 `npm run release:check`。
-干净提交上执行 `node scripts/package-native-hosts.mjs dist/native <tag>` 验证六平台打包。
-原生 archive 包含宿主和元数据、manifest/Skill/command，不包含凭据、状态、Go 源码或浏览器引擎。
-Git/source 安装需要另外构建并校验宿主，不会在任务运行时下载或回退 CLI。
+`node scripts/package-native-hosts.mjs dist/native` 检查宿主锁并打包 manifest/Skill/command/安装器。
+原生 archive 不携带其他平台的宿主、凭据、状态、Go 源码或浏览器引擎。
+Git 与 archive 安装使用同一显式安装器，只下载当前系统对应的固定发布物；普通工具调用不会下载。
 
 发布镜像前须通过 engine/native、Linux Browser/Egress 隔离、真实 Provider Session/取消、
 Codex/Claude Browser、SBOM 与来源门禁。保留 `run_live_provider`、`publish_images` 检查。

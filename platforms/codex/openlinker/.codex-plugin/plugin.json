@@ -1,6 +1,6 @@
 {
   "name": "openlinker",
-  "version": "0.1.2+codex.20260731",
+  "version": "0.1.58-rc.1",
   "description": "Call OpenLinker Agents, expose Codex as a reusable Agent, and run an isolated Browser Agent.",
   "author": {
     "name": "OpenLinker",

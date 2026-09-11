@@ -32,11 +32,10 @@ Dockerfiles、便携 [compose](./deploy/compose.providers.yml) 和回归门禁�
 
 ### 1. 安装
 
-新原生发布包自带六平台 Plugin 宿主、SHA-256 和构建信息，详见 [HOST.md](./HOST.md)。
-旧发布包仍配旧 CLI。Git marketplace/source 安装须另外提供已打包宿主及相邻元数据，
-通过 `OPENLINKER_PLUGIN_HOST_BIN` 选择；可在干净提交上运行
-`node scripts/package-native-hosts.mjs dist/native` 生成完整包。
-任务运行时不会隐式下载或编译。宿主解析器需要 Node.js 20+。
+Git marketplace 和发布包都带显式安装器及 `host-lock.json`。安装时只下载当前系统
+对应的固定 GitHub Release，并校验归档与二进制 SHA-256、源码提交及能力元数据。
+需要 Node.js 20+、curl 和 tar，不需要 Go、管理员权限或平台 CLI。
+任务和工具启动不会自动下载。
 
 Codex：
 
@@ -58,22 +57,28 @@ claude plugin install openlinker@openlinker
 安装后在 Claude Code 中运行 `/reload-plugins`。Claude 插件命令带命名空间，前缀
 始终为 `/openlinker:`。
 
-### 2. 验证或安装锁定版本的 CLI
+### 2. 安装锁定版本的 Plugin 宿主
 
-调用宿主原生安装流程。它会依次尝试 `OPENLINKER_CLI_BIN`、`PATH` 和私有 Plugin
-data 中的兼容 CLI；只有确有需要并获得明确授权时，才安装经过校验和锁定的精确版本。
+安装或更新 Plugin 后执行以下安装入口。即使 MCP 提示缺少宿主，Skill 和斜杠命令
+仍可使用，它们不依赖 MCP 启动。
 
 Codex：
 
 ```text
-$setup-openlinker-cli Verify the CLI required by OpenLinker.
+$setup-plugin-host
 ```
 
 Claude Code：
 
 ```text
-/openlinker:openlinker-setup
+/openlinker:install-plugin-host
 ```
+
+安装器展示版本、Release 来源、平台和私有安装路径。完成后重载插件或新建任务。
+手动安装可运行 `node "<插件安装目录>/scripts/install-plugin-host.mjs" --plan`，
+查看计划后去掉 `--plan` 再执行。缓存路径与修复见 [HOST.md](./HOST.md)。
+独立调用类 Skill 如需平台 CLI，可另用 `$setup-openlinker-cli` 或
+`/openlinker:openlinker-setup` 安装。
 
 ### 3. 初始化 Use Mode
 
@@ -217,7 +222,9 @@ claude plugin validate .
 ## 发布顺序
 
 Node 协议模块先公开，Plugin 固定真实版本与 checksum。Plugin module 不依赖 CLI，
-原生发布从干净 tag 构建六平台宿主并随包分发；Provider 镜像从同一归档源码构建宿主。
+宿主发布从不可变 tag 构建六个平台的独立归档，再从真实公开产物生成三个一致的宿主锁。
+Git marketplace 和原生包提供显式安装器，只下载当前系统所需产物；安装验证通过后才合入原生包变更。
+Provider 镜像从精确归档源码构建宿主。
 镜像要求 `OPENLINKER_PLUGIN_COMMIT` 构建参数，记录可由 Worker UID 读取的
 `/opt/openlinker/host-build-info.json`。CLI lock 只用于独立调用类 Skill。
 完整门禁、来源校验与回滚要求见 [RELEASE.zh-CN.md](./RELEASE.zh-CN.md)。

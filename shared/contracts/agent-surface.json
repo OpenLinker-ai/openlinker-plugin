@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plugin_version": "0.1.2",
+  "plugin_version": "0.1.58-rc.1",
   "cli": {
     "surface_version": "openlinker.cli.v1",
     "version_range": ">=0.2.0-rc.1 <0.3.0"
@@ -13,8 +13,18 @@
     "plugin.serve",
     "plugin.browser.serve"
   ],
-  "providers": ["codex", "claude"],
-  "states": ["disabled", "starting", "ready", "draining", "stopped", "error"],
+  "providers": [
+    "codex",
+    "claude"
+  ],
+  "states": [
+    "disabled",
+    "starting",
+    "ready",
+    "draining",
+    "stopped",
+    "error"
+  ],
   "tools": [
     "configure_agent_mode",
     "enable_agent_mode",
@@ -31,7 +41,10 @@
     "provider_session_ids_public": false,
     "core_owned_conversation_required": true
   },
-  "execution_profiles": ["standard", "browser"],
+  "execution_profiles": [
+    "standard",
+    "browser"
+  ],
   "browser": {
     "model_tool": "browser_session",
     "provider_computer_api": false,

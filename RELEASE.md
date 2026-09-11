@@ -5,9 +5,14 @@ See [HOST.md](./HOST.md) for compatibility and installation.
 
 1. Publish the immutable Node protocol module before consuming its exact version/checksums.
 2. Test and tag Plugin source; module CI remains independent of CLI artifacts.
-3. Dispatch Release on that clean immutable tag with `publish_native`. It builds
-   six host binaries, validates their SDK/Node dependencies, entry point and target,
-   records source/version/SHA-256/build info, and bundles them in both native archives.
+3. Pushing an immutable tag runs the host release job: build six per-platform host
+   archives and checksums, validate SDK/Node pins, source commit and target, then
+   publish without overwriting assets. For the first host release, source tests
+   can run before host locks exist; marketplace CI must not pass without real locks.
+   Run `node scripts/generate-host-lock.mjs <tag> --write` against the public release,
+   commit the three locks, and verify installation and MCP startup from both Git
+   marketplace package directories before merging. Native archives are lightweight:
+   dispatch Release with `publish_native` on the later immutable delivery tag.
 4. Provider images build the host from the same archived Plugin checkout. Pass
    `OPENLINKER_PLUGIN_COMMIT` bound to that archive. The image exposes root-owned,
    Worker-readable `/opt/openlinker/host-build-info.json`. No CLI artifact is downloaded.
@@ -16,11 +21,10 @@ See [HOST.md](./HOST.md) for compatibility and installation.
 
 Run `npm test`, `npm run test:go`, `npm run check:go-boundaries`,
 `npm run check:agent-runtime-integration`, `GOWORK=off go mod verify`, and
-`npm run release:check` before publication. From a clean committed checkout,
-`node scripts/package-native-hosts.mjs dist/native <tag>` verifies all six targets.
-Archives include host binaries and metadata, manifests/Skills/commands; exclude
-credentials, state, Go source and Browser engine binaries. Git/source installations
-need a separately built/verified host; there is no task-time download or CLI fallback.
+`npm run release:check` before publication. `node scripts/package-native-hosts.mjs dist/native` checks host locks and packages
+manifests/Skills/commands/installers. No foreign-platform binaries, credentials,
+state, Go sources or Browser engine are bundled. Git and archive installations
+use the same explicit current-platform installer; ordinary tools never download.
 
 Before publishing images, run engine/native tests, Linux Browser/Egress isolation,
 real Provider session/cancellation and Codex/Claude Browser gates, SBOM/provenance.
