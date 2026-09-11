@@ -34,8 +34,7 @@ if (metadata.tagName !== tag || metadata.isDraft) {
 }
 
 const caller = JSON.parse(await readFile(join(repoRoot, "shared", "contracts", "caller-surface.json"), "utf8"));
-const agent = JSON.parse(await readFile(join(repoRoot, "shared", "contracts", "agent-surface.json"), "utf8"));
-const capabilities = [...new Set([...Object.values(caller.operations).map((operation) => operation.cli_capability), ...agent.capabilities])].sort();
+const capabilities = [...new Set(Object.values(caller.operations).map((operation) => operation.cli_capability))].sort();
 const releaseAssets = new Map(metadata.assets.map((asset) => [asset.name, asset]));
 const assets = {};
 for (const os of ["darwin", "linux", "windows"]) {

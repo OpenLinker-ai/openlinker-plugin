@@ -23,7 +23,7 @@ Prepare these outside model context:
 2. An Agent Token for that Agent.
 3. An existing minimal workspace directory for remote tasks.
 4. The `codex` or `claude` CLI installed and authenticated.
-5. A compatible `openlinker` CLI resolved by the Plugin.
+5. The pinned `openlinker-plugin-host` installed with `$setup-plugin-host`.
 
 Use a workspace containing only the files remote tasks need. Plugin mode uses
 the host sandbox and software policy; it is intended for personal or development
@@ -79,16 +79,16 @@ the app, and start a new task. Do not store secrets in `agent.json` or a project
 Codex:
 
 ```text
-$setup-openlinker-cli Verify Agent Mode capabilities without enabling Agent Mode.
+$setup-plugin-host Install and verify the Plugin host without enabling Agent Mode.
 ```
 
 Claude Code:
 
 ```text
-/openlinker:openlinker-setup
+/openlinker:install-plugin-host
 ```
 
-The required CLI surface includes `agent.configure`, `agent.serve`,
+The required Plugin host surface includes `agent.configure`, `agent.serve`,
 `agent.status`, `agent.doctor`, and `plugin.serve`.
 
 ## Step 2: configure non-secret values
@@ -219,22 +219,22 @@ This calls `disable_agent_mode`, drains the Runtime Worker, and persists
 ## Headless or 24x7 operation
 
 Native Plugin mode follows the Codex or Claude Code host lifecycle. For a
-supervised process, install the CLI separately and use the same SDK-backed
+supervised process, install the Plugin host and use the same SDK-backed
 Runtime implementation:
 
 ```bash
-openlinker agent configure \
+openlinker-plugin-host agent configure \
   --provider codex \
   --agent-id <agent-uuid> \
   --workspace /absolute/minimal/workspace \
   --url https://openlinker.ai
-openlinker agent doctor --provider codex
-openlinker agent serve --provider codex
+openlinker-plugin-host agent doctor --provider codex
+openlinker-plugin-host agent serve --provider codex
 ```
 
 `agent serve` runs in the foreground and does not require `enabled: true`.
 Production images add a persistent Runtime volume, a non-root provider process,
-and enforced outbound-network policy. They still use the CLI and SDK directly,
+and enforced outbound-network policy. They use the Plugin host and SDK directly,
 not Agent Node.
 
 For a Browser Agent, layer the matching Browser compose override over the
@@ -256,7 +256,7 @@ diagnosis and rollback. This Agent path needs no `OPENLINKER_USER_TOKEN`.
 | Node ID mismatch | Remove the explicit `OPENLINKER_NODE_ID` or make it match the persisted private Node ID. Do not casually delete state. |
 | Worker already active | Only one Agent Mode process may use a state directory; stop the other process or use a separate state directory. |
 | Session did not resume | Confirm both Runs used the same Core conversation and `session_reuse` is enabled. Recovery may start one replacement session. |
-| Host must stay online continuously | Use supervised `openlinker agent serve` or a production provider image. |
+| Host must stay online continuously | Use supervised `openlinker-plugin-host agent serve` or a production provider image. |
 
 See [Configuration](./configuration.md) for all fields, precedence rules, and
 storage paths.

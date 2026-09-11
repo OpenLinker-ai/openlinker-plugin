@@ -385,7 +385,7 @@ func writeTestAgentRuntimePlugin(t *testing.T, provider string) string {
 			"plugins/openlinker/.mcp.json": `{
 				"mcpServers":{
 					"openlinker_browser":{
-						"command":"/usr/local/bin/openlinker",
+						"command":"/usr/local/bin/openlinker-plugin-host",
 						"args":["plugin","browser-proxy","--host","codex"],
 						"cwd":"/workspace",
 						"env_vars":["OPENLINKER_BROWSER_TOOL_SOCKET"]
@@ -406,7 +406,7 @@ func writeTestAgentRuntimePlugin(t *testing.T, provider string) string {
 			".mcp.json": `{
 				"mcpServers":{
 					"openlinker_browser":{
-						"command":"/usr/local/bin/openlinker",
+						"command":"/usr/local/bin/openlinker-plugin-host",
 						"args":["plugin","browser-proxy","--host","claude"],
 						"env":{"OPENLINKER_BROWSER_TOOL_SOCKET":"${OPENLINKER_BROWSER_TOOL_SOCKET}"}
 					}

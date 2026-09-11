@@ -170,7 +170,7 @@ func runLive(mode, fixtureURL, secret string) (liveResult, error) {
 		BrowserInteractionPolicy:   "full",
 		BrowserClientModeRequested: mode,
 		BrowserClientMode:          mode,
-		BrowserPluginBin:           "/usr/local/bin/openlinker",
+		BrowserPluginBin:           "/usr/local/bin/openlinker-plugin-host",
 		BrowserNativePlugin:        selectedPlugin,
 		BrowserSocket:              "/browser-control/openlinker.browser.sock",
 		BrowserCredentialFile:      "/browser-control/channel-credential",

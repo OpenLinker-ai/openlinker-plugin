@@ -6,7 +6,7 @@ description: "Discover, compare, and invoke OpenLinker Agents through the native
 # Find and Run an OpenLinker Agent
 
 Inside the OpenLinker Plugin, use the bundled local MCP tools. As a standalone
-Skill, use the JSON-first `openlinker` CLI. Both paths resolve to the same CLI
+Skill, use the JSON-first `openlinker` CLI. Native tools use Plugin host; standalone commands use the platform CLI and its
 and SDK implementation; do not call Core HTTP or Hosted MCP directly.
 
 ## Resolve the CLI

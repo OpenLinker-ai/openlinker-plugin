@@ -12,7 +12,7 @@ OpenLinker 官方 Codex 与 Claude Code 双向原生插件。
 | Agent Mode（被调用模式） | OpenLinker → Codex 或 Claude Code | 把当前宿主变成可调用 Agent，并私有复用 Provider Session。 |
 | Browser Agent | OpenLinker → Codex 或 Claude Code → 隔离 Browser | 为显式启用的 Agent 提供客户端 Browser 工具，不使用 Provider computer API。 |
 
-插件会启动本地 stdio MCP bridge；这些 bridge 由校验和锁定版本的 `openlinker` CLI
+插件会启动本地 stdio MCP bridge；这些 bridge 由校验后的 `openlinker-plugin-host`
 和官方 OpenLinker SDK 提供能力。Agent Mode 默认关闭，不依赖 OpenLinker Agent
 Node。Browser 入口在隔离 Browser Runtime 和权威 Attachment 都存在之前同样不会工作。
 
@@ -22,8 +22,8 @@ Node。Browser 入口在隔离 Browser Runtime 和权威 Attachment 都存在之
 `github.com/OpenLinker-ai/openlinker-plugin`。`packages/agent-adapters` 管理
 Provider/Session 执行和 SDK 应用装配；`packages/browser-runtime` 管理纯 Browser
 协议、服务、engine、native assets 与 egress。SDK 仍是 Runtime Worker 的唯一实现。
-CLI 依赖这些包并保持单可执行文件；Plugin Go 包不得反向依赖 CLI/Cobra，纯 Browser
-包不得传递依赖 SDK。独立 Agent 不要求安装原生 Plugin，Browser 仍独立进程/镜像。
+Plugin 宿主消费这些包，CLI 只负责平台调用；Plugin 不得反向依赖 CLI，Cobra 仅用于
+宿主组合入口，纯 Browser 包不得传递依赖 SDK。独立 Agent 不要求安装原生 Plugin，Browser 仍独立进程/镜像。
 
 Dockerfiles、便携 [compose](./deploy/compose.providers.yml) 和回归门禁由本仓库维护。
 原生安装 archive 不携带 Go 源码/浏览器二进制；宿主凭据、卷、Profile 格式和身份不变。
@@ -31,6 +31,11 @@ Dockerfiles、便携 [compose](./deploy/compose.providers.yml) 和回归门禁�
 ## 五分钟开始
 
 ### 1. 安装
+
+Git marketplace 和发布包都带显式安装器及 `host-lock.json`。安装时只下载当前系统
+对应的固定 GitHub Release，并校验归档与二进制 SHA-256、源码提交及能力元数据。
+需要 Node.js 20+、curl 和 tar，不需要 Go、管理员权限或平台 CLI。
+任务和工具启动不会自动下载。
 
 Codex：
 
@@ -52,22 +57,28 @@ claude plugin install openlinker@openlinker
 安装后在 Claude Code 中运行 `/reload-plugins`。Claude 插件命令带命名空间，前缀
 始终为 `/openlinker:`。
 
-### 2. 验证或安装锁定版本的 CLI
+### 2. 安装锁定版本的 Plugin 宿主
 
-调用宿主原生安装流程。它会依次尝试 `OPENLINKER_CLI_BIN`、`PATH` 和私有 Plugin
-data 中的兼容 CLI；只有确有需要并获得明确授权时，才安装经过校验和锁定的精确版本。
+安装或更新 Plugin 后执行以下安装入口。即使 MCP 提示缺少宿主，Skill 和斜杠命令
+仍可使用，它们不依赖 MCP 启动。
 
 Codex：
 
 ```text
-$setup-openlinker-cli Verify the CLI required by OpenLinker.
+$setup-plugin-host
 ```
 
 Claude Code：
 
 ```text
-/openlinker:openlinker-setup
+/openlinker:install-plugin-host
 ```
+
+安装器展示版本、Release 来源、平台和私有安装路径。完成后重载插件或新建任务。
+手动安装可运行 `node "<插件安装目录>/scripts/install-plugin-host.mjs" --plan`，
+查看计划后去掉 `--plan` 再执行。缓存路径与修复见 [HOST.md](./HOST.md)。
+独立调用类 Skill 如需平台 CLI，可另用 `$setup-openlinker-cli` 或
+`/openlinker:openlinker-setup` 安装。
 
 ### 3. 初始化 Use Mode
 
@@ -210,20 +221,13 @@ claude plugin validate .
 
 ## 发布顺序
 
-先发布不可变 Plugin Go module，其 tag CI 不依赖新的 CLI artifact。CLI 固定该 module
-并发布后，再生成六平台 CLI lock，选择已有 release tag 显式触发 native 包与镜像发布。
-Provider 镜像验证 archive checksum、Plugin/SDK build-info 与真实 CLI VCS revision；
-旧 lock 在新 CLI 发布前明确失败。同树生成最小 Runtime native 包，不下载自己的未发布
-release。原生包发布前运行：
-
-```bash
-npm run lock:cli -- <published-cli-version> --write
-npm run release:check
-```
-
-安装器只跟随获准的公开 GitHub Release Host，通过 curl 遵循标准 HTTP/HTTPS 代理，
-同时校验相邻 checksum 与 `cli-lock.json` 中固定的摘要；它只解压预期可执行文件、
-验证 JSON capability surface、拒绝符号链接目标，并原子替换旧版本。
+Node 协议模块先公开，Plugin 固定真实版本与 checksum。Plugin module 不依赖 CLI，
+宿主发布从不可变 tag 构建六个平台的独立归档，再从真实公开产物生成三个一致的宿主锁。
+Git marketplace 和原生包提供显式安装器，只下载当前系统所需产物；安装验证通过后才合入原生包变更。
+Provider 镜像从精确归档源码构建宿主。
+镜像要求 `OPENLINKER_PLUGIN_COMMIT` 构建参数，记录可由 Worker UID 读取的
+`/opt/openlinker/host-build-info.json`。CLI lock 只用于独立调用类 Skill。
+完整门禁、来源校验与回滚要求见 [RELEASE.zh-CN.md](./RELEASE.zh-CN.md)。
 
 ## 本地 Marketplace 测试
 

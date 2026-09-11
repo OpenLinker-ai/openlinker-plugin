@@ -26,7 +26,7 @@ metadata, project files, or logs.
 | `OPENLINKER_API_BASE` | Yes | Hosted or self-hosted Core public base URL. |
 | `OPENLINKER_USER_TOKEN` | Yes for authenticated operations | Least-privilege `ol_user_*` token. |
 | `OPENLINKER_CLI_BIN` | No | Absolute path to a compatible CLI; checked before `PATH` and Plugin data. |
-| `OPENLINKER_PLUGIN_DATA` | No | Override private Plugin data containing an installed CLI. |
+| `OPENLINKER_PLUGIN_DATA` | No | Override private Plugin data containing the installed host and optional caller CLI. |
 
 The local bridge does not silently fall back to Hosted MCP or direct HTTP. The
 effective caller order is explicit CLI options for standalone commands, then
@@ -46,7 +46,7 @@ environment, then the CLI default. Native Plugin calls use the host environment.
 
 Use `$serve-openlinker-agent` in Codex or
 `/openlinker:openlinker-agent` in Claude Code. The native workflow calls
-`configure_agent_mode`; standalone deployments can use `openlinker agent
+`configure_agent_mode`; standalone deployments can use `openlinker-plugin-host agent
 configure`.
 
 | Stored field | Required | Default | Meaning |
@@ -66,7 +66,7 @@ configure`.
 | `execution_profile` | No | `standard` | `standard` or opt-in `browser`; Browser requires capacity 1 and session reuse. |
 | `browser_client_mode` | Browser only | `mcp` | `auto`, strict `native`, or strict `mcp`. Official packaged Browser templates set `auto`. |
 | `browser_native_plugin` | Native only | Image path | Absolute Runtime-owned Browser-only Plugin path; never caller supplied in official images. |
-| `browser_plugin_bin` | Browser only | Current CLI | Absolute compatible OpenLinker CLI used for the Browser MCP subprocess. |
+| `browser_plugin_bin` | Browser only | Current Plugin host | Absolute compatible Plugin host used for the Browser MCP subprocess. |
 | `browser_socket` | Browser only | — | Private Browser Runtime Unix socket. |
 | `browser_credential_file` | Browser only | — | Owner-only Browser channel credential path, never the credential value. |
 | `browser_lease_root` | Browser only | — | Private authoritative per-Run lease directory. |
@@ -107,7 +107,7 @@ rejects unknown fields and unsupported versions.
 ## Configuration and state paths
 
 Set `OPENLINKER_AGENT_CONFIG` to override the configuration file. Otherwise the
-CLI uses the operating system's user configuration directory:
+Plugin host uses the operating system's user configuration directory:
 
 | Platform | Default `agent.json` |
 | --- | --- |
@@ -236,7 +236,7 @@ the app, and start a new task. The repository must never contain that file.
 
 Set environment variables before launching `claude`. After installing or
 enabling the Plugin, run `/reload-plugins`. Explicit native commands are
-`/openlinker:openlinker`, `/openlinker:openlinker-setup`,
+`/openlinker:openlinker`, `/openlinker:install-plugin-host`,
 `/openlinker:openlinker-agent`, and `/openlinker:use-isolated-browser`.
 
 ## Proxies and network scope

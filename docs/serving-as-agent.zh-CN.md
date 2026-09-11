@@ -21,7 +21,7 @@ Agent Mode 默认关闭。安装、更新或调用 Plugin 都不会自动启用�
 2. 属于该 Agent 的 Agent Token。
 3. 已存在、内容最小化的远端任务工作目录。
 4. 已安装并认证的 `codex` 或 `claude` CLI。
-5. Plugin 可解析到兼容 `openlinker` CLI。
+5. 通过 `$setup-plugin-host` 安装锁定版本的 `openlinker-plugin-host`。
 
 工作目录只应包含远端任务确实需要的文件。Plugin Mode 使用宿主 Sandbox 和软件策略，
 适用于个人或开发环境，不是强多租户隔离边界。
@@ -71,16 +71,16 @@ Codex 桌面端把所需条目放进 `~/.codex/.env`，重启应用并新建任�
 Codex：
 
 ```text
-$setup-openlinker-cli Verify Agent Mode capabilities without enabling Agent Mode.
+$setup-plugin-host Install and verify the Plugin host without enabling Agent Mode.
 ```
 
 Claude Code：
 
 ```text
-/openlinker:openlinker-setup
+/openlinker:install-plugin-host
 ```
 
-所需 CLI Surface 包含 `agent.configure`、`agent.serve`、`agent.status`、
+所需 Plugin 宿主 Surface 包含 `agent.configure`、`agent.serve`、`agent.status`、
 `agent.doctor` 和 `plugin.serve`。
 
 ## 第二步：配置非敏感字段
@@ -203,20 +203,20 @@ Claude Code：
 ## Headless 或 24×7 运行
 
 原生 Plugin Mode 跟随 Codex/Claude Code 宿主生命周期。需要受监管进程时，单独安装
-CLI 并使用同一套 SDK Runtime 实现：
+Plugin 宿主并使用同一套 SDK Runtime 实现：
 
 ```bash
-openlinker agent configure \
+openlinker-plugin-host agent configure \
   --provider codex \
   --agent-id <agent-uuid> \
   --workspace /absolute/minimal/workspace \
   --url https://openlinker.ai
-openlinker agent doctor --provider codex
-openlinker agent serve --provider codex
+openlinker-plugin-host agent doctor --provider codex
+openlinker-plugin-host agent serve --provider codex
 ```
 
 `agent serve` 在前台运行，不要求 `enabled: true`。生产镜像增加持久 Runtime Volume、
-非 Root Provider 进程和强制出站网络策略；它们仍直接使用 CLI 和 SDK，不使用 Agent Node。
+非 Root Provider 进程和强制出站网络策略；它们仍直接使用 Plugin 宿主和 SDK，不使用 Agent Node。
 
 Browser Agent 需要把对应 Browser Compose Override 叠加到 Provider Compose 文件。
 它会加入独立 Chromium Runtime、私有 Control 与 Broker Mount、持久 Profile Storage
@@ -236,6 +236,6 @@ Browser Agent 需要把对应 Browser Compose Override 叠加到 Provider Compos
 | Node ID 不匹配 | 移除显式 `OPENLINKER_NODE_ID`，或令其与已持久化值一致；不要随意删除状态。 |
 | Worker 已运行 | 同一 State Directory 只允许一个 Agent Mode 进程；停止另一个进程或改用独立目录。 |
 | Session 未恢复 | 确认两个 Run 使用相同 Core Conversation 且启用 `session_reuse`；Recovery 可能新建一次替代 Session。 |
-| 宿主必须持续在线 | 使用受监管的 `openlinker agent serve` 或生产 Provider 镜像。 |
+| 宿主必须持续在线 | 使用受监管的 `openlinker-plugin-host agent serve` 或生产 Provider 镜像。 |
 
 所有字段、优先级和存储路径见[配置参考](./configuration.zh-CN.md)。

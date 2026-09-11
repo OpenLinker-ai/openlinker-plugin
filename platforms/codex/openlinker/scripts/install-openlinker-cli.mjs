@@ -33,7 +33,7 @@ function fail(message) {
   throw new InstallerError(message);
 }
 
-function normalizePlatform() {
+export function normalizePlatform() {
   const os = hostPlatform();
   const cpu = hostArch();
   const platform = os === "win32" ? "windows" : os;
@@ -44,7 +44,7 @@ function normalizePlatform() {
   return { platform, arch, key: `${platform}-${arch}` };
 }
 
-function defaultDataDir() {
+export function defaultDataDir() {
   for (const name of ["OPENLINKER_PLUGIN_DATA", "PLUGIN_DATA", "CLAUDE_PLUGIN_DATA"]) {
     if (process.env[name]) return resolve(process.env[name]);
   }
@@ -156,7 +156,7 @@ function parseResponseHeaders(raw) {
   return { status, location };
 }
 
-async function download(rawURL, destination) {
+export async function download(rawURL, destination) {
   let current = await assertSafeDownloadURL(rawURL);
   for (let redirect = 0; redirect <= 5; redirect += 1) {
     const hopDir = await mkdtemp(join(tmpdir(), "openlinker-download-hop-"));
@@ -168,6 +168,8 @@ async function download(rawURL, destination) {
       "--silent",
       "--show-error",
       "--max-redirs", "0",
+      "--connect-timeout", "20",
+      "--max-time", "300",
       "--dump-header", headers,
       "--output", body,
       current.href,
@@ -189,21 +191,24 @@ async function download(rawURL, destination) {
   fail("download exceeded five redirects");
 }
 
-async function sha256(path) {
+export async function sha256(path) {
   const bytes = await readFile(path);
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-async function extractExecutable(archive, asset, target, destination) {
+export async function extractExecutable(archive, asset, target, destination) {
   const isZip = asset.archive.endsWith(".zip");
-  const list = spawnSync(isZip ? "unzip" : "tar", isZip ? ["-Z1", archive] : ["-tzf", archive], { encoding: "utf8" });
+  // GNU tar treats C: as a remote host; a basename plus cwd also works on Windows.
+  const archiveName = basename(archive);
+  const archiveDirectory = dirname(archive);
+  const list = spawnSync(isZip ? "unzip" : "tar", isZip ? ["-Z1", archiveName] : ["-tzf", archiveName], { encoding: "utf8", cwd: archiveDirectory });
   if (list.status !== 0) fail(`cannot inspect ${asset.archive}: ${list.stderr.trim()}`);
   const entries = list.stdout.split(/\r?\n/).filter(Boolean);
   if (entries.filter((entry) => entry === asset.executable_path).length !== 1) {
     fail(`archive does not contain exactly one ${asset.executable_path}`);
   }
   if (!isZip) {
-    const verbose = spawnSync("tar", ["-tvzf", archive, asset.executable_path], { encoding: "utf8" });
+    const verbose = spawnSync("tar", ["-tvzf", archiveName, asset.executable_path], { encoding: "utf8", cwd: archiveDirectory });
     if (verbose.status !== 0 || !verbose.stdout.trimStart().startsWith("-")) {
       fail("archive executable entry is not a regular file");
     }
@@ -212,8 +217,8 @@ async function extractExecutable(archive, asset, target, destination) {
   try {
     const result = spawnSync(
       isZip ? "unzip" : "tar",
-      isZip ? ["-p", archive, asset.executable_path] : ["-xOzf", archive, asset.executable_path],
-      { stdio: ["ignore", handle.fd, "pipe"], encoding: "utf8" },
+      isZip ? ["-p", archiveName, asset.executable_path] : ["-xOzf", archiveName, asset.executable_path],
+      { stdio: ["ignore", handle.fd, "pipe"], encoding: "utf8", cwd: archiveDirectory },
     );
     if (result.status !== 0) fail(`cannot extract CLI executable: ${result.stderr?.trim() || "archive command failed"}`);
   } finally {
@@ -222,7 +227,7 @@ async function extractExecutable(archive, asset, target, destination) {
   if (target.platform !== "windows") await chmod(destination, 0o700);
 }
 
-async function assertNoSymlinkPath(path) {
+export async function assertNoSymlinkPath(path) {
   const absolute = resolve(path);
   const root = parse(absolute).root;
   const relative = absolute.slice(root.length).split(/[\\/]+/).filter(Boolean);

@@ -25,7 +25,7 @@
 | `OPENLINKER_API_BASE` | 是 | Hosted 或自托管 Core 的公开 Base URL。 |
 | `OPENLINKER_USER_TOKEN` | 认证操作必填 | 最小权限 `ol_user_*` Token。 |
 | `OPENLINKER_CLI_BIN` | 否 | 兼容 CLI 的绝对路径，优先于 `PATH` 和 Plugin data。 |
-| `OPENLINKER_PLUGIN_DATA` | 否 | 覆盖安装 CLI 的私有 Plugin data。 |
+| `OPENLINKER_PLUGIN_DATA` | 否 | 覆盖安装宿主及可选调用 CLI 的私有 Plugin data。 |
 
 本地 bridge 不会静默回退到 Hosted MCP 或直接 HTTP。调用方解析顺序是：独立 CLI 命令
 的显式 Option、环境变量、CLI Default。原生 Plugin 调用使用宿主环境。
@@ -44,7 +44,7 @@
 
 Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
 `/openlinker:openlinker-agent`。原生流程调用 `configure_agent_mode`；独立部署可使用
-`openlinker agent configure`。
+`openlinker-plugin-host agent configure`。
 
 | 存储字段 | 必填 | 默认值 | 含义 |
 | --- | --- | --- | --- |
@@ -63,7 +63,7 @@ Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
 | `execution_profile` | 否 | `standard` | `standard` 或显式启用的 `browser`；Browser 强制 capacity 1 并启用 Session Reuse。 |
 | `browser_client_mode` | 仅 Browser | `mcp` | `auto`、严格 `native` 或严格 `mcp`；官方封装 Browser 模板设置为 `auto`。 |
 | `browser_native_plugin` | 仅 Native | 镜像路径 | Runtime 拥有的 Browser-only Plugin 绝对路径；官方镜像不接受调用方指定。 |
-| `browser_plugin_bin` | 仅 Browser | 当前 CLI | Browser MCP 子进程使用的兼容 OpenLinker CLI 绝对路径。 |
+| `browser_plugin_bin` | 仅 Browser | 当前 Plugin 宿主 | Browser MCP 子进程使用的兼容 Plugin 宿主 绝对路径。 |
 | `browser_socket` | 仅 Browser | — | 私有 Browser Runtime Unix Socket。 |
 | `browser_credential_file` | 仅 Browser | — | 仅 Owner 可读的 Browser Channel Credential 路径，绝不是 Credential Value。 |
 | `browser_lease_root` | 仅 Browser | — | 私有、权威的 Per-Run Lease Directory。 |
@@ -102,7 +102,7 @@ Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
 
 ## 配置和状态路径
 
-设置 `OPENLINKER_AGENT_CONFIG` 可覆盖配置文件。否则 CLI 使用操作系统 User Config
+设置 `OPENLINKER_AGENT_CONFIG` 可覆盖配置文件。否则 Plugin 宿主使用操作系统 User Config
 Directory：
 
 | 平台 | 默认 `agent.json` |
@@ -221,7 +221,7 @@ Plugin Root 启动，因此 Bundled Launcher 的解析不依赖用户当前 Work
 ### Claude Code
 
 启动 `claude` 前设置环境变量。安装或启用 Plugin 后运行 `/reload-plugins`。显式原生
-命令为 `/openlinker:openlinker`、`/openlinker:openlinker-setup`、
+命令为 `/openlinker:openlinker`、`/openlinker:install-plugin-host`、
 `/openlinker:openlinker-agent` 和 `/openlinker:use-isolated-browser`。
 
 ## 代理与网络范围

@@ -24,6 +24,8 @@ for name in \
 done
 
 repository_root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+plugin_commit=$(git -C "$repository_root" rev-parse HEAD)
+[ -z "$(git -C "$repository_root" status --porcelain --untracked-files=all)" ] || { echo "commit sources before live image acceptance" >&2; exit 1; }
 codex_image="openlinker-agent-codex:${OPENLINKER_BROWSER_LIVE_PREFIX}"
 claude_image="openlinker-agent-claude:${OPENLINKER_BROWSER_LIVE_PREFIX}"
 result_file=$(mktemp "${TMPDIR:-/tmp}/openlinker-browser-provider-live.XXXXXX")
@@ -41,11 +43,13 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 docker build \
+  --build-arg "OPENLINKER_PLUGIN_COMMIT=$plugin_commit" \
   --target codex-live \
   -f "$repository_root/Dockerfile.providers" \
   -t "$codex_image" \
   "$repository_root"
 docker build \
+  --build-arg "OPENLINKER_PLUGIN_COMMIT=$plugin_commit" \
   --target claude-live \
   -f "$repository_root/Dockerfile.providers" \
   -t "$claude_image" \

@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "repository": "OpenLinker-ai/openlinker-plugin",
+  "version": "v0.1.58-rc.1",
+  "plugin_commit": "e31862eb39aab05b9eb2c51e8cf7bee0c78400a1",
+  "source_tree_sha256": "05eb9e50fa9ea1d5a4ff344ea26aec62b9145800c386bc8f6fa1fd246dd1da54",
+  "surface_version": "openlinker.plugin-host.v1",
+  "capabilities": [
+    "agent.configure",
+    "agent.doctor",
+    "agent.serve",
+    "agent.status",
+    "plugin.browser.serve",
+    "plugin.serve"
+  ],
+  "assets": {
+    "darwin-amd64": {
+      "archive": "openlinker-plugin-host-v0.1.58-rc.1-darwin-amd64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-darwin-amd64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-darwin-amd64.tar.gz.sha256",
+      "sha256": "d3f25a208a2357a86363c9e9e0dae6d03568ea0ad0d7dc2611953cfa034ec4e0",
+      "binary_sha256": "5e4e00139a9b29929ed6358bb92d0ec21ff6d02b601faa07fc9e2482743b118c",
+      "executable_path": "openlinker-plugin-host",
+      "metadata_path": "host-build-info.json"
+    },
+    "darwin-arm64": {
+      "archive": "openlinker-plugin-host-v0.1.58-rc.1-darwin-arm64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-darwin-arm64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-darwin-arm64.tar.gz.sha256",
+      "sha256": "fe6e94d1f8fe0180849565fc1c028209648ecbbd2f1d4a8871081d458adf5980",
+      "binary_sha256": "cd19cb6d96dd6818d5748afc5b802d3139b0272cc611d2cde35b6b95dad3e546",
+      "executable_path": "openlinker-plugin-host",
+      "metadata_path": "host-build-info.json"
+    },
+    "linux-amd64": {
+      "archive": "openlinker-plugin-host-v0.1.58-rc.1-linux-amd64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-linux-amd64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-linux-amd64.tar.gz.sha256",
+      "sha256": "19d79907af6b3451b14eb0fca92a02f25f23838935b432135b3d82a59a5f5c39",
+      "binary_sha256": "8953d13f1c174ca513f085d343d235956cf4846b434ae6b25cf0ed85deff0836",
+      "executable_path": "openlinker-plugin-host",
+      "metadata_path": "host-build-info.json"
+    },
+    "linux-arm64": {
+      "archive": "openlinker-plugin-host-v0.1.58-rc.1-linux-arm64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-linux-arm64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-linux-arm64.tar.gz.sha256",
+      "sha256": "e023e348d6600f54bb9b25fa09f8a5d058c337060d2a19e6d0921e6618550e29",
+      "binary_sha256": "b5fa0c04eb6e7889083ce0c986ba9e8e83eb43c6edeb4900fb7c6d509c44fd71",
+      "executable_path": "openlinker-plugin-host",
+      "metadata_path": "host-build-info.json"
+    },
+    "windows-amd64": {
+      "archive": "openlinker-plugin-host-v0.1.58-rc.1-windows-amd64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-windows-amd64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-windows-amd64.tar.gz.sha256",
+      "sha256": "459924f9f0a1406ab6db76988a355ecc84664636b1ac2129ca22b4656e570779",
+      "binary_sha256": "2f322e49690e38cf16a781878af16e1b40ab136233a65fce0c36b9b1dd347608",
+      "executable_path": "openlinker-plugin-host.exe",
+      "metadata_path": "host-build-info.json"
+    },
+    "windows-arm64": {
+      "archive": "openlinker-plugin-host-v0.1.58-rc.1-windows-arm64.tar.gz",
+      "archive_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-windows-arm64.tar.gz",
+      "checksum_url": "https://github.com/OpenLinker-ai/openlinker-plugin/releases/download/v0.1.58-rc.1/openlinker-plugin-host-v0.1.58-rc.1-windows-arm64.tar.gz.sha256",
+      "sha256": "848ec3718b800af9bb108ab4dcc340524e283b1bbd078de774457dc28685748a",
+      "binary_sha256": "70713630e05f5b6208d75325203dca50de7cb5d3cb6e4d2dece90b124b8b38cc",
+      "executable_path": "openlinker-plugin-host.exe",
+      "metadata_path": "host-build-info.json"
+    }
+  }
+}

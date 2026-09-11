@@ -23,7 +23,10 @@ function dependencies(pattern) {
 
 for (const dependency of dependencies("./...")) {
   assert.ok(!dependency.startsWith("github.com/OpenLinker-ai/openlinker-cli"), `reverse CLI dependency: ${dependency}`);
-  assert.ok(!dependency.startsWith("github.com/spf13/cobra"), `Cobra must stay in CLI: ${dependency}`);
+
+}
+for (const dependency of dependencies("./packages/...")) {
+  assert.ok(!dependency.startsWith("github.com/spf13/cobra"), `Cobra must stay in the host composition root: ${dependency}`);
 }
 for (const pattern of ["./packages/browser-runtime/...", "./cmd/openlinker-browser-runtime", "./cmd/openlinker-egress-gateway"]) {
   for (const dependency of dependencies(pattern)) {

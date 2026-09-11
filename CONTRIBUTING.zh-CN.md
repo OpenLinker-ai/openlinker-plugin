@@ -3,7 +3,7 @@
 English documentation: [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 本仓库维护 Codex/Claude 原生包及可复用 Provider/Browser 执行实现，原生安装 archive
-仍须保持轻量。
+包含校验过的 Plugin 宿主二进制。
 
 ## 开发环境
 
@@ -29,8 +29,8 @@ npm run test:native-chrome
   engine/native 资源、Browser 服务、网络策略和 egress。
 - 原生 manifest、canonical Skill、轻量包、固定 CLI 解析、Dockerfile、便携 compose
   和镜像/Provider 回归门禁属于本仓库。
-- CLI 保留 Cobra、用户命令、CLI IO 和 MCP 应用组合；Plugin Go 包不得直接或传递依赖
-  CLI/Cobra。
+- Plugin 在 `internal/pluginhost` 组装原生 MCP/Agent/Browser 命令，Cobra 仅用于宿主入口；
+  Plugin 不得反向依赖 CLI，CLI 不包含本地执行适配器。
 - 纯 Browser 包/服务不得传递依赖 SDK；现有 SDK Runtime Worker 是唯一交付/恢复实现。
 - Core/Cloud、Agent Node 应用和 twv1 运维不属于此处。原生 archive 不得嵌入 secret、
   runtime 状态或浏览器可执行文件。
@@ -46,8 +46,8 @@ npm run test:native-chrome
 
 ## 发布检查
 
-遵循 [RELEASE.zh-CN.md](./RELEASE.zh-CN.md)。Module CI/发布在 CLI 之前，不依赖新
-CLI archive；native/image 发布在兼容 CLI lock 与真实 build-info 校验之后。凭据或
+遵循 [RELEASE.zh-CN.md](./RELEASE.zh-CN.md)。Module CI/发布独立于 CLI；native/image 发布须校验 Plugin 宿主、SDK/Node 模块校验和、
+平台和源码身份。凭据或
 artifact 不可用时明确报告未执行/阻塞，不得当作验收通过。
 
 ## 安全与许可证
