@@ -1273,7 +1273,7 @@ func runFullInteractionPolicyFixtures(
 	if err := navigateFixture(full, framesURL, "child-frame fixture"); err != nil {
 		return err
 	}
-	if err := waitForObservationMarker(full, "collector_frame=loaded", "collector child frame"); err != nil {
+	if err := waitForObservationMarkerAttempts(full, "collector_frame=ready", "collector child frame", 30); err != nil {
 		return err
 	}
 	if err := clickFixture(full, 240, 125, "allowlisted child frame"); err != nil {
@@ -1467,9 +1467,18 @@ func waitForObservationMarker(
 	marker,
 	label string,
 ) error {
+	return waitForObservationMarkerAttempts(client, marker, label, 5)
+}
+
+func waitForObservationMarkerAttempts(
+	client *browserclient.Client,
+	marker,
+	label string,
+	attempts int,
+) error {
 	waitMS := 1000
 	var observation browserprotocol.Observation
-	for attempt := 0; attempt < 5; attempt++ {
+	for attempt := 0; attempt < attempts; attempt++ {
 		var failure *browserprotocol.Failure
 		observation, failure = execute(client, browserprotocol.Action{
 			Kind:        browserprotocol.ActionWait,

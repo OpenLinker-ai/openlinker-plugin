@@ -77,7 +77,7 @@ jobs:
           sh -n ./test/browser-provider-live/matrix.sh
           node --test ./test/browser-provider-live/verify-results.test.mjs
       - name: Test native Chrome image and Native Messaging contracts
-        run: node --test ./packages/browser-runtime/native-chrome/test/*.test.mjs ./test/browser-image/native-chrome-image.test.mjs
+        run: node --test ./packages/browser-runtime/native-chrome/test/*.test.mjs ./test/browser-image/native-chrome-image.test.mjs ./test/browser-image/fixture-readiness.test.mjs
       - name: Run deterministic production Browser and Egress images
         env:
           # Keep the asserted image platform explicit even though each acceptance
