@@ -5,14 +5,12 @@ import (
 	"errors"
 	"net/url"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agentdelegation"
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentexec"
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agenthost"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentexec"
 )
 
 type Diagnostic struct {
@@ -290,10 +288,6 @@ func storedStatus(config Config, getenv func(string) string) (Status, bool) {
 		return Status{}, false
 	}
 	return status, true
-}
-
-func ContextWithSignals(parent context.Context) (context.Context, context.CancelFunc) {
-	return signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 }
 
 // ReadStatus resolves the persisted enabled setting and uses durable status when

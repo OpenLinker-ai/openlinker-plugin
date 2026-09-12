@@ -236,44 +236,6 @@ func (store *Store) Load(
 	return nil
 }
 
-func (store *Store) rewrap(
-	identity Identity,
-	roots map[uint64]*RootKey,
-	newRoot *RootKey,
-) error {
-	if store == nil || identity.validate() != nil || !validRoot(newRoot) {
-		return ErrInvalidConfiguration
-	}
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	if store.lockFile == nil {
-		return ErrProfileStoreClosed
-	}
-
-	snapshot, err := store.openSnapshot(identity, roots)
-	if err != nil {
-		return store.handleOpenError(identity, err)
-	}
-	defer snapshot.close()
-	if err := authenticatePayload(snapshot.payload, snapshot.payloadCipher); err != nil {
-		snapshot.close()
-		return store.handleOpenError(identity, err)
-	}
-	oldRoot := roots[snapshot.metadata.RootKeyGeneration]
-	rewrapped, err := store.protector.rewrap(snapshot.metadata, identity, oldRoot, newRoot)
-	if err != nil {
-		return store.handleOpenError(identity, err)
-	}
-	raw, err := marshalMetadata(rewrapped)
-	if err != nil {
-		return err
-	}
-	if _, err := atomicWriteFile(filepath.Join(snapshot.dir, metadataFileName), raw, 0o600); err != nil {
-		return fmt.Errorf("commit rewrapped browser profile metadata: %w", err)
-	}
-	return nil
-}
-
 // PruneInactive removes committed Profile snapshots whose current pointer
 // has not been updated since before. Missing or malformed state is retained so
 // that a later Load can quarantine it instead of silently discarding evidence.

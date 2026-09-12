@@ -124,9 +124,3 @@ func (manager *OpsObserverLeaseManager) Release(leaseID string) {
 		manager.active = nil
 	}
 }
-
-func (manager *OpsObserverLeaseManager) held() bool {
-	manager.mu.Lock()
-	defer manager.mu.Unlock()
-	return manager.active != nil
-}

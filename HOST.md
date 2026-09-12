@@ -68,3 +68,17 @@ host together before upgrading CLI; do not change a running Worker merely by
 replacing its binary. Drain/stop it, preserve identity/session/spool/state, then
 start the Plugin host. Agent Node migration is a separate procedure with its own
 configuration defaults. Keep the previous binary/image for rollback.
+
+## Shared app storage
+
+The Agent application consumes the pinned Agent Node `pkg/adapters/appfiles`
+leaf for config/status/identity writes, strict decoding, private secret reads and
+cross-process locking. It retains its config defaults and paths, `.agent-mode.lock`
+name, directory creation and acquire/release lifetime. This is compile-time reuse;
+no Node executable is required. Existing platform-specific limitations are unchanged.
+
+The unused `agent.ContextWithSignals` helper has been removed from the application
+package. Embedding hosts should own their signal lifecycle with `signal.NotifyContext`.
+Browser key-rewrap and lease inspection helpers live only in tests; they are not
+new runtime capabilities. Execution-source changes still require a new published
+host and regenerated marketplace locks before merging, as described above.

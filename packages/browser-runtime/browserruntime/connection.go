@@ -581,16 +581,6 @@ func attachmentRequestScope(identity browserprotocol.Identity) string {
 		fmt.Sprintf("%d|%d", identity.SessionEpoch, identity.ControlEpoch)
 }
 
-func (server *Server) validateObservation(
-	action browserprotocol.Action,
-	observation browserprotocol.Observation,
-) *browserprotocol.Failure {
-	if action.Kind == browserprotocol.ActionClose {
-		return observation.ValidateClosed()
-	}
-	return observation.ValidateEngine()
-}
-
 func (server *Server) decodeRequest(reader io.Reader) (browserprotocol.Request, *browserprotocol.Failure) {
 	var request browserprotocol.Request
 	limited := &io.LimitedReader{R: reader, N: server.options.MaxRequestBytes + 1}
