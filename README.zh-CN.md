@@ -206,6 +206,10 @@ Provider 镜像。
 工具链或 Agent Node 服务要求。Codex schema 更新归 Agent Node 仓库，本仓库的
 生成器命令仅支持针对固定模块执行 `--check`。
 
+Codex app-server 执行复用固定 Node 模块的 `codexturn` 叶子，统一原生环境/HOME 准备、
+完整轮次协议、取消与退出清理。Plugin 提供 Browser 安装回调、启动参数及进度观察，
+不启动 Agent Node 进程；Provider 会话策略与结果字段仍由 Plugin 自己维护。
+
 ```bash
 npm test
 npm run test:go
