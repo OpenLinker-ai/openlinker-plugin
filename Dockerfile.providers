@@ -44,7 +44,7 @@ WORKDIR /src
 COPY --from=go-source /usr/local/go /usr/local/go
 COPY --from=go-source /go/pkg/mod /go/pkg/mod
 COPY --from=go-source /src/go.mod /src/go.sum ./
-ENV PATH=/usr/local/go/bin:$PATH GOWORK=off GOFLAGS=-mod=readonly GOPROXY=off
+ENV PATH=/usr/local/go/bin:$PATH GOPATH=/go GOWORK=off GOFLAGS=-mod=readonly GOPROXY=off
 COPY package.json LICENSE ./
 COPY scripts/build-agent-runtime-packages.mjs ./scripts/build-agent-runtime-packages.mjs
 COPY scripts/resolve-agent-node-module.mjs ./scripts/resolve-agent-node-module.mjs
