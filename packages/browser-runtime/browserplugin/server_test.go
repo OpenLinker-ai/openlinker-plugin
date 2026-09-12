@@ -341,6 +341,15 @@ func TestServerReturnsStructuredObservationAndImage(t *testing.T) {
 		t.Fatalf("observation dimensions = viewport %#v screenshot %#v", viewport, screenshot)
 	}
 	content := result["content"].([]any)
+	var textObservation map[string]any
+	if err := json.Unmarshal([]byte(content[0].(map[string]any)["text"].(string)), &textObservation); err != nil {
+		t.Fatalf("text-only MCP client must receive the observation: %v", err)
+	}
+	textJSON, _ := json.Marshal(textObservation)
+	structuredJSON, _ := json.Marshal(structured)
+	if !bytes.Equal(textJSON, structuredJSON) {
+		t.Fatalf("text and structured observations differ: %s / %s", textJSON, structuredJSON)
+	}
 	if len(content) != 2 || content[1].(map[string]any)["type"] != "image" ||
 		content[1].(map[string]any)["mimeType"] != "image/png" {
 		t.Fatalf("content = %#v", content)

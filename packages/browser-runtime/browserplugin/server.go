@@ -659,10 +659,7 @@ func observationResult(
 		structured["mutation_requests_observed"] =
 			observation.MutationRequestsObserved
 	}
-	content := []contentBlock{{
-		Type: "text",
-		Text: "Browser observation returned in structured content.",
-	}}
+	content := []contentBlock{{Type: "text"}}
 	if observation.Screenshot != nil {
 		structured["screenshot"] = map[string]any{
 			"mime_type": observation.Screenshot.MIMEType,
@@ -675,6 +672,14 @@ func observationResult(
 			MIMEType: observation.Screenshot.MIMEType,
 		})
 	}
+	// Some MCP clients (including code-mode callers iterating content) only
+	// expose text blocks to the model. Mirror the same sanitized observation,
+	// not the raw runtime response, so they can finish without a second call.
+	encoded, err := json.Marshal(structured)
+	if err != nil {
+		return browserErrorResult(err)
+	}
+	content[0].Text = string(encoded)
 	return toolResult{Content: content, StructuredContent: structured}
 }
 
