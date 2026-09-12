@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -541,8 +540,4 @@ func validBoundedOpaque(value string, maximum int) bool {
 		}
 	}
 	return true
-}
-
-func officialChromeAssetError(reason string) error {
-	return fmt.Errorf("official Chrome assets are unavailable (%s)", reason)
 }

@@ -106,6 +106,10 @@ observer images, then proves:
 - state-changing requests and WebSockets to the second, unallowlisted public
   origin are blocked before reaching the fixture, including top-level and
   child-frame actions, while an allowlisted same-origin child frame succeeds;
+  child-frame readiness requires a message from the initialized document with
+  the exact expected window and origin, not an iframe load event. Only fixture
+  GET navigation retries (at most five) are allowed; mutation assertions and
+  actions are never retried or weakened.
 - a mutation whose server-side commit is followed by response loss returns
   `BROWSER_MUTATION_OUTCOME_UNKNOWN`, stays usable, and is never retried;
 - old clients are rejected through the real UDS path after either policy

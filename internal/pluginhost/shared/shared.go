@@ -1,7 +1,6 @@
 package shared
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -27,13 +26,6 @@ type GlobalOptions struct {
 	Timeout   time.Duration
 }
 
-func (io IO) Env(key string) string {
-	if io.Getenv == nil {
-		return os.Getenv(key)
-	}
-	return io.Getenv(key)
-}
-
 func DefaultGlobalOptions(getenv func(string) string) GlobalOptions {
 	if getenv == nil {
 		getenv = os.Getenv
@@ -43,10 +35,6 @@ func DefaultGlobalOptions(getenv func(string) string) GlobalOptions {
 		UserToken: strings.TrimSpace(getenv("OPENLINKER_USER_TOKEN")),
 		Timeout:   60 * time.Second,
 	}
-}
-
-func ContextForOptions(opts GlobalOptions) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), opts.Timeout)
 }
 
 func UserClient(opts GlobalOptions) (*openlinker.Client, error) {

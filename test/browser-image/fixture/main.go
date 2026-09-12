@@ -885,10 +885,22 @@ const fullFramesHTML = `<!doctype html>
   <script>
     const collector = %s;
     const collectorFrame = document.getElementById("collector-child");
-    collectorFrame.addEventListener("load", () => {
-      document.getElementById("collector-frame-state").textContent = "collector_frame=loaded";
+    let ready = false;
+    let attempts = 0;
+    window.addEventListener("message", (event) => {
+      if (event.source !== collectorFrame.contentWindow || event.origin !== collector ||
+          event.data !== "openlinker-child-ready") return;
+      ready = true;
+      document.getElementById("collector-frame-state").textContent = "collector_frame=ready";
     });
-    collectorFrame.src = collector + "/full/child?scope=collector";
+    const loadCollector = () => {
+      if (ready || attempts >= 5) return;
+      attempts += 1;
+      collectorFrame.src = collector + "/full/child?scope=collector&attempt=" + attempts;
+      // Retry only fixture GET navigation. No mutation action is retried.
+      setTimeout(loadCollector, 5000);
+    };
+    loadCollector();
   </script>
 </body></html>`
 
@@ -904,6 +916,7 @@ const fullChildHTML = `<!doctype html>
         .then(() => { document.getElementById("child-state").textContent = "child=allowed"; })
         .catch(() => { document.getElementById("child-state").textContent = "child=blocked"; });
     });
+    parent.postMessage("openlinker-child-ready", "*");
   </script>
 </body></html>`
 

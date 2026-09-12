@@ -87,24 +87,6 @@ func (protector *protector) open(
 	return payloadCipher, nil
 }
 
-func (protector *protector) rewrap(
-	metadata Metadata,
-	expected Identity,
-	oldRoot *RootKey,
-	newRoot *RootKey,
-) (Metadata, error) {
-	if protector == nil || protector.random == nil || !validRoot(newRoot) ||
-		!validRoot(oldRoot) || newRoot.generation <= oldRoot.generation {
-		return Metadata{}, ErrInvalidConfiguration
-	}
-	dek, err := unwrap(metadata, expected, oldRoot)
-	if err != nil {
-		return Metadata{}, err
-	}
-	defer clear(dek)
-	return protector.wrap(expected, newRoot, dek)
-}
-
 func (protector *protector) wrap(
 	identity Identity,
 	root *RootKey,
