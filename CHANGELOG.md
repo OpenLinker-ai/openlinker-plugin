@@ -6,6 +6,10 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Use Node's shared `codexturn` leaf for Codex app-server preparation, turn
+  events, cancellation and shutdown. Plugin retains Browser installation,
+  launch flags and progress policy. Canceled requests no longer start a new
+  app-server; failed Browser installation still prevents thread/turn creation.
 - Add minimal Codex and Claude Agent Runtime Browser Plugin artifacts for
   packaged Provider images.
 - Document restricted/full Browser interaction, exact mutation-origin scopes,

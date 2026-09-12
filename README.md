@@ -228,6 +228,12 @@ Agent Node service requirement. Codex schema refresh now belongs to the Agent
 Node repository; this repository's generator command only supports `--check`
 against its pinned module.
 
+Codex app-server execution uses the pinned Node module's `codexturn` leaf for
+native environment/home preparation, the complete turn protocol, cancellation
+and shutdown. Plugin supplies its Browser installation hook, launch arguments
+and progress observer; it does not run an Agent Node process. Provider session
+policy and result metadata remain owned by Plugin.
+
 ```bash
 npm test
 npm run test:go
