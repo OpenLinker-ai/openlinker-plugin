@@ -77,6 +77,11 @@ cross-process locking. It retains its config defaults and paths, `.agent-mode.lo
 name, directory creation and acquire/release lifetime. This is compile-time reuse;
 no Node executable is required. Existing platform-specific limitations are unchanged.
 
+The pinned Node module also contains opt-in native session isolation for the Node
+product. Updating that dependency does not enable session sandboxes in Plugin,
+move Browser into Node, or extend the Linux Codex launcher credential proxy to
+Node/Claude. Plugin retains its Provider/Browser process and container policies.
+
 The unused `agent.ContextWithSignals` helper has been removed from the application
 package. Embedding hosts should own their signal lifecycle with `signal.NotifyContext`.
 Browser key-rewrap and lease inspection helpers live only in tests; they are not
