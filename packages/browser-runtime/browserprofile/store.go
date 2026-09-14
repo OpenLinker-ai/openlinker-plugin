@@ -2,6 +2,7 @@ package browserprofile
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -35,6 +36,8 @@ type Store struct {
 	now       func() time.Time
 	lockFile  *os.File
 	mu        sync.Mutex
+	// Set only by the private, locked migration reservation capability.
+	retainFailedMigration bool
 }
 
 // QuarantineInvalidState removes an authenticated Profile whose decrypted
@@ -97,6 +100,10 @@ func newStore(root string, protector *protector) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := migrationMarkerGuard(root); err != nil {
+		_ = releaseStoreLock(lockFile)
+		return nil, err
+	}
 	for _, name := range []string{"profiles", "quarantine"} {
 		if err := ensurePrivateDirectory(filepath.Join(root, name)); err != nil {
 			_ = releaseStoreLock(lockFile)
@@ -146,18 +153,23 @@ func (store *Store) Create(
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("inspect browser profile: %w", err)
 	}
+	if err := store.legacyProfileGuard(identity); err != nil {
+		return err
+	}
 	if err := ensurePrivateDirectory(profileDir); err != nil {
 		return fmt.Errorf("create browser profile: %w", err)
 	}
 	metadata, payloadCipher, err := store.protector.create(identity, root)
 	if err != nil {
-		_ = os.Remove(profileDir)
+		if !store.retainFailedMigration {
+			_ = os.Remove(profileDir)
+		}
 		return err
 	}
 	defer payloadCipher.close()
 	committed, err := store.commitSnapshot(profileDir, metadata, payloadCipher, payload)
 	if err != nil {
-		if !committed {
+		if !committed && !store.retainFailedMigration {
 			_ = os.RemoveAll(profileDir)
 		}
 		return err
@@ -205,6 +217,10 @@ func (store *Store) Load(
 	roots map[uint64]*RootKey,
 	writer io.Writer,
 ) error {
+	return store.loadContext(context.Background(), identity, roots, writer)
+}
+
+func (store *Store) loadContext(ctx context.Context, identity Identity, roots map[uint64]*RootKey, writer io.Writer) error {
 	if store == nil || identity.validate() != nil || writer == nil {
 		return ErrInvalidConfiguration
 	}
@@ -219,14 +235,23 @@ func (store *Store) Load(
 		return store.handleOpenError(identity, err)
 	}
 	defer snapshot.close()
-	if err := authenticatePayload(snapshot.payload, snapshot.payloadCipher); err != nil {
+	if _, err := snapshot.payload.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	if err := snapshot.payloadCipher.decrypt(io.Discard, &migrationContextReader{ctx: ctx, reader: snapshot.payload}); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		snapshot.close()
 		return store.handleOpenError(identity, err)
 	}
 	if _, err := snapshot.payload.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("rewind browser profile payload: %w", err)
 	}
-	if err := snapshot.payloadCipher.decrypt(writer, snapshot.payload); err != nil {
+	if err := snapshot.payloadCipher.decrypt(writer, &migrationContextReader{ctx: ctx, reader: snapshot.payload}); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if errors.Is(err, ErrProfileCorrupt) {
 			snapshot.close()
 			return store.handleOpenError(identity, err)
@@ -259,11 +284,43 @@ func (store *Store) PruneInactive(before time.Time) (int, error) {
 			continue
 		}
 		profileDir := filepath.Join(profilesDir, entry.Name())
+		if validatePrivateDirectory(profileDir) != nil || validatePrivateDirectory(filepath.Join(profileDir, "checkpoints")) != nil {
+			continue
+		}
 		currentPath := filepath.Join(profileDir, currentFileName)
 		info, err := os.Lstat(currentPath)
 		if err != nil || !info.Mode().IsRegular() ||
 			info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0o077 != 0 ||
 			!info.ModTime().Before(before) {
+			continue
+		}
+		// A directory-shaped digest and old pointer are not enough: preserve
+		// legacy, unknown and malformed contracts before any destructive step.
+		raw, err := readBoundedRegularFile(currentPath, maxCurrentBytes)
+		if err != nil {
+			continue
+		}
+		var strictCurrent currentRecord
+		if strictMigrationJSON(raw, &strictCurrent) != nil {
+			continue
+		}
+		current, err := parseCurrent(raw)
+		if err != nil {
+			continue
+		}
+		if validatePrivateDirectory(filepath.Join(profileDir, "checkpoints", current.Checkpoint)) != nil {
+			continue
+		}
+		raw, err = readBoundedRegularFile(filepath.Join(profileDir, "checkpoints", current.Checkpoint, metadataFileName), maxMetadataBytes)
+		if err != nil {
+			continue
+		}
+		metadata, err := parseMetadata(raw)
+		if err != nil || profileDigest(metadata.Identity) != entry.Name() {
+			continue
+		}
+		var strictMetadata Metadata
+		if strictMigrationJSON(raw, &strictMetadata) != nil {
 			continue
 		}
 		if err := os.RemoveAll(profileDir); err != nil {
@@ -305,6 +362,9 @@ func (store *Store) openSnapshot(
 	profileDir := store.profileDir(identity)
 	if err := validatePrivateDirectory(profileDir); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
+			if legacyErr := store.legacyProfileGuard(identity); legacyErr != nil {
+				return nil, legacyErr
+			}
 			return nil, ErrProfileNotFound
 		}
 		return nil, ErrProfileCorrupt
@@ -381,12 +441,14 @@ func (store *Store) commitSnapshot(
 		return false, fmt.Errorf("create browser profile checkpoint: %w", err)
 	}
 	if err := os.Chmod(pendingDir, 0o700); err != nil {
-		_ = os.RemoveAll(pendingDir)
+		if !store.retainFailedMigration {
+			_ = os.RemoveAll(pendingDir)
+		}
 		return false, fmt.Errorf("secure browser profile checkpoint: %w", err)
 	}
 	committed := false
 	defer func() {
-		if !committed {
+		if !committed && !store.retainFailedMigration {
 			_ = os.RemoveAll(pendingDir)
 		}
 	}()
@@ -559,15 +621,35 @@ func (store *Store) profileDir(identity Identity) string {
 }
 
 func profileDigest(identity Identity) string {
+	return profileDigestForContract(identity, storageContractV2)
+}
+
+func profileDigestForContract(identity Identity, contract storageContract) string {
 	raw, _ := json.Marshal(struct {
 		ContractID string   `json:"contract_id"`
 		Identity   Identity `json:"identity"`
 	}{
-		ContractID: contractID(),
+		ContractID: string(contract),
 		Identity:   identity,
 	})
 	digest := sha256.Sum256(raw)
 	return hex.EncodeToString(digest[:])
+}
+
+func migrationMarkerGuard(root string) error {
+	_, err := os.Lstat(filepath.Join(root, migrationPendingName))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return ErrProfileMigrationPending
+}
+
+func (store *Store) legacyProfileGuard(identity Identity) error {
+	_, err := os.Lstat(filepath.Join(store.root, "profiles", profileDigestForContract(identity, storageContractV1)))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return ErrProfileMigrationRequired
 }
 
 func parseCurrent(raw []byte) (currentRecord, error) {

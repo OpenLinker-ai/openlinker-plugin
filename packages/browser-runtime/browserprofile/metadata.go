@@ -28,6 +28,10 @@ func marshalMetadata(metadata Metadata) ([]byte, error) {
 }
 
 func parseMetadata(raw []byte) (Metadata, error) {
+	return parseMetadataForContract(raw, storageContractV2)
+}
+
+func parseMetadataForContract(raw []byte, contract storageContract) (Metadata, error) {
 	if len(raw) == 0 || len(raw) > maxMetadataBytes {
 		return Metadata{}, ErrProfileCorrupt
 	}
@@ -41,7 +45,7 @@ func parseMetadata(raw []byte) (Metadata, error) {
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return Metadata{}, ErrProfileCorrupt
 	}
-	if validateMetadataShape(metadata) != nil {
+	if validateMetadataShapeForContract(metadata, contract) != nil {
 		return Metadata{}, ErrProfileCorrupt
 	}
 	return metadata, nil
@@ -119,10 +123,14 @@ func (protector *protector) wrap(
 }
 
 func unwrap(metadata Metadata, expected Identity, root *RootKey) ([]byte, error) {
+	return unwrapForContract(metadata, expected, root, storageContractV2)
+}
+
+func unwrapForContract(metadata Metadata, expected Identity, root *RootKey, contract storageContract) ([]byte, error) {
 	if expected.validate() != nil || !validRoot(root) {
 		return nil, ErrInvalidConfiguration
 	}
-	if validateMetadataShape(metadata) != nil {
+	if validateMetadataShapeForContract(metadata, contract) != nil {
 		return nil, ErrProfileCorrupt
 	}
 	if !metadata.Identity.equal(expected) {
@@ -131,7 +139,7 @@ func unwrap(metadata Metadata, expected Identity, root *RootKey) ([]byte, error)
 	if metadata.RootKeyGeneration != root.generation {
 		return nil, ErrKeyGeneration
 	}
-	wrappingKey, err := deriveWrappingKey(expected, root)
+	wrappingKey, err := deriveWrappingKeyForContract(expected, root, contract)
 	if err != nil {
 		return nil, err
 	}
@@ -149,13 +157,20 @@ func unwrap(metadata Metadata, expected Identity, root *RootKey) ([]byte, error)
 }
 
 func deriveWrappingKey(identity Identity, root *RootKey) ([]byte, error) {
+	return deriveWrappingKeyForContract(identity, root, storageContractV2)
+}
+
+func deriveWrappingKeyForContract(identity Identity, root *RootKey, contract storageContract) ([]byte, error) {
+	if !contract.valid() {
+		return nil, ErrInvalidConfiguration
+	}
 	context, err := json.Marshal(struct {
 		ContractID        string   `json:"contract_id"`
 		Purpose           string   `json:"purpose"`
 		Identity          Identity `json:"identity"`
 		RootKeyGeneration uint64   `json:"root_key_generation"`
 	}{
-		ContractID:        contractID(),
+		ContractID:        string(contract),
 		Purpose:           "profile-dek-wrap",
 		Identity:          identity,
 		RootKeyGeneration: root.generation,
@@ -198,8 +213,12 @@ func validRoot(root *RootKey) bool {
 }
 
 func validateMetadataShape(metadata Metadata) error {
+	return validateMetadataShapeForContract(metadata, storageContractV2)
+}
+
+func validateMetadataShapeForContract(metadata Metadata, contract storageContract) error {
 	if metadata.Version != metadataVersion ||
-		metadata.ContractID != contractID() ||
+		!contract.valid() || metadata.ContractID != string(contract) ||
 		metadata.Algorithm != algorithmName ||
 		metadata.KDF != kdfName ||
 		metadata.Identity.validate() != nil ||
