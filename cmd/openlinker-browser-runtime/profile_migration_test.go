@@ -229,6 +229,32 @@ func TestProfileMigrationSIGTERMCancelsTheCommandContext(t *testing.T) {
 	}
 }
 
+func TestProfileMigrationClosedStdoutReportsSafeUncertainty(t *testing.T) {
+	command := migrationHelperCommand(t, "main")
+	reader, err := command.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	if err := command.Run(); err == nil {
+		t.Fatal("closed stdout unexpectedly succeeded")
+	}
+	var report struct {
+		browserprofile.MigrationReport
+		OutcomeUncertain bool `json:"outcome_uncertain"`
+	}
+	if err := json.Unmarshal(stderr.Bytes(), &report); err != nil || report.FailureCode != "output_failed" || !report.OutcomeUncertain {
+		t.Fatalf("closed stdout lost its safe uncertainty report: %v stderr=%s", err, &stderr)
+	}
+	if strings.Contains(stderr.String(), "synthetic-private") {
+		t.Fatal("closed stdout exposed its request path")
+	}
+}
+
 func TestProfileMigrationProcessHelper(t *testing.T) {
 	mode := os.Getenv("OPENLINKER_TEST_MIGRATION_HELPER")
 	if mode == "" {
