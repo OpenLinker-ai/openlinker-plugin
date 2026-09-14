@@ -6,6 +6,11 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Align the SDK module, Node leaf module, and Provider build pin with the shared
+  SDK contract synchronization. Production Go sources retain their existing
+  behavior. Pin CLI `v0.2.0-rc.15` and Plugin host `v0.1.58-rc.8` using locks
+  generated from their verified public six-platform release artifacts.
+
 - Use Node's shared `codexturn` leaf for Codex app-server preparation, turn
   events, cancellation and shutdown. Plugin retains Browser installation,
   launch flags and progress policy. Canceled requests no longer start a new
