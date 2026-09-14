@@ -50,7 +50,7 @@ jobs:
           node-version: 22
       - name: Build six immutable platform hosts
         run: node scripts/package-plugin-host-release.mjs "$GITHUB_REF_NAME"
-      - uses: actions/attest-build-provenance@v3
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/plugin-host-release/*.tar.gz
       - name: Publish host archives before generating marketplace locks
@@ -166,7 +166,7 @@ jobs:
           )
 
       - name: Attest Agent Runtime Plugin artifacts
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/openlinker-agent-runtime-codex-plugin-${{ github.ref_name }}.tar.gz
