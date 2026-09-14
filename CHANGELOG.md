@@ -10,7 +10,9 @@ CLI release and cross-platform installation matrix pass.
   1.83.2 and protobuf dependency updates while retaining the SDK Go 1.25 baseline.
   Pin Node `v0.1.58-rc.3` for the shared protocol leaves. Command, credential,
   session and persistent-state contracts are unchanged. The caller CLI locks
-  adopt the six-platform public `v0.2.0-rc.16` release.
+  adopt the six-platform public `v0.2.0-rc.16` release. Pin Host `v0.1.58-rc.9`
+  from its public archives and checksums; source marketplace installation is
+  verified on Linux, macOS and Windows.
 
 - Align the SDK module, Node leaf module, and Provider build pin with the shared
   SDK contract synchronization. Production Go sources retain their existing
