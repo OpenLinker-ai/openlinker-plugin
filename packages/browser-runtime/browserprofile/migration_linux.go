@@ -143,10 +143,21 @@ func executeProfileMigration(ctx context.Context, requestPath string, mode Migra
 		return migrationFailure(report, "interrupted", err)
 	}
 	report.Stage = "target_authenticate"
+	// Migration failures retain the exact encrypted target in place. Normal
+	// Store.Load deliberately quarantines corrupt Profiles, so use the same
+	// read-only snapshot verifier as check/finalize instead.
+	authenticatedTarget, err := openMigrationSnapshot(ctx, destination, request.ExpectedIdentity, key, storageContractV2)
+	if err != nil {
+		return migrationFailure(report, "target_authentication_failed", err)
+	}
+	defer authenticatedTarget.close()
 	targetHash := sha256.New()
 	targetCount := &migrationLimitWriter{ctx: ctx, writer: targetHash, remaining: migrationMaxPlaintext}
-	if err := store.loadContext(ctx, request.ExpectedIdentity, map[uint64]*RootKey{key.Generation(): key}, targetCount); err != nil {
+	if err := authenticatedTarget.decrypt(ctx, targetCount); err != nil {
 		return migrationFailure(report, "target_authentication_failed", err)
+	}
+	if err := authenticatedTarget.verify(ctx, request.ExpectedIdentity, key, storageContractV2); err != nil {
+		return migrationFailure(report, "target_changed", err)
 	}
 	report.TargetAuthenticated = true
 	if sourceCount.count != targetCount.count || !bytes.Equal(sourceHash.Sum(nil), targetHash.Sum(nil)) {
@@ -494,7 +505,6 @@ func verifyMigration(ctx context.Context, request MigrationRequest, keyRaw []byt
 		return migrationFailure(report, "target_unavailable", err)
 	}
 	defer dir.Close()
-	report.Published = true
 	if migrationSameFile(source.root, dir) {
 		return migrationFailure(report, "source_destination_alias", ErrInvalidConfiguration)
 	}
@@ -507,7 +517,9 @@ func verifyMigration(ctx context.Context, request MigrationRequest, keyRaw []byt
 	if err != nil {
 		return migrationFailure(report, "marker_mismatch", err)
 	}
-	report.ActivationReady = !pending
+	// An existing directory is not evidence that this operation published it.
+	// A matching pending marker proves reservation only, never activation.
+	report.Published = pending
 	raw, err := migrationReadFile(dir, migrationReceiptName, migrationMaxRequest)
 	if err != nil {
 		return migrationFailure(report, "receipt_unavailable", err)
@@ -524,6 +536,9 @@ func verifyMigration(ctx context.Context, request MigrationRequest, keyRaw []byt
 		!receipt.SourceAuthenticated || !receipt.TargetAuthenticated || !receipt.PlaintextEqual || !receipt.SourceUnchanged || !receipt.Published || receipt.ActivationReady {
 		return migrationFailure(report, "receipt_mismatch", ErrProfileCorrupt)
 	}
+	// Without a marker, the exact operation's complete receipt establishes
+	// publication. Readiness still requires the full target verification below.
+	report.Published = true
 	target, err := openMigrationSnapshot(ctx, dir, request.ExpectedIdentity, key, storageContractV2)
 	if err != nil {
 		return migrationFailure(report, "target_snapshot_invalid", err)
@@ -564,6 +579,7 @@ func verifyMigration(ctx context.Context, request MigrationRequest, keyRaw []byt
 		}
 		return activateMigration(ctx, dir, parent, marker, report)
 	}
+	report.ActivationReady = !pending
 	report.AlreadyFinalized = !pending
 	report.Stage = "complete"
 	return nil

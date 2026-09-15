@@ -9,7 +9,9 @@ pending-migration startup guard. An older Runtime must not mount the new target.
 The command is for a trusted local operator, not an Agent/model tool or a remote
 API. It does not change Core authorization, register a Worker, obtain credentials,
 start Chrome, initialize the normal Browser service, or merge existing Profiles.
-It is supported only on Linux; other platforms return a fixed failure report.
+It is supported only on Linux. Windows and other non-Linux builds use the same
+fixed JSON failure-report contract but still refuse migration; a successful
+cross-platform Host installation does not imply migration support there.
 
 ## Commands
 
@@ -89,8 +91,14 @@ explicitly approved restoration instead supplies this retention object:
 ```
 
 The anchor must be the already approved instant, not the time of another copy
-or retry. Future or expired anchors are rejected. This association is local
-operation evidence, not a new network authorization mechanism.
+or retry. Future or expired anchors are rejected. The command validates the
+format of `authorization_sha256` and `prior_restoration_receipt_sha256` and records
+them for audit association. It does **not** load or authenticate those approval
+documents, verify an approver/signature, or establish that approval was granted.
+The trusted operator must verify the actual approval and prior receipt, bind
+them to the exact source, identity, destination and anchor, and retain that
+evidence before invoking the command. Supplying a correctly shaped hash is not
+approval. This is neither Core authorization nor a general remote recovery API.
 
 ## Isolation and activation
 
@@ -105,7 +113,9 @@ Migration authenticates the complete v1 stream and writes fresh v2 encryption
 without extracting or rewriting its archive. It authenticates the target and
 compares complete archive bytes internally. Plaintext, plaintext digests, key
 material, URLs and Browser data are not report fields. Source contents and
-mtime are not modified or quarantined on failure.
+mtime are not modified or quarantined on failure. Read-only target authentication
+and evidence-check failures also leave the encrypted target in its original
+location: they do not quarantine, delete, repair or rewrite it.
 
 A published reservation is **not** an activatable Profile. A pending marker and
 the shared manager lock block normal Runtime use until complete verification,
@@ -117,7 +127,33 @@ directory, or retry migration against an existing target.
 locks. `--finalize` is only for the exact operation whose complete target was
 written but whose pending marker remains. It repeats full verification before
 removing the marker. An incomplete, changed, unrelated, or in-use target is not
-finalizable. An already finalized exact target is checked without rewriting it.
+finalizable. Both commands are scoped to the initial migrated checkpoint before
+normal Browser use, not to ongoing health checks. An already finalized exact
+target can be checked without rewriting it only while its receipt-bound
+checkpoint, contents and pointer mtime still match. Normal use that advances the
+checkpoint or pointer mtime makes this initial-migration verification refuse;
+it does not by itself show that the running Profile is corrupt.
+
+Keep the private request, migration receipt and an encrypted pre-use baseline
+with its required key retained separately under existing access controls. After
+activation, use normal Runtime/Browser evidence to verify consumption and future
+checkpoints. Do not remove the pending marker, rewrite the receipt, roll back a
+live pointer, or reset mtime to force `--check`/`--finalize` to pass.
+
+## Retention and operator cleanup
+
+Automatic expiry must not infer a deletable Profile from an old pointer alone.
+Legacy v1, unknown-contract, malformed or otherwise unrecognized state is retained
+for explicit operator inspection and cleanup, including expired legacy Profiles.
+This retention is not permission to load or restore them. Normal expiry of
+recognized, structurally valid inactive v2 Profiles remains in effect; the
+migration workflow does not authorize arbitrary deletion of valid v2 Profiles.
+
+Retained sources, encrypted baselines, failed targets and exceptional Profiles
+consume disk space. Monitor capacity and arrange a separately authorized cleanup
+after identifying the exact store, stopping its writers, preserving required
+audit/rollback evidence and checking that the data is no longer needed. Migration
+does not perform this cleanup or reclaim space by silently deleting evidence.
 
 ## Output and recovery
 
@@ -126,12 +162,25 @@ Failure codes/types and stages are fixed, safe values; raw filesystem or JSON
 errors are never printed. Reports include `published` and `activation_ready`,
 which must be interpreted independently of the exit code.
 
+`published` refers to a destination reservation bound to this request/operation,
+not merely an existing directory, a public release, a running Worker, or a
+successful migration. It may be true for a partial or failed target.
+`activation_ready` means this exact operation's target has passed its required
+identity, receipt, snapshot and cryptographic checks and its pending marker is
+absent (or has been removed after verification). Marker absence alone is not
+proof. Match the operation/request/identity hashes and generations to the private
+request; neither flag grants access to another identity or proves Browser
+consumption. A subsequent durability or output failure can still require recovery
+even when activation has already become possible.
+
 If stdout itself fails, the command attempts a safe JSON report on stderr with
 `failure_code: "output_failed"`, `stage: "output"`, `completed_stage`, and
 `outcome_uncertain: true`, retaining the actual publication/activation flags.
 The command never retries a migration because report delivery failed. Inspect
-the original request and encrypted target, run `--check`, and use `--finalize`
-only when its exact-operation requirements hold.
+the original request and encrypted target, and use `--check`/`--finalize` only
+while their exact-operation, initial-checkpoint requirements still hold. Once
+normal use has advanced the target, preserve the report and encrypted baseline
+for investigation instead of trying to re-finalize the live Profile.
 
 Cryptographic conversion does not prove normal Browser consumption. Before
 enabling the retained Worker, independently validate the selected new Browser

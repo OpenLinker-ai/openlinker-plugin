@@ -209,7 +209,8 @@ func TestMigrationSupplementIncompleteOrWrongOperationCannotFinalize(t *testing.
 			before := migrationTreeProof(t, fixture.request.DestinationStore)
 			for _, mode := range []MigrationMode{MigrationCheck, MigrationFinalize} {
 				report, err := ExecuteProfileMigration(supplementBoundedContext(t), fixture.path, mode)
-				if err == nil || report.ActivationReady || !report.Published {
+				wantPublished := condition == "missing-receipt" // The exact pending marker still binds this request.
+				if err == nil || report.ActivationReady || report.Published != wantPublished {
 					t.Fatalf("%s accepted %s: %+v", mode, condition, report)
 				}
 				if before != migrationTreeProof(t, fixture.request.DestinationStore) || sourceBefore != migrationTreeProof(t, fixture.request.SourceStore) {
