@@ -57,3 +57,20 @@ The frozen small tar fixtures under `browserprofile/testdata` are independent
 codec vectors, not a replacement for this real-browser gate. Every failed
 attempt remains failed; an infrastructure or fixture correction requires a new
 report path and a fresh container.
+
+## Conversion cancellation regression
+
+Linux CI also repeats the actual migration cancellation and growing-ciphertext
+cases with the race detector. After the conversion result is received, the
+goroutine may still be finishing its runtime epilogue. The exit assertion polls
+for at most two seconds instead of treating an immediate stack snapshot as a
+leak. It still fails if the converter remains blocked. A negative control holds
+the actual converter at a `conversion_chunk`, verifies that the exit check times
+out, then cancels/releases it and verifies its exit. The source integrity,
+encrypted partial output and pending-activation assertions remain intact.
+
+```sh
+GOWORK=off go test -race -count=25 -timeout=2m \
+  -run '^TestMigrationSupplement(CancellationAfterActualConversionChunk|CiphertextGrowsAfterAuthentication|ExitCheckDetectsBlockedConversion)$' \
+  ./packages/browser-runtime/browserprofile
+```
