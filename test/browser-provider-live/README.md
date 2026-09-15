@@ -25,6 +25,23 @@ their entrypoint is replaced with the one-Run acceptance client.
 
 ## Run
 
+For a deterministic protocol regression without model credentials, run the
+installed repository-pinned Codex against the local fake Responses API:
+
+```sh
+OPENLINKER_TEST_CODEX_RPC_LOCAL_MODEL=1 GOWORK=off go test -count=1 -v \
+  -run '^TestInstalledCodexRPCWithLocalResponsesAPI$' ./packages/agent-adapters/agentexec
+```
+
+Its five cases cover standard RPC, native Browser, native Browser Code Mode,
+ordinary incomplete-response retry, and `max_messages` after a Browser tool
+result. The last case must stop without another automatic model request and
+retain the session for explicit follow-ups; the ordinary retry must still
+recover. CI runs this test with the pinned official client. Keep it when
+upgrading Codex because its error wording is part of the observed compatibility
+surface. This protocol fixture does not replace the credential-backed acceptance
+below or prove that an upstream gateway/model issue is resolved.
+
 Store each Provider credential in a separate private file, then run:
 
 ```sh

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexrpc"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexturn"
 )
 
 // Exercises the installed official binary against a local fake Responses API.
@@ -24,19 +25,22 @@ func TestInstalledCodexRPCWithLocalResponsesAPI(t *testing.T) {
 		t.Skip("opt-in installed Codex, local fake model only")
 	}
 	for _, test := range []struct {
-		name             string
-		native, codeMode bool
-		retry            bool
+		name                string
+		native, codeMode    bool
+		retry, messageLimit bool
 	}{
-		{"standard", false, false, false},
-		{"native-browser", true, false, false},
-		{"native-browser-code-mode", true, true, false},
-		{"native-browser-code-mode-retry", true, true, true},
+		{"standard", false, false, false, false},
+		{"native-browser", true, false, false, false},
+		{"native-browser-code-mode", true, true, false, false},
+		{"native-browser-code-mode-retry", true, true, true, false},
+		{"native-browser-code-mode-message-limit", true, true, true, true},
 	} {
-		t.Run(test.name, func(t *testing.T) { testInstalledCodexRPCWithLocalAPI(t, test.native, test.codeMode, test.retry) })
+		t.Run(test.name, func(t *testing.T) {
+			testInstalledCodexRPCWithLocalAPI(t, test.native, test.codeMode, test.retry, test.messageLimit)
+		})
 	}
 }
-func testInstalledCodexRPCWithLocalAPI(t *testing.T, native, codeMode, retry bool) {
+func testInstalledCodexRPCWithLocalAPI(t *testing.T, native, codeMode, retry, messageLimit bool) {
 	var calls atomic.Int32
 	var incomplete atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +66,11 @@ func testInstalledCodexRPCWithLocalAPI(t *testing.T, native, codeMode, retry boo
 			// Reproduce staging's incomplete response after the MCP tool result.
 			w.Header().Set("Content-Type", "text/event-stream")
 			fmt.Fprint(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"incomplete\"}}\n\n")
-			fmt.Fprint(w, "data: {\"type\":\"response.incomplete\",\"response\":{\"id\":\"incomplete\",\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_messages\"}}}\n\n")
+			reason := "fixture_transient"
+			if messageLimit {
+				reason = "max_messages"
+			}
+			fmt.Fprintf(w, "data: {\"type\":\"response.incomplete\",\"response\":{\"id\":\"incomplete\",\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":%q}}}\n\n", reason)
 			return
 		}
 		n := calls.Add(1)
@@ -171,20 +179,36 @@ text("isolated browser discovered");`
 	}
 	provider := CodexProvider{Config: config}
 	run := RunContext{Input: "reply briefly", Conversation: &ConversationContext{SessionKey: "local-rpc-test", Source: "core"}}
-	retries := 0
+	retries, limitStops := 0, 0
 	run.Emit = func(kind string, value any) error {
 		data, ok := value.(map[string]any)
 		if kind == "run.status.changed" && ok && data["status"] == "provider_retrying" {
 			retries++
+			if len(data) != 3 {
+				t.Errorf("ordinary retry shape changed: %v", data)
+			}
+		}
+		if kind == "run.status.changed" && ok && data["status"] == "provider_failed" {
+			limitStops++
 			if data["provider_error_kind"] != "incomplete_response" || data["provider_error_reason"] != "max_messages" || len(data) != 5 {
-				t.Errorf("real client retry did not produce safe classification: %v", data)
+				t.Errorf("real client did not classify the message limit safely: %v", data)
 			}
 		}
 		return nil
 	}
-	for n := 1; n <= 2; n++ {
+	turns := 2
+	if messageLimit {
+		turns++
+	}
+	for n := 1; n <= turns; n++ {
 		run.RunID = fmt.Sprintf("run-%d", n)
 		result, err := provider.Run(context.Background(), run)
+		if messageLimit && n == 1 {
+			if !errors.Is(err, codexturn.ErrResponseMessageLimit) || calls.Load() != 2 || !incomplete.Load() || limitStops != 1 || retries != 0 {
+				t.Fatalf("real client retried or lost message-limit diagnosis: err=%v calls=%d stops=%d retries=%d", err, calls.Load(), limitStops, retries)
+			}
+			continue
+		}
 		if err != nil {
 			var rpcErr *codexrpc.Error
 			if errors.As(err, &rpcErr) {
@@ -196,10 +220,14 @@ text("isolated browser discovered");`
 		if native && output["codex_sandbox"] != "read-only" {
 			t.Fatal("native Browser escaped read-only sandbox", output)
 		}
-		if output["summary"] != fmt.Sprintf("local protocol answer %d", n) {
+		answerNumber := n
+		if messageLimit {
+			answerNumber--
+		}
+		if output["summary"] != fmt.Sprintf("local protocol answer %d", answerNumber) {
 			t.Fatal(output)
 		}
-		if n == 2 && (output["codex_session_resumed"] != true || output["codex_session_recovered"] != false) {
+		if n >= 2 && (output["codex_session_resumed"] != true || output["codex_session_recovered"] != false) {
 			t.Fatal("native rollouts failed to resume across private homes", output)
 		}
 	}
@@ -210,7 +238,7 @@ text("isolated browser discovered");`
 	if calls.Load() != expectedCalls {
 		t.Fatal("unexpected local API call count", calls.Load())
 	}
-	if (retry && (retries != 1 || !incomplete.Load())) || (!retry && retries != 0) {
+	if (retry && !messageLimit && (retries != 1 || !incomplete.Load())) || (!retry && retries != 0) || (messageLimit && (retries != 0 || limitStops != 1 || !incomplete.Load())) {
 		t.Fatalf("unexpected retry behavior: requested=%v notifications=%d injected=%v", retry, retries, incomplete.Load())
 	}
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {

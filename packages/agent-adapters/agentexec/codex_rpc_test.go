@@ -2,12 +2,14 @@ package agentexec
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexturn"
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/providertest"
 )
 
@@ -117,4 +119,14 @@ func TestCodexRPCDoesNotRecoverUnrelatedResumeErrors(t *testing.T) {
 
 func TestCodexRPCResolvesRelativeWorkspaceAndDottedTrustKey(t *testing.T) {
 	providertest.CodexRPCResolvesRelativeWorkspaceAndDottedTrustKey(t, runCodexFixture)
+}
+
+func TestCodexRPCMessageLimitStops(t *testing.T) {
+	providertest.CodexRPCMessageLimitStops(t, func(ctx context.Context, bin, dir string, emit func(string, any) error) (string, error) {
+		_, answer, err := runCodexRPC(ctx, bin, dir, "read-only", "", "message limit", false, ProviderConfig{}, emit)
+		return answer, err
+	}, func(err error) bool { return errors.Is(err, codexturn.ErrResponseMessageLimit) })
+}
+func TestCodexRPCMessageLimitPreservesSession(t *testing.T) {
+	providertest.CodexRPCMessageLimitPreservesSession(t, runCodexFixture, func(err error) bool { return errors.Is(err, codexturn.ErrResponseMessageLimit) })
 }
