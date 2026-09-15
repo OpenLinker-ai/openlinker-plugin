@@ -6,9 +6,12 @@ import (
 )
 
 type ConfigureOptions struct {
-	DelegationTargets    []string
-	DelegationProxyBin   string
-	DelegationBrokerRoot string
+	// MCP enable passes the persisted provider explicitly, unlike CLI serve's
+	// default environment override. Diagnostics must match that execution entry.
+	RuntimeUsesConfiguredProvider bool
+	DelegationTargets             []string
+	DelegationProxyBin            string
+	DelegationBrokerRoot          string
 	// ChangedFields, when non-nil, is the exact set of configuration fields to
 	// update, using their command flag names. It preserves explicit zero, empty,
 	// and false values. Nil retains the non-empty patch behavior of MCP callers.
@@ -180,6 +183,18 @@ func ConfigureNonSecret(getenv func(string) string, options ConfigureOptions) (C
 	if err := validateNonSecretConfig(config); err != nil {
 		return Config{}, path, err
 	}
+	// Persist the requested value, but expose any environment override to both
+	// configuration entry points. Invalid search overrides fail before writing.
+	runtimeConfig := config
+	if !options.RuntimeUsesConfiguredProvider {
+		// CLI serve without --provider honors the environment override.
+		runtimeConfig.Provider = firstNonEmpty(envValue(getenv, "OPENLINKER_PROVIDER"), config.Provider)
+	}
+	policy, err := resolveWebSearchPolicy(runtimeConfig, getenv)
+	if err != nil {
+		return Config{}, path, err
+	}
+	config.webSearchPolicy = &policy
 	if err := saveConfig(path, config); err != nil {
 		return Config{}, path, err
 	}

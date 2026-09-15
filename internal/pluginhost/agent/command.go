@@ -60,6 +60,7 @@ func newConfigureCommand(ioStreams shared.IO) *cobra.Command {
 				"configured": true, "config_path": path, "provider": config.Provider,
 				"agent_id": config.AgentID, "workspace": config.Workspace, "enabled": config.Enabled,
 				"secrets_written": false,
+				"web_search":      config.SearchPolicy(),
 			})
 		},
 	}

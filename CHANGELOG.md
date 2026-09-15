@@ -6,6 +6,14 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Report configured/effective WebSearch policy and override source through CLI
+  and MCP configuration, doctor and Worker status. Preserve requested file values,
+  reject invalid search overrides before writing, and retain the last Worker
+  snapshot when the status caller uses a different environment. Older status
+  files leave the policy unknown. Search remains opt-in; diagnostics do not prove
+  model/gateway availability. Execution-source adoption requires a new published
+  host and regenerated installation locks.
+
 - Add an offline Linux-only Browser Profile v1-to-v2 migration command with exact
   identity/source preconditions, authenticated archive preservation, a fresh
   encrypted destination, pending-activation guard and operation-bound reports.

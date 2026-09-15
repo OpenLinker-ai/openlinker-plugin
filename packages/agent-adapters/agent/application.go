@@ -14,10 +14,11 @@ import (
 )
 
 type Diagnostic struct {
-	OK      bool              `json:"ok"`
-	Checks  map[string]string `json:"checks"`
-	Config  string            `json:"config_path"`
-	Message string            `json:"message,omitempty"`
+	OK        bool              `json:"ok"`
+	Checks    map[string]string `json:"checks"`
+	Config    string            `json:"config_path"`
+	Message   string            `json:"message,omitempty"`
+	WebSearch *WebSearchPolicy  `json:"web_search,omitempty"`
 }
 
 func Diagnose(getenv func(string) string, providerOverride string) Diagnostic {
@@ -32,6 +33,9 @@ func Diagnose(getenv func(string) string, providerOverride string) Diagnostic {
 	config.Workspace = firstNonEmpty(envValue(getenv, "OPENLINKER_WORKSPACE"), config.Workspace)
 	config.OpenLinkerURL = firstNonEmpty(envValue(getenv, "OPENLINKER_URL"), envValue(getenv, "OPENLINKER_API_BASE"), config.OpenLinkerURL)
 	runtimeOptionsErr := applyRuntimeEnvironment(&config, getenv)
+	if runtimeOptionsErr == nil {
+		result.WebSearch = config.SearchPolicy()
+	}
 	if runtimeOptionsErr == nil {
 		runtimeOptionsErr = validateProviderPolicy(config)
 	}

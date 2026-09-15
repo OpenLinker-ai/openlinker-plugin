@@ -234,6 +234,23 @@ Rebinding、直连 DNS、QUIC、WebRTC、DoH 或代理绕过，应使用该部�
 
 ## 安全诊断
 
+`agent configure` / `configure_agent_mode` 的响应增加 `web_search` 对象，包含
+`provider`、`configured`、`effective`、`source` 和 `overridden`。例如文件写入 true，
+但 `OPENLINKER_CODEX_WEB_SEARCH=false`，响应会明确显示最终 false 及环境覆盖来源；
+文件仍保留用户请求的值。修正实际服务环境后重启/重建对应 Worker 才会采用。
+非法搜索环境值会在写配置前报错，且不回显原值。CLI 配置预测不带 `--provider` 的
+serve，计入 `OPENLINKER_PROVIDER`；MCP 配置则使用文件中的 Provider，与
+`enable_agent_mode` 的显式 Provider 行为一致，不改变原有优先级。
+`agent serve --provider` / doctor 的显式覆盖需在对应调用环境里检查；如果环境指定了
+另一个 Provider，MCP diagnose 应显式传入文件中的 Provider 以匹配 enable。
+
+`agent doctor` / `diagnose_agent_mode` 显示当前调用解析出的策略；`agent status` 读取
+持久化 Worker 快照，`get_agent_mode_status` 显示当前宿主实例的 Worker 快照，需结合
+原有生命周期和时间戳判断。更改调用方环境不会把旧 Worker 显示成已更新。
+旧 status 文件没有 `web_search` 字段时表示未知，不能当作已关闭。这些字段只说明配置，
+不证明模型/网关支持搜索；默认仍关闭。新字段需采用新宿主，marketplace 合并前仍需
+发布宿主并重新生成 host-lock。
+
 - 原生 CLI 安装流程报告 CLI 来源、版本、Surface 和 Capability。
 - `diagnose_agent_mode` 只报告 `environment`、`file`、`absent`、`missing` 等来源类别，
   不报告值。
