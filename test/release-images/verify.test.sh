@@ -50,7 +50,7 @@ require_workflow_value '      - "scripts/resolve-agent-node-module.mjs"' 1
 require_workflow_value '      - "internal/pluginhost/**"' 1
 require_workflow_value '            OPENLINKER_PLUGIN_COMMIT=${{ github.sha }}' 1
 require_workflow_value '          DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}' 1
-require_workflow_value "docker/setup-qemu-action@v3" 1
+require_workflow_value "docker/setup-qemu-action@v4" 1
 require_workflow_value "docker.io/tonistiigi/binfmt:qemu-v10.2.3-68@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0" 1
 require_workflow_value "platforms: arm64" 1
 require_workflow_value "run_live_provider:" 1
