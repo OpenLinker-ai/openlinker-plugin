@@ -7,6 +7,13 @@ because it creates a short-lived public HTTPS fixture through a pinned
 Cloudflare Quick Tunnel. The tunnel has no uptime guarantee and is not a
 production dependency.
 
+The `mcp-evidence` phase also injects one batch of eight five-second waits using
+the production client's twenty-second action deadline. Both Codex and Claude
+MCP entry points must return `BROWSER_DEADLINE_EXCEEDED` within the bounded
+cleanup window and then complete another observation. This drives real Chrome
+without provider credentials; it is separate from live Codex/Claude model
+acceptance and does not infer tool success from a model's final answer.
+
 Run from the Plugin repository (`openlinker-plugin`):
 
 ```sh

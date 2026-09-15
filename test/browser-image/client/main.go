@@ -34,18 +34,19 @@ const (
 )
 
 type result struct {
-	Status             string                   `json:"status"`
-	Mode               string                   `json:"mode"`
-	Origin             string                   `json:"origin,omitempty"`
-	Title              string                   `json:"title,omitempty"`
-	ScreenshotSHA256   string                   `json:"screenshot_sha256,omitempty"`
-	ContinuationOrigin string                   `json:"continuation_origin,omitempty"`
-	ActionLatency      *actionLatencyComparison `json:"action_latency,omitempty"`
-	BackendSelected    string                   `json:"browser_backend_selected,omitempty"`
-	ExtensionID        string                   `json:"browser_extension_id,omitempty"`
-	ExtensionVersion   string                   `json:"browser_extension_version,omitempty"`
-	ProfileGeneration  uint64                   `json:"browser_profile_generation,omitempty"`
-	SessionRecovered   *bool                    `json:"browser_session_recovered,omitempty"`
+	Status                string                   `json:"status"`
+	Mode                  string                   `json:"mode"`
+	Origin                string                   `json:"origin,omitempty"`
+	Title                 string                   `json:"title,omitempty"`
+	ScreenshotSHA256      string                   `json:"screenshot_sha256,omitempty"`
+	ContinuationOrigin    string                   `json:"continuation_origin,omitempty"`
+	ActionLatency         *actionLatencyComparison `json:"action_latency,omitempty"`
+	BackendSelected       string                   `json:"browser_backend_selected,omitempty"`
+	ExtensionID           string                   `json:"browser_extension_id,omitempty"`
+	ExtensionVersion      string                   `json:"browser_extension_version,omitempty"`
+	ProfileGeneration     uint64                   `json:"browser_profile_generation,omitempty"`
+	SessionRecovered      *bool                    `json:"browser_session_recovered,omitempty"`
+	DeadlineRecoveryHosts []string                 `json:"deadline_recovery_hosts,omitempty"`
 }
 
 type runtimeExpectation struct {
@@ -264,12 +265,23 @@ func run(
 		); err != nil {
 			return result{}, err
 		}
+		deadlineClient, err := browserclient.New(browserclient.Config{
+			SocketPath: socketPath, CredentialFile: credentialPath, LeaseFile: leasePath,
+		})
+		if err != nil {
+			return result{}, err
+		}
+		for _, host := range []string{"codex", "claude"} {
+			if err := validateMCPDeadlineRecovery(deadlineClient, host); err != nil {
+				return result{}, fmt.Errorf("%s MCP deadline recovery: %w", host, err)
+			}
+		}
 		if _, failure := execute(client, browserprotocol.Action{
 			Kind: browserprotocol.ActionClose,
 		}); failure != nil {
 			return result{}, fmt.Errorf("MCP evidence attachment close failed: %w", failure)
 		}
-		return result{Status: "passed", Mode: mode}, nil
+		return result{Status: "passed", Mode: mode, DeadlineRecoveryHosts: []string{"codex", "claude"}}, nil
 	}
 
 	firstIdentity := identityFor(1, 1, 1, 1, 1)
