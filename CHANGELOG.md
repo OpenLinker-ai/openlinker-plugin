@@ -6,6 +6,16 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Adopt Node's macOS native Codex descendant cleanup (Node #46) and its bound
+  fix (Node #47). Plugin's Codex provider now keeps observed tool children and
+  grandchildren from surviving cancellation after they leave the original
+  process group, and long successful turns with many short-lived commands no
+  longer fail the tracking bound. A canceled or timed-out request preserves
+  `ErrProcessCleanup` instead of hiding incomplete cleanup. This is bounded
+  observed-ancestry cleanup, not hostile double-fork containment; Linux and
+  Windows keep their existing process-group behavior. Execution sources change,
+  so adoption requires a newly published host and regenerated marketplace locks.
+
 - Fix the Linux Profile migration test's premature goroutine-leak assertion:
   allow a bounded exit interval after receiving the final conversion result,
   with a real blocked-converter negative control and repeated race checks in CI.
