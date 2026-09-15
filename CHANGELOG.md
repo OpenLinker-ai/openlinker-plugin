@@ -11,7 +11,9 @@ CLI release and cross-platform installation matrix pass.
   grandchildren from surviving cancellation after they leave the original
   process group, and long successful turns with many short-lived commands no
   longer fail the tracking bound. A canceled or timed-out request preserves
-  `ErrProcessCleanup` instead of hiding incomplete cleanup. This is bounded
+  `ErrProcessCleanup` instead of hiding incomplete cleanup, and a resume
+  attempt that reports both a missing session and incomplete cleanup returns
+  that failure instead of retrying with a new session (Node #48). This is bounded
   observed-ancestry cleanup, not hostile double-fork containment; Linux and
   Windows keep their existing process-group behavior. Execution sources change,
   so adoption requires a newly published host and regenerated marketplace locks.
