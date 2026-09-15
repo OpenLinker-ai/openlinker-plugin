@@ -25,6 +25,23 @@ their entrypoint is replaced with the one-Run acceptance client.
 
 ## Run
 
+For a deterministic protocol regression without model credentials, run the
+installed repository-pinned Codex against the local fake Responses API:
+
+```sh
+OPENLINKER_TEST_CODEX_RPC_LOCAL_MODEL=1 GOWORK=off go test -count=1 -v \
+  -run '^TestInstalledCodexRPCWithLocalResponsesAPI$' ./packages/agent-adapters/agentexec
+```
+
+Its five cases cover standard RPC, native Browser, native Browser Code Mode,
+ordinary incomplete-response retry, and `max_messages` after a Browser tool
+result. The last case must stop without another automatic model request and
+retain the session for explicit follow-ups; the ordinary retry must still
+recover. CI runs this test with the pinned official client. Keep it when
+upgrading Codex because its error wording is part of the observed compatibility
+surface. This protocol fixture does not replace the credential-backed acceptance
+below or prove that an upstream gateway/model issue is resolved.
+
 Store each Provider credential in a separate private file, then run:
 
 ```sh
@@ -47,6 +64,24 @@ existing-directory path to retain the redacted four-line JSONL evidence.
 Missing credentials, Docker, a pinned Provider binary, the Plugin bundle, a
 Provider API response, the public fixture, a Browser tool call or any quadrant
 is a hard failure. There is no skip or mock-success path.
+
+## Codex upgrade regression without model credentials
+
+The separate `CI / validate-go` job installs the exact official Codex version
+and integrity pinned in `Dockerfile.providers`, then requires
+`TestInstalledCodexRPCWithLocalResponsesAPI`. Retain this gate when upgrading
+Codex. Its `native-browser-code-mode-message-limit` case sends a structured
+`response.incomplete` with `incomplete_details.reason=max_messages` after a tool
+result, and checks the real client's classified stop and explicit next-turn
+continuation. The separate `native-browser-code-mode-retry` case still requires
+ordinary transient retry recovery. It does not manufacture the client's error text: changes to the
+currently observed Codex 0.153.0 wording must fail the classification assertion.
+Node's protocol fixtures alone cannot detect that wording change.
+
+This test uses a local fake Responses API and synthetic credentials only. It
+does not determine whether a live `max_messages` limit originated at a gateway
+or further upstream, or replace the credential-backed acceptance above. That
+attribution requires correlated server-side logs.
 
 ## 中文说明
 

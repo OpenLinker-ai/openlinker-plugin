@@ -48,6 +48,8 @@ jobs:
           node-version: 22
       - run: node scripts/generate-codex-rpc.mjs --check
       - run: npm run test:go
+      - name: Stress migration cancellation and conversion exit
+        run: GOWORK=off go test -race -count=25 -timeout=2m -run '^TestMigrationSupplement(CancellationAfterActualConversionChunk|CiphertextGrowsAfterAuthentication|ExitCheckDetectsBlockedConversion)$' ./packages/browser-runtime/browserprofile
       - name: Test pinned Codex tool execution without model credentials
         env:
           OPENLINKER_TEST_CODEX_RPC_LOCAL_MODEL: "1"

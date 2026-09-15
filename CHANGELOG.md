@@ -6,6 +6,30 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Fix the Linux Profile migration test's premature goroutine-leak assertion:
+  allow a bounded exit interval after receiving the final conversion result,
+  with a real blocked-converter negative control and repeated race checks in CI.
+  Production migration behavior is unchanged. Package tests participate in the
+  host source digest, so adoption still requires a newly published host and
+  regenerated marketplace locks. Keep the pinned official Codex local API
+  regression on upgrades; the live upstream `max_messages` limit remains open.
+
+- Adopt Node's shared Codex message-limit stop: interrupt the active turn at
+  the first scoped `max_messages` diagnostic and return a fixed failure without
+  repeated native retries or partial success. Preserve the native session for
+  an explicit follow-up when reuse is enabled. Ordinary transient retries remain
+  unchanged. The installed Codex local API regression separately checks both
+  paths after an actual Browser MCP result, including session continuation and
+  no extra automatic model request. No real model credentials are required.
+  This limits retry waste; the upstream cause remains unconfirmed. Publish a
+  new host and regenerate all installation locks before merging.
+
+- Return `BROWSER_PROTOCOL_INVALID` with fixed, actionable messages for invalid
+  Browser MCP arguments, including actions on observe and oversized or unsafe
+  batches. Rejected calls do not execute Browser actions or poison the MCP
+  connection. Unexpected internal errors remain redacted; action limits and
+  authority/policy checks are unchanged. New host publication is required.
+
 - Preserve Browser action deadline errors through the local Runtime transport.
   After the action deadline, the client allows up to five seconds to receive
   Runtime cleanup and its structured response. Caller cancellation/deadlines
