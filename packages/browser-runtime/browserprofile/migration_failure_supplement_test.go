@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -63,11 +64,86 @@ func supplementEncryptedBytes(t *testing.T, root string) int64 {
 
 func supplementNoConversionGoroutine(t *testing.T) {
 	t.Helper()
-	stacks := make([]byte, 1<<20)
-	count := runtime.Stack(stacks, true)
-	if bytes.Contains(stacks[:count], []byte("browserprofile.executeProfileMigration.func")) {
-		t.Fatal("migration returned while a conversion goroutine remained")
+	if !supplementWaitForConversionExit(2 * time.Second) {
+		t.Fatal("conversion goroutine did not exit within 2 seconds after migration returned")
 	}
+}
+
+func supplementWaitForConversionExit(timeout time.Duration) bool {
+	// The result send is the conversion goroutine's final operation, but the
+	// receiver may return before the sender finishes its runtime epilogue.
+	// Poll for actual exit; a blocked converter must still fail at the deadline.
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	tick := time.NewTicker(5 * time.Millisecond)
+	defer tick.Stop()
+	stacks := make([]byte, 1<<20)
+	for {
+		count := runtime.Stack(stacks, true)
+		for count == len(stacks) {
+			stacks = make([]byte, 2*len(stacks))
+			count = runtime.Stack(stacks, true)
+		}
+		if !bytes.Contains(stacks[:count], []byte("browserprofile.executeProfileMigration.func")) {
+			return true
+		}
+		select {
+		case <-deadline.C:
+			return false
+		case <-tick.C:
+		}
+	}
+}
+
+func TestMigrationSupplementExitCheckDetectsBlockedConversion(t *testing.T) {
+	fixture := newMigrationFixture(t)
+	base, cancel := context.WithCancel(supplementBoundedContext(t))
+	entered, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	stop := func() {
+		cancel()
+		releaseOnce.Do(func() { close(release) })
+	}
+	ctx := context.WithValue(base, migrationFaultKey{}, func(stage string) error {
+		if stage == "conversion_chunk" {
+			close(entered)
+			<-release
+			return base.Err()
+		}
+		return nil
+	})
+	var report MigrationReport
+	var err error
+	go func() {
+		defer close(done)
+		report, err = ExecuteProfileMigration(ctx, fixture.path, MigrationExecute)
+	}()
+	t.Cleanup(func() {
+		stop()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Error("blocked migration did not stop during cleanup")
+		}
+	})
+	select {
+	case <-entered:
+	case <-base.Done():
+		t.Fatal("migration never reached a real conversion chunk")
+	}
+	if supplementWaitForConversionExit(25 * time.Millisecond) {
+		t.Fatal("exit check accepted a conversion goroutine held inside a real chunk")
+	}
+	stop()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("migration did not return after releasing the conversion chunk")
+	}
+	if err == nil || report.Stage != "convert" || report.FailureType != "cancellation" {
+		t.Fatalf("released converter did not report cancellation: %+v", report)
+	}
+	supplementNoConversionGoroutine(t)
 }
 
 func TestMigrationSupplementCancellationAfterActualConversionChunk(t *testing.T) {

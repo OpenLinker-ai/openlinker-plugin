@@ -6,6 +6,14 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Fix the Linux Profile migration test's premature goroutine-leak assertion:
+  allow a bounded exit interval after receiving the final conversion result,
+  with a real blocked-converter negative control and repeated race checks in CI.
+  Production migration behavior is unchanged. Package tests participate in the
+  host source digest, so adoption still requires a newly published host and
+  regenerated marketplace locks. Keep the pinned official Codex local API
+  regression on upgrades; the live upstream `max_messages` limit remains open.
+
 - Adopt Node's shared Codex message-limit stop: interrupt the active turn at
   the first scoped `max_messages` diagnostic and return a fixed failure without
   repeated native retries or partial success. Preserve the native session for

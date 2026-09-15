@@ -65,6 +65,24 @@ Missing credentials, Docker, a pinned Provider binary, the Plugin bundle, a
 Provider API response, the public fixture, a Browser tool call or any quadrant
 is a hard failure. There is no skip or mock-success path.
 
+## Codex upgrade regression without model credentials
+
+The separate `CI / validate-go` job installs the exact official Codex version
+and integrity pinned in `Dockerfile.providers`, then requires
+`TestInstalledCodexRPCWithLocalResponsesAPI`. Retain this gate when upgrading
+Codex. Its `native-browser-code-mode-message-limit` case sends a structured
+`response.incomplete` with `incomplete_details.reason=max_messages` after a tool
+result, and checks the real client's classified stop and explicit next-turn
+continuation. The separate `native-browser-code-mode-retry` case still requires
+ordinary transient retry recovery. It does not manufacture the client's error text: changes to the
+currently observed Codex 0.153.0 wording must fail the classification assertion.
+Node's protocol fixtures alone cannot detect that wording change.
+
+This test uses a local fake Responses API and synthetic credentials only. It
+does not determine whether a live `max_messages` limit originated at a gateway
+or further upstream, or replace the credential-backed acceptance above. That
+attribution requires correlated server-side logs.
+
 ## 中文说明
 
 该门禁使用同一套真实 Browser Runtime、Egress Gateway 和临时 HTTPS fixture，
