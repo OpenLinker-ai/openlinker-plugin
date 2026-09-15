@@ -6,6 +6,14 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Report configured/effective WebSearch policy and override source through CLI
+  and MCP configuration, doctor and Worker status. Preserve requested file values,
+  reject invalid search overrides before writing, and retain the last Worker
+  snapshot when the status caller uses a different environment. Older status
+  files leave the policy unknown. Search remains opt-in; diagnostics do not prove
+  model/gateway availability. Execution-source adoption requires a new published
+  host and regenerated installation locks.
+
 - Pin the verified Go SDK module at `63fc87d73406`, adopting the gRPC
   1.83.2 and protobuf dependency updates while retaining the SDK Go 1.25 baseline.
   Pin Node `v0.1.58-rc.3` for the shared protocol leaves. Command, credential,

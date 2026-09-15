@@ -47,6 +47,7 @@ type Config struct {
 	browserSelectedMode      string
 	browserBackendMode       string
 	browserFallbackReason    string
+	webSearchPolicy          *WebSearchPolicy
 }
 
 func defaultConfig() Config {
@@ -253,13 +254,11 @@ func applyRuntimeEnvironment(config *Config, getenv func(string) string) error {
 	if err := applyBoolean(getenv, "OPENLINKER_AGENT_SESSION_REUSE", &config.SessionReuse); err != nil {
 		return err
 	}
-	webSearchName := "OPENLINKER_" + strings.ToUpper(config.Provider) + "_WEB_SEARCH"
-	if strings.TrimSpace(envValue(getenv, webSearchName)) == "" {
-		webSearchName = "OPENLINKER_AGENT_WEB_SEARCH"
-	}
-	if err := applyBoolean(getenv, webSearchName, &config.WebSearch); err != nil {
+	policy, err := resolveWebSearchPolicy(*config, getenv)
+	if err != nil {
 		return err
 	}
+	config.WebSearch, config.webSearchPolicy = policy.Effective, &policy
 	return nil
 }
 

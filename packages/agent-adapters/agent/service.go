@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agenthost"
 	openlinker "github.com/OpenLinker-ai/openlinker-go"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentexec"
-	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agenthost"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/browserclientmode"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/browserextension"
 )
@@ -135,6 +135,8 @@ type Status struct {
 	BrowserClientMode        string `json:"browser_client_mode,omitempty"`
 	Message                  string `json:"message,omitempty"`
 	UpdatedAt                string `json:"updated_at"`
+
+	WebSearch *WebSearchPolicy `json:"web_search,omitempty"`
 }
 
 type resolvedRuntime struct {
@@ -257,6 +259,7 @@ func (service *Service) Enable(parent context.Context, providerOverride string) 
 				Transport: resolved.config.Transport, AgentTokenSource: resolved.agentTokenSource,
 				ProviderAuthSource: resolved.providerAuthSource, ConfigPath: resolved.configPath,
 				StateDir: resolved.stateDir, UpdatedAt: nowText(),
+				WebSearch:                resolved.config.SearchPolicy(),
 				ExecutionProfile:         resolved.config.ExecutionProfile,
 				BrowserInteractionPolicy: resolved.config.BrowserInteractionPolicy,
 				BrowserClientMode: firstNonEmpty(
@@ -280,6 +283,7 @@ func (service *Service) Enable(parent context.Context, providerOverride string) 
 		NodeID: resolved.nodeID, Workspace: resolved.config.Workspace, Transport: resolved.config.Transport,
 		AgentTokenSource: resolved.agentTokenSource, ProviderAuthSource: resolved.providerAuthSource,
 		ConfigPath: resolved.configPath, StateDir: resolved.stateDir, UpdatedAt: nowText(),
+		WebSearch:                resolved.config.SearchPolicy(),
 		ExecutionProfile:         resolved.config.ExecutionProfile,
 		BrowserInteractionPolicy: resolved.config.BrowserInteractionPolicy,
 		BrowserClientMode: firstNonEmpty(
@@ -374,7 +378,12 @@ func (service *Service) Disable(ctx context.Context) error {
 func (service *Service) Status() Status {
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	return service.status
+	status := service.status
+	if status.WebSearch != nil {
+		policy := *status.WebSearch
+		status.WebSearch = &policy
+	}
+	return status
 }
 
 func resolveRuntime(getenv func(string) string, providerOverride, version string) (resolvedRuntime, error) {

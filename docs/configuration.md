@@ -201,6 +201,30 @@ Recreate the relevant container after changing its deployment environment.
 Browser tools and provider web search are configured separately; enabling this
 switch also requires the model provider and tool permissions to support search.
 
+`agent configure` / `configure_agent_mode` now return a `web_search` object with
+`provider`, `configured`, `effective`, `source` and `overridden`. For example,
+persisting `--web-search=true` while `OPENLINKER_CODEX_WEB_SEARCH=false` reports
+configured=true, effective=false, source=OPENLINKER_CODEX_WEB_SEARCH and
+overridden=true. The requested file value is preserved; fix the actual service
+environment and restart/recreate that Worker to adopt it. Invalid search override
+values reject configuration before writing and are not echoed in the error.
+CLI configuration predicts `agent serve` without `--provider`, including
+`OPENLINKER_PROVIDER`. MCP configuration instead uses the persisted provider,
+matching `enable_agent_mode`, which passes that provider explicitly. Neither
+entry changes provider precedence. An explicit `agent serve --provider` or doctor
+override must be checked in that invocation's environment; pass the persisted
+provider to MCP diagnosis if an environment override selects a different one.
+
+`agent doctor` / `diagnose_agent_mode` report the policy resolved in the current
+invocation. `agent status` reads the last persisted Worker snapshot;
+`get_agent_mode_status` reports the current host instance's Worker snapshot.
+Both include the existing lifecycle and timestamp and do not relabel an old
+Worker when the caller changes its environment.
+An older status file has no `web_search` object: the policy is unknown, not false.
+These are configuration diagnostics, not a live search test or proof of gateway
+support. Defaults remain off. Deploy a newly built host to obtain these fields;
+marketplace adoption still requires a published host and regenerated host locks.
+
 ## Native Agent-control tools
 
 | Tool | Behavior |

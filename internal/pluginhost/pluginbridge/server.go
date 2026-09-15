@@ -428,7 +428,8 @@ func (server *Server) configureAgent(arguments map[string]any) (toolResult, erro
 		webSearch = &value
 	}
 	config, path, err := agent.ConfigureNonSecret(server.IO.Getenv, agent.ConfigureOptions{
-		Provider: stringArgument(arguments, "provider"), AgentID: stringArgument(arguments, "agent_id"),
+		RuntimeUsesConfiguredProvider: true,
+		Provider:                      stringArgument(arguments, "provider"), AgentID: stringArgument(arguments, "agent_id"),
 		Workspace: stringArgument(arguments, "workspace"), OpenLinkerURL: stringArgument(arguments, "openlinker_url"),
 		StateDir: stringArgument(arguments, "state_dir"), ProviderBin: stringArgument(arguments, "provider_bin"),
 		Model: stringArgument(arguments, "model"), Transport: stringArgument(arguments, "transport"),
@@ -453,6 +454,7 @@ func (server *Server) configureAgent(arguments map[string]any) (toolResult, erro
 	return successToolResult(map[string]any{
 		"configured": true, "config_path": path, "provider": config.Provider, "agent_id": config.AgentID,
 		"workspace": config.Workspace, "secrets_written": false, "enabled": config.Enabled,
+		"web_search":                 config.SearchPolicy(),
 		"execution_profile":          config.ExecutionProfile,
 		"browser_interaction_policy": config.BrowserInteractionPolicy,
 		"browser_client_mode":        config.BrowserClientMode,
