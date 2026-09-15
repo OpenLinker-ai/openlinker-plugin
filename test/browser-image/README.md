@@ -30,6 +30,45 @@ DOCKER_DEFAULT_PLATFORM=linux/amd64 ./test/browser-image/run.sh
 DOCKER_DEFAULT_PLATFORM=linux/arm64 ./test/browser-image/run.sh
 ```
 
+## Locked Official Chrome artifacts
+
+The separate `Dockerfile.browser.native-chrome` overlay accepts `amd64` and
+`arm64`. Artifact preparation defaults to `amd64` for existing callers; select
+`--architecture arm64` explicitly for a native Linux ARM64 build. The preparer
+resolves the exact version in official Chrome for Testing metadata, never a
+different architecture or a substitute version. For example, Chrome
+`153.0.8010.36` has a `linux-arm64` archive; `151.0.7922.77` does not.
+
+From a root checkout containing `openlinker-plugin`, supply absolute private
+state paths (outside the Plugin submodule):
+
+```sh
+node openlinker-plugin/test/browser-image/prepare-native-chrome-artifacts.mjs chrome \
+  --root-repository /absolute/openlinker \
+  --state-root /absolute/openlinker/.openlinker-dev/native-chrome/local-arm64 \
+  --version 153.0.8010.36 --architecture arm64
+```
+
+For the ARM64 overlay, set `--platform linux/arm64`,
+`OPENLINKER_CHROME_ARTIFACT=chrome-linux-arm64.tar` and
+`OPENLINKER_CHROME_UPSTREAM_ARTIFACT=chrome-linux-arm64.zip`. AMD64 retains
+`chrome-linux-amd64.tar` and `chrome-linux64.zip`. The strict seven-field lock
+is unchanged: its filenames and official versioned URL bind the architecture,
+and both the upstream ZIP and normalized tar have independently checked
+digests. The lock verifier accepts architecture as its sixth argument (default
+`amd64`); Docker always passes `TARGETARCH`. Preparation and the post-extraction
+image gate also verify both Chrome and sandbox ELF headers against that target.
+ARM64 output uses its own version/architecture directory, so preparing both
+platforms cannot overwrite the same lock.
+
+These checks establish artifact integrity, not Browser functionality. Every
+new native Chrome version/architecture must still pass the real Chrome,
+extension/Native Messaging, restricted network and credential-backed Provider
+gates before being described as accepted or used for cutover. Existing
+Chromium acceptance below does not substitute for native Chrome acceptance.
+
+## Browser/Egress behavioral gate
+
 The harness inspects the resulting Browser image architecture and selects the
 matching repository-pinned Chromium version fixture; changing the platform is
 not a build-only substitute for actually starting Chromium and completing the

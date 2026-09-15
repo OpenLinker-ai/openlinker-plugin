@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { chromePlatform, chromeSourceURL } from "./chrome-platform.mjs";
 
 const EXPECTED_KEYS = [
   "distribution",
@@ -19,7 +20,9 @@ async function verifyChromeLock(
   upstreamPath,
   expectedDistribution,
   expectedVersion,
+  expectedArchitecture = "amd64",
 ) {
+  const platform = chromePlatform(expectedArchitecture);
   if (
     expectedDistribution !== "chrome_for_testing" ||
     !/^[1-9][0-9]{0,3}(?:\.[0-9]{1,8}){3}$/.test(expectedVersion ?? "")
@@ -34,16 +37,15 @@ async function verifyChromeLock(
       throw new Error("Chrome lock record contains a duplicate or missing field");
     }
   }
-  const expectedSource =
-    `https://storage.googleapis.com/chrome-for-testing-public/${expectedVersion}/linux64/chrome-linux64.zip`;
+  const expectedSource = chromeSourceURL(expectedVersion, expectedArchitecture);
   if (
     keys.length !== EXPECTED_KEYS.length ||
     keys.some((key, index) => key !== EXPECTED_KEYS[index]) ||
     value.distribution !== expectedDistribution ||
     value.version !== expectedVersion ||
-    value.filename !== "chrome-linux-amd64.tar" ||
+    value.filename !== platform.filename ||
     value.filename !== path.basename(artifactPath) ||
-    value.upstream_filename !== "chrome-linux64.zip" ||
+    value.upstream_filename !== platform.upstreamFilename ||
     value.upstream_filename !== path.basename(upstreamPath) ||
     value.source_reference !== expectedSource ||
     !/^[0-9a-f]{64}$/.test(value.sha256) ||
@@ -73,6 +75,7 @@ if (path.resolve(process.argv[1] ?? "") === path.resolve(fileURLToPath(import.me
     upstreamPath,
     expectedDistribution,
     expectedVersion,
+    expectedArchitecture,
   ] = process.argv.slice(2);
   await verifyChromeLock(
     lockPath,
@@ -80,6 +83,7 @@ if (path.resolve(process.argv[1] ?? "") === path.resolve(fileURLToPath(import.me
     upstreamPath,
     expectedDistribution,
     expectedVersion,
+    expectedArchitecture,
   );
 }
 
