@@ -3,7 +3,7 @@ import {
   createHash,
   generateKeyPairSync,
 } from "node:crypto";
-import { chmod, cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -21,7 +21,7 @@ import { verifyExtensionLock } from "./verify-native-chrome-extension-lock.mjs";
 test("all Chrome image verifier copies include loadable module dependencies", async () => {
   for (const name of ["Dockerfile.browser.native-chrome", "Dockerfile.browser.chrome"]) {
     const dockerfile = await readFile(new URL(`../../${name}`, import.meta.url), "utf8");
-    const root = await mkdtemp(path.join(tmpdir(), "native-chrome-verifier-copy-"));
+    const root = await realpath(await mkdtemp(path.join(tmpdir(), "native-chrome-verifier-copy-")));
     try {
       let verifier;
       for (const line of dockerfile.split("\n")) {
@@ -34,8 +34,17 @@ test("all Chrome image verifier copies include loadable module dependencies", as
       assert.ok(verifier, name);
       // Execute imports outside the checkout: a missing COPY cannot be hidden
       // by a dependency present next to the source verifier in the repository.
-      execFileSync(process.execPath, ["--input-type=module", "-e",
-        'await import((await import("node:url")).pathToFileURL(process.argv[1]).href)', verifier], { stdio: "pipe" });
+      // Keep argv[1] distinct from the imported module so its real CLI guard
+      // does not run. Canonical paths above prevent macOS temp-directory
+      // symlinks from accidentally hiding that mistake compared with Linux.
+      const importVerifier = () => execFileSync(process.execPath, ["--input-type=module", "-e",
+        'await import((await import("node:url")).pathToFileURL(process.argv[2]).href)',
+        "verifier-import-check", verifier], { stdio: "pipe" });
+      importVerifier();
+      await rm(path.join(root, "chrome-platform.mjs"));
+      assert.throws(importVerifier, (error) =>
+        error.stderr?.toString().includes("ERR_MODULE_NOT_FOUND"),
+      `${name}: removing the copied helper must break the real import`);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
