@@ -80,15 +80,12 @@ func (provider CodexProvider) Run(ctx context.Context, run RunContext) (openlink
 			buildCodexPrompt(runWithSessionHistory(run, sessionPath, "codex", workspace, sessionKey, sessionID), config.WebSearch, browserProfileEnabled(config)),
 			config.SessionReuse && sessionKey != "", config, run.Emit)
 		if requestCtx.Err() != nil {
-			if errors.Is(requestCtx.Err(), context.DeadlineExceeded) {
-				return openlinker.RuntimeResult{}, fmt.Errorf("Codex timed out after %s", timeout)
-			}
-			return openlinker.RuntimeResult{}, requestCtx.Err()
+			return openlinker.RuntimeResult{}, codexCanceledResult(requestCtx.Err(), err, timeout)
 		}
 		if err == nil {
 			break
 		}
-		if sessionID != "" && attempt == 0 && errors.Is(err, errCodexSessionMissing) {
+		if codexRecoversMissingSession(sessionID, attempt, err) {
 			if err := deleteSessionID(sessionPath, "codex", workspace, sessionKey); err != nil {
 				return openlinker.RuntimeResult{}, err
 			}
@@ -132,6 +129,26 @@ func (provider CodexProvider) Run(ctx context.Context, run RunContext) (openlink
 		Status: "success", Output: result,
 		Events: []openlinker.RuntimeEvent{{EventType: "run.message.delta", Payload: map[string]any{"text": summary}}},
 	}, nil
+}
+
+// A missing saved session is recovered once with a new session, unless the
+// failed attempt also left native process cleanup incomplete: a later success
+// must not hide that failure.
+func codexRecoversMissingSession(sessionID string, attempt int, err error) bool {
+	return sessionID != "" && attempt == 0 &&
+		errors.Is(err, errCodexSessionMissing) && !errors.Is(err, codexturn.ErrProcessCleanup)
+}
+
+// A canceled or timed-out request must not hide incomplete native process
+// cleanup; ordinary cancellation and timeout results are unchanged.
+func codexCanceledResult(cause, executionErr error, timeout time.Duration) error {
+	if errors.Is(executionErr, codexturn.ErrProcessCleanup) {
+		return errors.Join(cause, executionErr)
+	}
+	if errors.Is(cause, context.DeadlineExceeded) {
+		return fmt.Errorf("Codex timed out after %s", timeout)
+	}
+	return cause
 }
 
 func codexLaunchConfiguration(config ProviderConfig, sandbox string) []string {
