@@ -1,12 +1,14 @@
 package browserplugin
 
-import (
-	"errors"
-
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserprotocol"
-)
+import "github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserprotocol"
 
 const maxBatchActions = 8
+
+// Only fixed validation messages belong here. Unexpected Runtime errors still
+// use the private generic fallback in browserErrorResult.
+func invalidToolArguments(message string) *browserprotocol.Failure {
+	return browserprotocol.NewFailure(browserprotocol.ErrorProtocolInvalid, message, false)
+}
 
 func browserToolDefinitions(policy string) []toolDefinition {
 	stringProperty := func(description string) map[string]any {
@@ -102,24 +104,24 @@ func validateToolArguments(arguments toolArguments, policy string) error {
 		return failure
 	}
 	if arguments.Observation == browserprotocol.ObservationNone {
-		return errors.New("Browser tool observation mode is invalid")
+		return invalidToolArguments("Browser tool observation mode is invalid")
 	}
 	switch arguments.Operation {
 	case "observe", "checkpoint", "close":
 		if len(arguments.Actions) != 0 {
-			return errors.New("Browser operation does not accept actions")
+			return invalidToolArguments("Browser operation does not accept actions; use act for actions")
 		}
 		return nil
 	case "act":
 		if len(arguments.Actions) < 1 || len(arguments.Actions) > maxBatchActions {
-			return errors.New("Browser act requires one to eight actions")
+			return invalidToolArguments("Browser act requires one to eight actions")
 		}
 	default:
-		return errors.New("Browser operation is invalid")
+		return invalidToolArguments("Browser operation is invalid; use observe, act, checkpoint, or close")
 	}
 	for _, action := range arguments.Actions {
 		if action.Observation != browserprotocol.ObservationDefault {
-			return errors.New("Browser action observation is controlled by the operation")
+			return invalidToolArguments("Browser action observation is controlled by the operation")
 		}
 		if failure := action.ValidateForPolicy(policy); failure != nil {
 			return failure
@@ -132,8 +134,8 @@ func validateToolArguments(arguments toolArguments, policy string) error {
 				browserprotocol.ActionWait,
 				browserprotocol.ActionScreenshot:
 			default:
-				return errors.New(
-					"multi-action Browser batches may contain only scroll, wait, and screenshot",
+				return invalidToolArguments(
+					"multi-action Browser batches may contain only scroll, wait, and screenshot; send navigation in a separate act call",
 				)
 			}
 		}

@@ -26,16 +26,19 @@ func TestInstalledCodexRPCWithLocalResponsesAPI(t *testing.T) {
 	for _, test := range []struct {
 		name             string
 		native, codeMode bool
+		retry            bool
 	}{
-		{"standard", false, false},
-		{"native-browser", true, false},
-		{"native-browser-code-mode", true, true},
+		{"standard", false, false, false},
+		{"native-browser", true, false, false},
+		{"native-browser-code-mode", true, true, false},
+		{"native-browser-code-mode-retry", true, true, true},
 	} {
-		t.Run(test.name, func(t *testing.T) { testInstalledCodexRPCWithLocalAPI(t, test.native, test.codeMode) })
+		t.Run(test.name, func(t *testing.T) { testInstalledCodexRPCWithLocalAPI(t, test.native, test.codeMode, test.retry) })
 	}
 }
-func testInstalledCodexRPCWithLocalAPI(t *testing.T, native, codeMode bool) {
+func testInstalledCodexRPCWithLocalAPI(t *testing.T, native, codeMode, retry bool) {
 	var calls atomic.Int32
+	var incomplete atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/responses" {
 			http.NotFound(w, r)
@@ -53,6 +56,13 @@ func testInstalledCodexRPCWithLocalAPI(t *testing.T, native, codeMode bool) {
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Error("decode local fake API request", err)
 			http.Error(w, "invalid request", 400)
+			return
+		}
+		if retry && calls.Load() == 2 && incomplete.CompareAndSwap(false, true) {
+			// Reproduce staging's incomplete response after the MCP tool result.
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprint(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"incomplete\"}}\n\n")
+			fmt.Fprint(w, "data: {\"type\":\"response.incomplete\",\"response\":{\"id\":\"incomplete\",\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_messages\"}}}\n\n")
 			return
 		}
 		n := calls.Add(1)
@@ -161,6 +171,17 @@ text("isolated browser discovered");`
 	}
 	provider := CodexProvider{Config: config}
 	run := RunContext{Input: "reply briefly", Conversation: &ConversationContext{SessionKey: "local-rpc-test", Source: "core"}}
+	retries := 0
+	run.Emit = func(kind string, value any) error {
+		data, ok := value.(map[string]any)
+		if kind == "run.status.changed" && ok && data["status"] == "provider_retrying" {
+			retries++
+			if data["provider_error_kind"] != "incomplete_response" || data["provider_error_reason"] != "max_messages" || len(data) != 5 {
+				t.Errorf("real client retry did not produce safe classification: %v", data)
+			}
+		}
+		return nil
+	}
 	for n := 1; n <= 2; n++ {
 		run.RunID = fmt.Sprintf("run-%d", n)
 		result, err := provider.Run(context.Background(), run)
@@ -188,6 +209,9 @@ text("isolated browser discovered");`
 	}
 	if calls.Load() != expectedCalls {
 		t.Fatal("unexpected local API call count", calls.Load())
+	}
+	if (retry && (retries != 1 || !incomplete.Load())) || (!retry && retries != 0) {
+		t.Fatalf("unexpected retry behavior: requested=%v notifications=%d injected=%v", retry, retries, incomplete.Load())
 	}
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {
 		t.Fatal("untrusted user/project MCP was started")

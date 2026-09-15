@@ -6,6 +6,18 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Adopt the public Node `56984d486bcb` turn lifecycle to add safe
+  `incomplete_response` / `max_messages` retry diagnostics. Retry behavior is
+  unchanged and raw upstream errors are not exported. The installed Codex local
+  API regression now reproduces an incomplete response after a Browser tool
+  result and verifies recovery and continuation without real model credentials.
+
+- Return `BROWSER_PROTOCOL_INVALID` with fixed, actionable messages for invalid
+  Browser MCP arguments, including actions on observe and oversized or unsafe
+  batches. Rejected calls do not execute Browser actions or poison the MCP
+  connection. Unexpected internal errors remain redacted; action limits and
+  authority/policy checks are unchanged. New host publication is required.
+
 - Preserve Browser action deadline errors through the local Runtime transport.
   After the action deadline, the client allows up to five seconds to receive
   Runtime cleanup and its structured response. Caller cancellation/deadlines

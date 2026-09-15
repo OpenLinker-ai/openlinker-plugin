@@ -484,7 +484,7 @@ func (server *Server) callBrowser(
 	var arguments toolArguments
 	raw, err := json.Marshal(rawArguments)
 	if err != nil || decodeStrict(raw, &arguments) != nil {
-		return toolResult{}, errors.New("Browser tool arguments are invalid")
+		return toolResult{}, invalidToolArguments("Browser tool arguments are invalid")
 	}
 	if err := validateToolArguments(arguments, server.interactionPolicy()); err != nil {
 		return toolResult{}, err
