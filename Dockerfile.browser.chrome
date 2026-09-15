@@ -16,6 +16,7 @@ ARG OPENLINKER_BROWSER_PROFILE_GENERATION
 COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_ARTIFACT} /tmp/operator-chrome/chrome.tar
 COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_LOCK} /tmp/operator-chrome/chrome.lock.json
 COPY --chown=root:root --chmod=0444 test/browser-image/verify-chrome-lock.mjs /tmp/operator-chrome/verify-chrome-lock.mjs
+COPY --chown=root:root --chmod=0444 test/browser-image/chrome-platform.mjs /tmp/operator-chrome/chrome-platform.mjs
 RUN base_digest="${OPENLINKER_BROWSER_BASE##*@sha256:}" \
  && test "${OPENLINKER_BROWSER_BASE}" != "${base_digest}" \
  && test "${#base_digest}" -eq 64 \

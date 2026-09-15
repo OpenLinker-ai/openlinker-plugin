@@ -27,6 +27,7 @@ import {
   extensionIDFromPublicKey,
   verifyCRX3,
 } from "./crx3.mjs";
+import { chromePlatform, chromeSourceURL, verifyChromeELF } from "./chrome-platform.mjs";
 
 const PLUGIN_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -309,7 +310,9 @@ async function boundedDownload(url, fetchImplementation = fetch) {
   return bytes;
 }
 
-async function chromeDownloadForVersion(version, fetchImplementation = fetch) {
+async function chromeDownloadForVersion(version, fetchImplementation = fetch, architecture = "amd64") {
+  const platform = chromePlatform(architecture);
+  const expectedURL = chromeSourceURL(version, architecture);
   const metadataBytes = await boundedDownload(CHROME_METADATA_URL, fetchImplementation);
   if (metadataBytes.length > 32 * 1024 * 1024) {
     throw new Error("Chrome for Testing metadata is too large");
@@ -317,19 +320,19 @@ async function chromeDownloadForVersion(version, fetchImplementation = fetch) {
   const metadata = JSON.parse(metadataBytes.toString("utf8"));
   const record = metadata.versions?.find((candidate) => candidate.version === version);
   const download = record?.downloads?.chrome?.find(
-    (candidate) => candidate.platform === "linux64",
+    (candidate) => candidate.platform === platform.platform,
   );
-  const expectedURL = `https://storage.googleapis.com/chrome-for-testing-public/${version}/linux64/chrome-linux64.zip`;
   if (download?.url !== expectedURL) {
-    throw new Error("official Chrome for Testing linux64 download is unavailable");
+    throw new Error(`official Chrome for Testing ${platform.platform} download is unavailable`);
   }
   return expectedURL;
 }
 
-function normalizedChromeEntries(zipEntries) {
+function normalizedChromeEntries(zipEntries, architecture) {
+  const platform = chromePlatform(architecture);
   const output = [];
   for (const entry of zipEntries) {
-    const relative = entry.path.slice("chrome-linux64/".length);
+    const relative = entry.path.slice(platform.prefix.length);
     let normalized = relative === "" ? "chrome/" : `chrome/${relative}`;
     if (normalized === "chrome/chrome_sandbox") {
       normalized = "chrome/chrome-sandbox";
@@ -351,10 +354,15 @@ function normalizedChromeEntries(zipEntries) {
   ) {
     throw new Error("Chrome for Testing archive lacks required executables");
   }
+  for (const name of ["chrome/chrome", "chrome/chrome-sandbox"]) {
+    verifyChromeELF(output.find((entry) => entry.path === name).data, architecture);
+  }
   return output;
 }
 
 async function prepareChromeArtifacts(options) {
+  const architecture = options.architecture ?? "amd64";
+  const platform = chromePlatform(architecture);
   const { state } = await validateStateRoot(
     options.rootRepository,
     options.stateRoot,
@@ -363,20 +371,21 @@ async function prepareChromeArtifacts(options) {
     throw new Error("Chrome for Testing version must contain four numeric parts");
   }
   const sourceReference = options.sourceReference ??
-    await chromeDownloadForVersion(options.version, options.fetchImplementation);
-  const expectedURL = `https://storage.googleapis.com/chrome-for-testing-public/${options.version}/linux64/chrome-linux64.zip`;
+    await chromeDownloadForVersion(options.version, options.fetchImplementation, architecture);
+  const expectedURL = chromeSourceURL(options.version, architecture);
   if (sourceReference !== expectedURL) {
     throw new Error("Chrome for Testing source reference is not the official versioned URL");
   }
   const upstream = options.upstreamBytes ??
     await boundedDownload(sourceReference, options.fetchImplementation);
-  const zipEntries = readZipEntries(upstream, "chrome-linux64/");
-  const tar = deterministicTar(normalizedChromeEntries(zipEntries));
-  const outputRoot = path.join(state, "artifacts", `chrome-${options.version}`);
+  const zipEntries = readZipEntries(upstream, platform.prefix);
+  const tar = deterministicTar(normalizedChromeEntries(zipEntries, architecture));
+  // Preserve the existing AMD64 location while keeping ARM64 locks independent.
+  const outputRoot = path.join(state, "artifacts", `chrome-${options.version}${architecture === "amd64" ? "" : `-${architecture}`}`);
   await mkdir(outputRoot, { recursive: true, mode: 0o700 });
   await chmod(outputRoot, 0o700);
-  const artifactPath = path.join(outputRoot, "chrome-linux-amd64.tar");
-  const upstreamPath = path.join(outputRoot, "chrome-linux64.zip");
+  const artifactPath = path.join(outputRoot, platform.filename);
+  const upstreamPath = path.join(outputRoot, platform.upstreamFilename);
   const lockPath = path.join(outputRoot, "chrome.lock.json");
   const lock = {
     distribution: "chrome_for_testing",
@@ -412,6 +421,7 @@ function parseArguments(argv) {
     "--state-root",
     "--version",
     "--source-reference",
+    "--architecture",
   ]);
   if (Object.keys(values).some((name) => !allowed.has(name))) {
     throw new Error("artifact preparation argument is unknown");
@@ -425,6 +435,10 @@ function parseArguments(argv) {
   if (command === "chrome" && values["--source-reference"] !== undefined) {
     throw new Error("Chrome source reference is resolved from official metadata");
   }
+  if (command === "extension" && values["--architecture"] !== undefined) {
+    throw new Error("--architecture is only supported for Chrome preparation");
+  }
+  if (command === "chrome") chromePlatform(values["--architecture"] ?? "amd64");
   return { command, values };
 }
 
@@ -440,7 +454,7 @@ if (path.resolve(process.argv[1] ?? "") === path.resolve(fileURLToPath(import.me
         ...common,
         sourceReference: values["--source-reference"],
       })
-    : await prepareChromeArtifacts(common);
+    : await prepareChromeArtifacts({ ...common, architecture: values["--architecture"] });
   process.stdout.write(`${JSON.stringify({
     artifact_path: result.artifactPath,
     extension_id: result.extensionID,

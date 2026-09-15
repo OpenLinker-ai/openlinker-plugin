@@ -3,7 +3,8 @@ import {
   createHash,
   generateKeyPairSync,
 } from "node:crypto";
-import { chmod, mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -16,6 +17,39 @@ import {
 import { deterministicZip } from "./deterministic-archive.mjs";
 import { createCRX3 } from "./crx3.mjs";
 import { verifyExtensionLock } from "./verify-native-chrome-extension-lock.mjs";
+
+test("all Chrome image verifier copies include loadable module dependencies", async () => {
+  for (const name of ["Dockerfile.browser.native-chrome", "Dockerfile.browser.chrome"]) {
+    const dockerfile = await readFile(new URL(`../../${name}`, import.meta.url), "utf8");
+    const root = await realpath(await mkdtemp(path.join(tmpdir(), "native-chrome-verifier-copy-")));
+    try {
+      let verifier;
+      for (const line of dockerfile.split("\n")) {
+        const copy = line.match(/^COPY .* (test\/browser-image\/[^ ]+\.mjs) (\/tmp\/[^ ]+\.mjs)$/);
+        if (!copy) continue;
+        const target = path.join(root, path.basename(copy[2]));
+        await cp(new URL(`../../${copy[1]}`, import.meta.url), target);
+        if (copy[1].endsWith("/verify-chrome-lock.mjs")) verifier = target;
+      }
+      assert.ok(verifier, name);
+      // Execute imports outside the checkout: a missing COPY cannot be hidden
+      // by a dependency present next to the source verifier in the repository.
+      // Keep argv[1] distinct from the imported module so its real CLI guard
+      // does not run. Canonical paths above prevent macOS temp-directory
+      // symlinks from accidentally hiding that mistake compared with Linux.
+      const importVerifier = () => execFileSync(process.execPath, ["--input-type=module", "-e",
+        'await import((await import("node:url")).pathToFileURL(process.argv[2]).href)',
+        "verifier-import-check", verifier], { stdio: "pipe" });
+      importVerifier();
+      await rm(path.join(root, "chrome-platform.mjs"));
+      assert.throws(importVerifier, (error) =>
+        error.stderr?.toString().includes("ERR_MODULE_NOT_FOUND"),
+      `${name}: removing the copied helper must break the real import`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
 
 test("extension build input is pinned by exact ID, version and digest", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "native-extension-lock-"));
@@ -66,11 +100,16 @@ test("native Chrome Dockerfile has no runtime download or exposed control port",
     "find /opt/openlinker/native-chrome/src -type d -exec chmod 0555 {} +",
     "find /opt/openlinker/native-chrome/src -type f -exec chmod 0444 {} +",
     "chmod 4755 /opt/google/chrome/chrome-sandbox",
-	"test \"${TARGETARCH}\" = amd64",
+    'case "${TARGETARCH}" in amd64|arm64) ;; *) exit 1 ;; esac',
+    'node /tmp/native-chrome/chrome-platform.mjs "${TARGETARCH}" /opt/google/chrome/chrome /opt/google/chrome/chrome-sandbox',
     "USER 10001:10001",
   ]) {
     assert.match(dockerfile, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.match(dockerfile, /verify-chrome-lock\.mjs \\\n[\s\S]*?"\$\{OPENLINKER_CHROME_VERSION\}" \\\n\s+"\$\{TARGETARCH\}";/);
+  const extractedCheck = dockerfile.indexOf('node /tmp/native-chrome/chrome-platform.mjs "${TARGETARCH}"');
+  assert.ok(extractedCheck < dockerfile.indexOf('/opt/google/chrome/chrome --version'));
+  assert.ok(extractedCheck < dockerfile.indexOf('node /tmp/native-chrome/build-assets-lock.mjs'));
   for (const forbidden of [
     "clients2.google.com",
     "--load-extension",

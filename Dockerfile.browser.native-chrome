@@ -18,12 +18,13 @@ ARG OPENLINKER_EXTENSION_VERSION
 ARG OPENLINKER_NATIVE_HOST_PROTOCOL=openlinker.native-chrome.v2
 ARG OPENLINKER_NATIVE_CHROME_PROFILE_GENERATION
 
-COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_ARTIFACT} /tmp/native-chrome/chrome-linux-amd64.tar
-COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_UPSTREAM_ARTIFACT} /tmp/native-chrome/chrome-linux64.zip
+COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_ARTIFACT} /tmp/native-chrome/
+COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_UPSTREAM_ARTIFACT} /tmp/native-chrome/
 COPY --chown=root:root --chmod=0444 ${OPENLINKER_CHROME_LOCK} /tmp/native-chrome/chrome.lock.json
 COPY --chown=root:root --chmod=0444 ${OPENLINKER_EXTENSION_ARTIFACT} /tmp/native-chrome/openlinker-native-extension.tar
 COPY --chown=root:root --chmod=0444 ${OPENLINKER_EXTENSION_LOCK} /tmp/native-chrome/extension.lock.json
 COPY --chown=root:root --chmod=0444 test/browser-image/verify-chrome-lock.mjs /tmp/native-chrome/verify-chrome-lock.mjs
+COPY --chown=root:root --chmod=0444 test/browser-image/chrome-platform.mjs /tmp/native-chrome/chrome-platform.mjs
 COPY --chown=root:root --chmod=0444 test/browser-image/verify-native-chrome-extension-lock.mjs /tmp/native-chrome/verify-extension-lock.mjs
 COPY --chown=root:root --chmod=0444 test/browser-image/build-native-chrome-assets-lock.mjs /tmp/native-chrome/build-assets-lock.mjs
 COPY --chown=root:root --chmod=0444 test/browser-image/crx3.mjs /tmp/native-chrome/crx3.mjs
@@ -36,27 +37,30 @@ RUN set -eu; \
     test "${OPENLINKER_BROWSER_BASE}" != "${base_digest}"; \
     test "${#base_digest}" -eq 64; \
     case "${base_digest}" in *[!0-9a-f]*) exit 1 ;; esac; \
-    test "${TARGETARCH}" = amd64; \
+    case "${TARGETARCH}" in amd64|arm64) ;; *) exit 1 ;; esac; \
+    chrome_artifact="/tmp/native-chrome/${OPENLINKER_CHROME_ARTIFACT##*/}"; \
+    chrome_upstream="/tmp/native-chrome/${OPENLINKER_CHROME_UPSTREAM_ARTIFACT##*/}"; \
     test "${OPENLINKER_CHROME_DISTRIBUTION}" = chrome_for_testing; \
     node /tmp/native-chrome/verify-chrome-lock.mjs \
       /tmp/native-chrome/chrome.lock.json \
-      /tmp/native-chrome/chrome-linux-amd64.tar \
-      /tmp/native-chrome/chrome-linux64.zip \
+      "${chrome_artifact}" \
+      "${chrome_upstream}" \
       "${OPENLINKER_CHROME_DISTRIBUTION}" \
-      "${OPENLINKER_CHROME_VERSION}"; \
+      "${OPENLINKER_CHROME_VERSION}" \
+      "${TARGETARCH}"; \
     node /tmp/native-chrome/verify-extension-lock.mjs \
       /tmp/native-chrome/extension.lock.json \
       /tmp/native-chrome/openlinker-native-extension.tar \
       "${OPENLINKER_EXTENSION_ID}" \
       "${OPENLINKER_EXTENSION_VERSION}"; \
     expr "${OPENLINKER_NATIVE_CHROME_PROFILE_GENERATION}" : '[1-9][0-9]*$' >/dev/null; \
-    tar -tf /tmp/native-chrome/chrome-linux-amd64.tar \
+    tar -tf "${chrome_artifact}" \
       | awk 'BEGIN { ok=1 } !/^chrome\// || /(^|\/)\.\.($|\/)/ || /^\// { ok=0 } END { exit ok ? 0 : 1 }'; \
     tar -tf /tmp/native-chrome/openlinker-native-extension.tar \
       | awk 'BEGIN { ok=1 } !/^extension\// || /(^|\/)\.\.($|\/)/ || /^\// { ok=0 } END { exit ok ? 0 : 1 }'; \
-    test -z "$(tar -tvf /tmp/native-chrome/chrome-linux-amd64.tar | awk 'substr($1,1,1) != "-" && substr($1,1,1) != "d" { print }')"; \
+    test -z "$(tar -tvf "${chrome_artifact}" | awk 'substr($1,1,1) != "-" && substr($1,1,1) != "d" { print }')"; \
     test -z "$(tar -tvf /tmp/native-chrome/openlinker-native-extension.tar | awk 'substr($1,1,1) != "-" && substr($1,1,1) != "d" { print }')"; \
-    tar -tvf /tmp/native-chrome/chrome-linux-amd64.tar \
+    tar -tvf "${chrome_artifact}" \
       | awk 'BEGIN { ok=1 } NR > 4096 { ok=0; exit } { total += $3 } END { exit ok && total <= 2147483648 ? 0 : 1 }'; \
     tar -tvf /tmp/native-chrome/openlinker-native-extension.tar \
       | awk 'BEGIN { ok=1 } NR > 4096 { ok=0; exit } { total += $3 } END { exit ok && total <= 536870912 ? 0 : 1 }'; \
@@ -66,10 +70,11 @@ RUN set -eu; \
       /usr/share/chromium/extensions \
       /etc/opt/chrome_for_testing/policies/managed \
       /etc/opt/chrome_for_testing/native-messaging-hosts; \
-    tar -xf /tmp/native-chrome/chrome-linux-amd64.tar -C /opt/google --no-same-owner --no-same-permissions; \
+    tar -xf "${chrome_artifact}" -C /opt/google --no-same-owner --no-same-permissions; \
     tar -xf /tmp/native-chrome/openlinker-native-extension.tar -C /opt/openlinker/native-chrome --no-same-owner --no-same-permissions; \
     test -x /opt/google/chrome/chrome; \
     test -f /opt/google/chrome/chrome-sandbox; \
+    node /tmp/native-chrome/chrome-platform.mjs "${TARGETARCH}" /opt/google/chrome/chrome /opt/google/chrome/chrome-sandbox; \
     test -f /opt/openlinker/native-chrome/extension/manifest.json; \
     test -f /opt/openlinker/native-chrome/extension/extension.crx; \
     test -x /usr/bin/xvfb-run; \
