@@ -59,6 +59,13 @@ func TestCodexRPCAlreadyCanceledDoesNotLaunch(t *testing.T) {
 	})
 }
 
+func TestCodexRPCRetryDiagnostics(t *testing.T) {
+	providertest.CodexRPCRetryDiagnostics(t, func(ctx context.Context, bin, dir string, emit func(string, any) error) (string, error) {
+		_, answer, err := runCodexRPC(ctx, bin, dir, "read-only", "", "retry diagnostics", false, ProviderConfig{}, emit)
+		return answer, err
+	})
+}
+
 func TestCodexRPCBrowserInstallPrecedesThreadAndFailsClosed(t *testing.T) {
 	for _, scenario := range []string{"plugin-install", "plugin-install-failed", "plugin-install-auth"} {
 		t.Run(scenario, func(t *testing.T) {
