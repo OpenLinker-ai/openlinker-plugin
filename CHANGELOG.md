@@ -6,6 +6,12 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Preserve Browser action deadline errors through the local Runtime transport.
+  After the action deadline, the client allows up to five seconds to receive
+  Runtime cleanup and its structured response. Caller cancellation/deadlines
+  still interrupt immediately; unresponsive transports remain bounded and are
+  not reported as confirmed action failures. No action is automatically retried.
+
 - Report configured/effective WebSearch policy and override source through CLI
   and MCP configuration, doctor and Worker status. Preserve requested file values,
   reject invalid search overrides before writing, and retain the last Worker
