@@ -3,10 +3,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserclient"
@@ -23,15 +23,28 @@ func validateMCPDeadlineRecovery(client *browserclient.Client, host string) erro
 		// Environment evidence was already verified by the caller's preflight.
 		EvidenceSupplier: func() (browserplugin.EvidenceSnapshot, error) { return browserplugin.EvidenceSnapshot{}, nil },
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	input, send := io.Pipe()
+	receive, output := io.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer output.Close()
+		_ = server.Serve(ctx, input, output)
+	}()
+	defer func() {
+		send.Close()
+		receive.Close()
+		cancel()
+		<-done
+	}()
+	encoder, decoder := json.NewEncoder(send), json.NewDecoder(receive)
 	call := func(id int, arguments map[string]any) (map[string]any, error) {
-		request, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": "tools/call", "params": map[string]any{"name": "browser_session", "arguments": arguments}})
-		if err != nil {
-			return nil, err
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		var output bytes.Buffer
-		if err := server.Serve(ctx, bytes.NewReader(append(request, '\n')), &output); err != nil {
+		// Keep stdin open until the response. EOF is a client disconnect and
+		// correctly cancels an outstanding long-running tool call.
+		timer := time.AfterFunc(30*time.Second, cancel)
+		defer timer.Stop()
+		if err := encoder.Encode(map[string]any{"jsonrpc": "2.0", "id": id, "method": "tools/call", "params": map[string]any{"name": "browser_session", "arguments": arguments}}); err != nil {
 			return nil, err
 		}
 		var response struct {
@@ -39,7 +52,7 @@ func validateMCPDeadlineRecovery(client *browserclient.Client, host string) erro
 			Result map[string]any `json:"result"`
 			Error  any            `json:"error"`
 		}
-		if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		if err := decoder.Decode(&response); err != nil {
 			return nil, err
 		}
 		if response.ID != id || response.Error != nil {
