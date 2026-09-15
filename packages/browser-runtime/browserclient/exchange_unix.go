@@ -14,6 +14,11 @@ import (
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserprotocol"
 )
 
+// Execution stops at Request.Deadline. Allow a bounded interval for Runtime to
+// stop its engine and deliver the structured failure (including mutation and
+// recovery evidence). Cancellation still closes the socket immediately below.
+const actionResponseGrace = 5 * time.Second
+
 func exchange(
 	ctx context.Context,
 	socketPath string,
@@ -44,6 +49,13 @@ func exchange(
 		if err := unixConnection.CloseWrite(); err != nil {
 			return browserprotocol.Response{}, contextFailure(ctx, "finish Browser Runtime request")
 		}
+	}
+	if err := connection.SetReadDeadline(deadline.Add(actionResponseGrace)); err != nil {
+		return browserprotocol.Response{}, contextFailure(ctx, "set Browser Runtime response deadline")
+	}
+	// Setting the response deadline must not undo a concurrent cancellation.
+	if ctx.Err() != nil {
+		return browserprotocol.Response{}, contextFailure(ctx, "read Browser Runtime response")
 	}
 	counted := &countingReader{reader: connection}
 	limited := &io.LimitedReader{
