@@ -59,13 +59,18 @@ const (
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "openlinker Browser Runtime:", err)
+		if !errors.Is(err, errProfileMigrationReported) {
+			fmt.Fprintln(os.Stderr, "openlinker Browser Runtime:", err)
+		}
 		os.Exit(1)
 	}
 }
 
 func run() error {
 	if len(os.Args) > 1 {
+		if os.Args[1] == "migrate-profile" {
+			return runProfileMigration(os.Args[2:], os.Stdout, os.Stderr)
+		}
 		if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
 			return runHealthcheck()
 		}

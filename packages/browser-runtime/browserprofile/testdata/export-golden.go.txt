@@ -1,0 +1,70 @@
+package browserprofile
+
+// This test-only exporter is compiled alongside UNMODIFIED historical Git
+// objects. It deliberately contains no encryption, KDF or storage algorithm.
+import (
+	"archive/tar"
+	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestExportHistoricalGolden(t *testing.T) {
+	identity := Identity{AgentID: "11111111-1111-4111-8111-111111111111", PrincipalScopeID: "synthetic-golden-principal-scope", ProfileSlot: "default", ProfileGeneration: 1}
+	rootBytes := bytes.Repeat([]byte{0x11}, 32)
+	root, err := NewRootKey(1, rootBytes)
+	if err != nil { t.Fatal(err) }
+	defer root.Close()
+	randomBytes := make([]byte, 256)
+	for i := range randomBytes { randomBytes[i] = byte(i + 1) }
+	store, err := newStore(t.TempDir(), newProtector(bytes.NewReader(randomBytes)))
+	if err != nil { t.Fatal(err) }
+	defer store.Close()
+	var archive bytes.Buffer
+	writer := tar.NewWriter(&archive)
+	content := []byte("SYNTHETIC TEST DATA ONLY: historical browser Profile contract compatibility.\n")
+	if err := writer.WriteHeader(&tar.Header{Name: "synthetic-profile-marker.txt", Mode: 0o600, Size: int64(len(content)), ModTime: time.Unix(1700000000, 0), Format: tar.FormatUSTAR}); err != nil { t.Fatal(err) }
+	if _, err := writer.Write(content); err != nil { t.Fatal(err) }
+	if err := writer.Close(); err != nil { t.Fatal(err) }
+	if err := store.Create(identity, root, bytes.NewReader(archive.Bytes())); err != nil { t.Fatal(err) }
+	var loaded bytes.Buffer
+	if err := store.Load(identity, map[uint64]*RootKey{1: root}, &loaded); err != nil { t.Fatal(err) }
+	if !bytes.Equal(loaded.Bytes(), archive.Bytes()) { t.Fatal("historical producer failed its own roundtrip") }
+	read := func(path string) []byte { raw, err := os.ReadFile(path); if err != nil { t.Fatal(err) }; return raw }
+	profileDir := store.profileDir(identity)
+	currentRaw := read(filepath.Join(profileDir, currentFileName))
+	current, err := parseCurrent(currentRaw)
+	if err != nil { t.Fatal(err) }
+	snapshot := filepath.Join(profileDir, "checkpoints", current.Checkpoint)
+	metadataRaw := read(filepath.Join(snapshot, metadataFileName))
+	metadata, err := parseMetadata(metadataRaw)
+	if err != nil { t.Fatal(err) }
+	payloadRaw := read(filepath.Join(snapshot, payloadFileName))
+	kek, err := deriveWrappingKey(identity, root)
+	if err != nil { t.Fatal(err) }
+	defer clear(kek)
+	hash := func(raw []byte) string { digest := sha256.Sum256(raw); return hex.EncodeToString(digest[:]) }
+	b64 := base64.StdEncoding.EncodeToString
+	golden := map[string]any{
+		"schema": "openlinker.browser.profile.synthetic-golden.v1", "synthetic_only": true,
+		"contract_id": contractID(), "identity": identity, "root_key_generation": 1,
+		"root_key_hex": hex.EncodeToString(rootBytes), "random_bytes_hex": hex.EncodeToString(randomBytes),
+		"profile_directory_digest": profileDigest(identity), "checkpoint_id": current.Checkpoint,
+		"checkpoint_id_sha256": hash([]byte(current.Checkpoint)), "current_base64": b64(currentRaw),
+		"metadata_base64": b64(metadataRaw), "metadata_sha256": hash(metadataRaw),
+		"payload_base64": b64(payloadRaw), "payload_sha256": hash(payloadRaw),
+		"plaintext_base64": b64(archive.Bytes()), "plaintext_sha256": hash(archive.Bytes()),
+		"wrapping_key_hex": hex.EncodeToString(kek), "wrap_aad_base64": b64(wrapAAD(metadata)),
+		"payload_data_aad_base64": b64(payloadAAD(identity, 0, uint32(archive.Len()), false)),
+		"payload_terminal_aad_base64": b64(payloadAAD(identity, 1, 0, true)),
+	}
+	raw, err := json.MarshalIndent(golden, "", "  ")
+	if err != nil { t.Fatal(err) }
+	if err := os.WriteFile(os.Getenv("GOLDEN_EXPORT_FILE"), append(raw, '\n'), 0o600); err != nil { t.Fatal(err) }
+}

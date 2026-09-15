@@ -856,6 +856,13 @@ func readProfileRootKey(path string) ([]byte, error) {
 
 func profileFailure(err error) *browserprotocol.Failure {
 	switch {
+	case errors.Is(err, browserprofile.ErrProfileMigrationRequired),
+		errors.Is(err, browserprofile.ErrProfileMigrationPending):
+		return browserprotocol.NewFailure(
+			browserprotocol.ErrorRuntimeUnavailable,
+			"Browser Profile requires verified offline migration before use",
+			false,
+		)
 	case errors.Is(err, browserprofile.ErrProfileStoreLocked):
 		return browserprotocol.NewFailure(
 			browserprotocol.ErrorProfileLocked,

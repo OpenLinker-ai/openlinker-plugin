@@ -1,0 +1,130 @@
+package main
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserprofile"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserprotocol"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserruntime"
+	"io"
+	"os"
+	"path/filepath"
+	"time"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+func run() error {
+	if string(mustRead("/scratch/synthetic-marker")) != "fresh-browser-fixture-only" {
+		return fmt.Errorf("synthetic marker missing")
+	}
+	var request browserprofile.MigrationRequest
+	if err := json.Unmarshal(mustRead("/scratch/request.json"), &request); err != nil {
+		return err
+	}
+	before, err := sourceFingerprint(request.SourceStore)
+	if err != nil {
+		return err
+	}
+	var report browserprofile.MigrationReport
+	if err := json.Unmarshal(mustRead("/scratch/migration-execute-report.json"), &report); err != nil {
+		return err
+	}
+	if !report.SourceUnchanged || !report.PlaintextEqual || !report.ActivationReady {
+		return fmt.Errorf("migration incomplete")
+	}
+	checked, err := browserprofile.ExecuteProfileMigration(context.Background(), "/scratch/request.json", browserprofile.MigrationCheck)
+	if err != nil || !checked.ActivationReady {
+		return fmt.Errorf("check %s/%s", checked.Stage, checked.FailureCode)
+	}
+	font := "8a130568f9f30f5ca10a64b5e99e16d3b813e4cf733fd8feefc43992c6fc759f"
+	environment := browserruntime.ProfileEnvironment{ProfileGeneration: 1, EgressLabel: "synthetic-loopback", Evidence: browserprotocol.EnvironmentEvidence{BrowserEngine: "chromium", BrowserDistribution: "playwright_chromium", BrowserVersion: "149.0.7827.0", BrowserMajorVersion: 149, BrowserLocale: "en-US", BrowserTimezone: "UTC", FontContractVersion: "openlinker.browser.fonts.v1", FontManifestSHA256: font}}
+	engine, err := browserruntime.NewProfileEngine(browserruntime.ProfileEngineOptions{StoreRoot: request.DestinationStore, WorkRoot: "/scratch/work", RootKeyFile: request.RootKeyFile, Environment: environment, Process: browserruntime.ProcessEngineOptions{Command: []string{"/usr/bin/node", "/test/profile-migration-engine-driver.mjs"}, Environment: []string{"HOME=/scratch/home", "TMPDIR=/scratch/tmp", "PLAYWRIGHT_BROWSERS_PATH=/ms-playwright", "OPENLINKER_BROWSER_FONT_MANIFEST_SHA256=" + font}}})
+	if err != nil {
+		return err
+	}
+	defer engine.Close()
+	identity := browserprotocol.Identity{RunID: "33333333-3333-4333-8333-333333333333", AgentID: request.ExpectedIdentity.AgentID, PrincipalScopeID: request.ExpectedIdentity.PrincipalScopeID, BrowserSessionID: "44444444-4444-4444-8444-444444444444", SessionEpoch: 1, AttachmentID: "55555555-5555-4555-8555-555555555555", ControlEpoch: 1, Controller: browserprotocol.ControllerAgent, BrowserInteractionPolicy: "restricted", BrowserInteractionPolicyGeneration: 1, BrowserMutationOrigins: []string{}, BrowserMutationOriginsSHA256: browserprotocol.RestrictedMutationOriginsSHA256}
+	execute := func(action browserprotocol.Action) (browserprotocol.Observation, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+		defer cancel()
+		observation, failure := engine.Execute(ctx, identity, action)
+		if failure != nil {
+			return observation, fmt.Errorf("profile action %s failed: %s", action.Kind, failure.Code)
+		}
+		return observation, nil
+	}
+	if _, err := execute(browserprotocol.Action{Kind: browserprotocol.ActionPreflight}); err != nil {
+		return err
+	}
+	generation, recovered, selected := engine.ProfileSelectionEvidence()
+	if !selected || !recovered || generation != 1 {
+		return fmt.Errorf("ProfileEngine did not recover migrated profile")
+	}
+	observation, err := execute(browserprotocol.Action{Kind: browserprotocol.ActionScreenshot})
+	if err != nil {
+		return err
+	}
+	if observation.Title != "SYNTHETIC_COOKIE_AND_STORAGE_RESTORED" {
+		return fmt.Errorf("real Chrome state not restored")
+	}
+	profile := filepath.Join(request.DestinationStore, "profiles", report.Target.ProfileDirectorySHA256)
+	beforePointer := string(mustRead(filepath.Join(profile, "current.json")))
+	if _, err := execute(browserprotocol.Action{Kind: browserprotocol.ActionCheckpoint}); err != nil {
+		return err
+	}
+	if beforePointer == string(mustRead(filepath.Join(profile, "current.json"))) {
+		return fmt.Errorf("checkpoint did not advance")
+	}
+	if err := engine.Close(); err != nil {
+		return err
+	}
+	after, err := sourceFingerprint(request.SourceStore)
+	if err != nil {
+		return err
+	}
+	if before != after {
+		return fmt.Errorf("source store changed")
+	}
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{"status": "pass", "historical_v1_authenticated": report.SourceAuthenticated, "migrated_v2_authenticated": report.TargetAuthenticated, "plaintext_equal": report.PlaintextEqual, "source_unchanged": report.SourceUnchanged, "normal_profile_engine_recovered": recovered, "profile_generation": generation, "real_chromium_cookie_restored": true, "real_chromium_localstorage_restored": true, "checkpoint_advanced": true, "production_go_profile_engine": true, "production_js_browser_engine": false, "test_only_engine_protocol_driver": true, "native_messaging_tested": false, "provider_model_tested": false})
+}
+func mustRead(path string) []byte {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		panic("synthetic fixture missing")
+	}
+	return raw
+}
+func sourceFingerprint(root string) (string, error) {
+	hash := sha256.New()
+	err := filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(hash, "%s:%s:%d:%d\n", rel, info.Mode(), info.Size(), info.ModTime().UnixNano())
+		if info.Mode().IsRegular() {
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			_, copyErr := io.Copy(hash, file)
+			closeErr := file.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+			return closeErr
+		}
+		return nil
+	})
+	return fmt.Sprintf("%x", hash.Sum(nil)), err
+}

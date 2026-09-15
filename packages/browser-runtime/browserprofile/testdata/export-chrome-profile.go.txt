@@ -1,0 +1,49 @@
+package browserprofile
+
+// Only linked into the historical producer TEST binary. Fixed paths are inside
+// the single-use network-none container's synthetic tmpfs, never a live store.
+import (
+	"archive/tar"
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestExportSyntheticChromeProfile(t *testing.T) {
+	if raw, err := os.ReadFile("/scratch/synthetic-marker"); err != nil || string(raw) != "fresh-browser-fixture-only" { t.Fatal("synthetic marker missing") }
+	identity := Identity{AgentID:"11111111-1111-4111-8111-111111111111", PrincipalScopeID:"synthetic-golden-principal-scope", ProfileSlot:"default", ProfileGeneration:1}
+	rootBytes := bytes.Repeat([]byte{0x11},32)
+	root, err := NewRootKey(1,rootBytes); if err != nil { t.Fatal(err) }; defer root.Close()
+	store, err := NewStore("/scratch/source"); if err != nil { t.Fatal(err) }; defer store.Close()
+	archive, err := os.OpenFile("/scratch/synthetic-profile.tar",os.O_CREATE|os.O_EXCL|os.O_RDWR,0o600); if err != nil { t.Fatal(err) }; defer archive.Close()
+	writer := tar.NewWriter(archive)
+	var total int64
+	err = filepath.WalkDir("/scratch/seed-profile",func(path string,entry os.DirEntry,walkErr error) error {
+		if walkErr != nil { return walkErr }; if path == "/scratch/seed-profile" { return nil }
+		info, err := entry.Info(); if err != nil { return err }
+		if !info.IsDir() && !info.Mode().IsRegular() { return nil }
+		rel, err := filepath.Rel("/scratch/seed-profile",path); if err != nil { return err }
+		header:= &tar.Header{Name:filepath.ToSlash(rel),ModTime:info.ModTime().UTC(),Mode:0o600,Typeflag:tar.TypeReg,Size:info.Size()}
+		if info.IsDir() { header.Mode=0o700;header.Typeflag=tar.TypeDir;header.Size=0 } else { total+=info.Size();if total>96<<20 { t.Fatal("synthetic profile exceeds bound") } }
+		if err:=writer.WriteHeader(header);err!=nil{return err}
+		if info.Mode().IsRegular(){ f,err:=os.Open(path);if err!=nil{return err};_,copyErr:=io.CopyN(writer,f,info.Size());closeErr:=f.Close();if copyErr!=nil{return copyErr};return closeErr };return nil
+	}); if err != nil { t.Fatal(err) }; if err:=writer.Close();err!=nil{t.Fatal(err)}
+	if _,err:=archive.Seek(0,io.SeekStart);err!=nil{t.Fatal(err)}
+	if err:=store.Create(identity,root,archive);err!=nil{t.Fatal(err)}
+	read:=func(path string)[]byte{raw,err:=os.ReadFile(path);if err!=nil{t.Fatal(err)};return raw}
+	hash:=func(raw []byte)string{sum:=sha256.Sum256(raw);return hex.EncodeToString(sum[:])}
+	profile:=store.profileDir(identity);current,err:=parseCurrent(read(filepath.Join(profile,"current.json")));if err!=nil{t.Fatal(err)}
+	anchor:=time.Now().UTC().Add(-time.Minute).Truncate(time.Second)
+	if err:=os.Chtimes(filepath.Join(profile,"current.json"),anchor,anchor);err!=nil{t.Fatal(err)}
+	if err:=os.WriteFile("/scratch/synthetic-root-key",rootBytes,0o600);err!=nil{t.Fatal(err)}
+	snapshot:=filepath.Join(profile,"checkpoints",current.Checkpoint)
+	request:=map[string]any{"schema":"openlinker.browser.profile-migration.v1","operation_id":"22222222-2222-4222-8222-222222222222","source_contract":contractID(),"target_contract":"openlinker.browser.v2","source_store":"/scratch/source","destination_store":"/scratch/migrated","root_key_file":"/scratch/synthetic-root-key","expected_identity":identity,"root_key_generation":1,"retention":map[string]any{"mode":"preserve"},"source":map[string]any{"profile_directory_sha256":profileDigest(identity),"metadata_sha256":hash(read(filepath.Join(snapshot,"metadata.json"))),"payload_sha256":hash(read(filepath.Join(snapshot,"payload.bin"))),"checkpoint_id_sha256":hash([]byte(current.Checkpoint)),"current_pointer_mtime":anchor.Format(time.RFC3339Nano)}}
+	raw,err:=json.Marshal(request);if err!=nil{t.Fatal(err)};if err:=os.WriteFile("/scratch/request.json",raw,0o600);err!=nil{t.Fatal(err)}
+	if contractID()!="openlinker.browser.v1"{t.Fatal("not the historical producer")}
+}

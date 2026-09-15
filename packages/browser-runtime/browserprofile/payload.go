@@ -100,7 +100,7 @@ func (cipher *payloadCipher) decrypt(writer io.Writer, reader io.Reader) error {
 			nil,
 			payloadNonce(prefix, index),
 			sealed,
-			payloadAAD(cipher.identity, index, length, final),
+			payloadAADForContract(cipher.identity, index, length, final, cipher.storageContract()),
 		)
 		clear(sealed)
 		if err != nil || len(plaintext) != int(length) {
@@ -132,7 +132,7 @@ func (cipher *payloadCipher) validate() error {
 	if cipher == nil || cipher.closed {
 		return ErrKeyClosed
 	}
-	if cipher.identity.validate() != nil || allZero(cipher.key[:]) || cipher.random == nil {
+	if cipher.identity.validate() != nil || allZero(cipher.key[:]) || cipher.random == nil || !cipher.storageContract().valid() {
 		return ErrInvalidConfiguration
 	}
 	return nil
@@ -191,6 +191,10 @@ func payloadNonce(prefix []byte, index uint32) []byte {
 }
 
 func payloadAAD(identity Identity, index uint32, length uint32, final bool) []byte {
+	return payloadAADForContract(identity, index, length, final, storageContractV2)
+}
+
+func payloadAADForContract(identity Identity, index uint32, length uint32, final bool, contract storageContract) []byte {
 	raw, _ := json.Marshal(struct {
 		ContractID string   `json:"contract_id"`
 		Purpose    string   `json:"purpose"`
@@ -199,7 +203,7 @@ func payloadAAD(identity Identity, index uint32, length uint32, final bool) []by
 		Length     uint32   `json:"length"`
 		Final      bool     `json:"final"`
 	}{
-		ContractID: contractID(),
+		ContractID: string(contract),
 		Purpose:    "profile-payload",
 		Identity:   identity,
 		ChunkIndex: index,
