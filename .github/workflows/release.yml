@@ -88,6 +88,15 @@ jobs:
         run: node scripts/generate-host-lock.mjs "$GITHUB_REF_NAME" --write
       - name: Test source marketplace install and native MCP without Go or CLI
         run: node scripts/verify-marketplace-host.mjs
+      - uses: actions/setup-go@v7
+        if: runner.os == 'Windows'
+        with:
+          go-version-file: go.mod
+      - name: Test Windows Browser migration refusal reports
+        if: runner.os == 'Windows'
+        env:
+          GOWORK: "off"
+        run: go test ./cmd/openlinker-browser-runtime -count=1
 
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.publish_native && github.ref_type == 'tag'

@@ -14,6 +14,20 @@ CLI release and cross-platform installation matrix pass.
   model/gateway availability. Execution-source adoption requires a new published
   host and regenerated installation locks.
 
+- Add an offline Linux-only Browser Profile v1-to-v2 migration command with exact
+  identity/source preconditions, authenticated archive preservation, a fresh
+  encrypted destination, pending-activation guard and operation-bound reports.
+  Read-only authentication failures preserve the target in place. Initial
+  `--check`/`--finalize` verification refuses after normal checkpoint or mtime
+  advancement; retain the receipt and encrypted pre-use baseline. Approval hashes
+  are format-checked audit associations, not approval verification or Core
+  authorization: the trusted operator owns approval binding. Legacy, unknown and
+  malformed expired Profiles require explicit operator cleanup and capacity
+  management; normal valid inactive v2 expiry is retained. Non-Linux platforms,
+  including Windows, report a fixed refusal rather than enabling migration.
+  Browser Runtime image acceptance and a newly published Host/marketplace lock
+  remain separate release gates; this unreleased entry does not advance either.
+
 - Pin the verified Go SDK module at `63fc87d73406`, adopting the gRPC
   1.83.2 and protobuf dependency updates while retaining the SDK Go 1.25 baseline.
   Pin Node `v0.1.58-rc.3` for the shared protocol leaves. Command, credential,

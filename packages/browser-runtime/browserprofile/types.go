@@ -5,8 +5,6 @@ import (
 	"errors"
 	"io"
 	"strings"
-
-	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserprotocol"
 )
 
 const (
@@ -16,17 +14,19 @@ const (
 )
 
 var (
-	ErrInvalidConfiguration = errors.New("browser profile encryption configuration is invalid")
-	ErrIdentityMismatch     = errors.New("browser profile identity does not match")
-	ErrKeyGeneration        = errors.New("browser profile root key generation does not match")
-	ErrRootKeyUnavailable   = errors.New("browser profile root key is unavailable")
-	ErrProfileCorrupt       = errors.New("browser profile is corrupt or cannot be authenticated")
-	ErrProfileExists        = errors.New("browser profile already exists")
-	ErrProfileNotFound      = errors.New("browser profile does not exist")
-	ErrProfileQuarantined   = errors.New("browser profile was quarantined")
-	ErrProfileStoreLocked   = errors.New("browser profile store is already in use")
-	ErrProfileStoreClosed   = errors.New("browser profile store is closed")
-	ErrKeyClosed            = errors.New("browser profile data key is closed")
+	ErrInvalidConfiguration     = errors.New("browser profile encryption configuration is invalid")
+	ErrIdentityMismatch         = errors.New("browser profile identity does not match")
+	ErrKeyGeneration            = errors.New("browser profile root key generation does not match")
+	ErrRootKeyUnavailable       = errors.New("browser profile root key is unavailable")
+	ErrProfileCorrupt           = errors.New("browser profile is corrupt or cannot be authenticated")
+	ErrProfileExists            = errors.New("browser profile already exists")
+	ErrProfileNotFound          = errors.New("browser profile does not exist")
+	ErrProfileQuarantined       = errors.New("browser profile was quarantined")
+	ErrProfileStoreLocked       = errors.New("browser profile store is already in use")
+	ErrProfileStoreClosed       = errors.New("browser profile store is closed")
+	ErrKeyClosed                = errors.New("browser profile data key is closed")
+	ErrProfileMigrationRequired = errors.New("browser profile requires explicit offline migration")
+	ErrProfileMigrationPending  = errors.New("browser profile migration is pending verification")
 )
 
 type Identity struct {
@@ -89,6 +89,7 @@ func newProtector(randomSource io.Reader) *protector {
 }
 
 type payloadCipher struct {
+	contract storageContract
 	identity Identity
 	key      [32]byte
 	closed   bool
@@ -161,5 +162,25 @@ func allZero(value []byte) bool {
 }
 
 func contractID() string {
-	return browserprotocol.ContractID
+	return string(storageContractV2)
+}
+
+// Storage domains are independent of the Browser wire protocol. Only the
+// offline migration reader selects v1; normal Store operations always use v2.
+type storageContract string
+
+const (
+	storageContractV1 storageContract = "openlinker.browser.v1"
+	storageContractV2 storageContract = "openlinker.browser.v2"
+)
+
+func (contract storageContract) valid() bool {
+	return contract == storageContractV1 || contract == storageContractV2
+}
+
+func (cipher *payloadCipher) storageContract() storageContract {
+	if cipher.contract == "" {
+		return storageContractV2
+	}
+	return cipher.contract
 }
