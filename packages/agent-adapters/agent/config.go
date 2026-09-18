@@ -52,7 +52,7 @@ type Config struct {
 
 func defaultConfig() Config {
 	return Config{
-		Version: configVersion, Capacity: 1, TimeoutSeconds: 1800, SessionReuse: true,
+		Version: configVersion, Capacity: 1, TimeoutSeconds: 1800, SessionReuse: true, WebSearch: true,
 		Transport: "auto", ExecutionProfile: "standard", BrowserInteractionPolicy: "restricted", CodexSandbox: "read-only", CodexApproval: "never", ClaudePermission: "dontAsk",
 	}
 }

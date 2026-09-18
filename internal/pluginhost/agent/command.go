@@ -75,7 +75,7 @@ func newConfigureCommand(ioStreams shared.IO) *cobra.Command {
 	command.Flags().Int64Var(&capacity, "capacity", 1, "maximum concurrent Runs")
 	command.Flags().IntVar(&timeout, "timeout", 1800, "provider execution timeout in seconds")
 	command.Flags().BoolVar(&sessionReuse, "session-reuse", true, "reuse provider sessions by Core conversation")
-	command.Flags().BoolVar(&webSearch, "web-search", false, "allow provider web search")
+	command.Flags().BoolVar(&webSearch, "web-search", true, "allow provider web search (default on; --web-search=false turns it off)")
 	command.Flags().StringVar(&codexBaseURL, "codex-base-url", "", "Codex OpenAI-compatible API Base URL")
 	command.Flags().StringVar(&sandbox, "codex-sandbox", "read-only", "Codex sandbox mode: read-only, workspace-write, or danger-full-access for externally isolated runtimes")
 	command.Flags().StringVar(&approval, "codex-approval", "never", "Codex approval mode")

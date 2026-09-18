@@ -197,6 +197,13 @@ func claudeArguments(config ProviderConfig, permission, sessionID string) []stri
 	if browserProfileEnabled(config) {
 		allowed = appendUniqueString(allowed, "mcp__openlinker_browser__browser_session")
 	}
+	if config.WebSearch {
+		// dontAsk refuses every tool that is not allowed, so lifting the deny alone
+		// would leave search unusable. Enabling search grants exactly these two.
+		for _, tool := range []string{"WebSearch", "WebFetch"} {
+			allowed = appendUniqueString(allowed, tool)
+		}
+	}
 	if len(allowed) > 0 {
 		args = append(args, "--allowedTools", strings.Join(allowed, ","))
 	}
