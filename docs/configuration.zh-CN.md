@@ -59,7 +59,7 @@ Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
 | `capacity` | 否 | `1` | 并发 Run 数，范围 1–1024。 |
 | `timeout_seconds` | 否 | `1800` | Provider 执行超时，必须为正数。 |
 | `session_reuse` | 否 | `true` | 每个 Core Conversation 私有复用 Provider Session。 |
-| `web_search` | 否 | `false` | 允许 Provider Web Search。 |
+| `web_search` | 否 | `true` | 允许 Provider Web Search；Claude 同时放行 `WebSearch` 和 `WebFetch`。 |
 | `execution_profile` | 否 | `standard` | `standard` 或显式启用的 `browser`；Browser 强制 capacity 1 并启用 Session Reuse。 |
 | `browser_client_mode` | 仅 Browser | `mcp` | `auto`、严格 `native` 或严格 `mcp`；官方封装 Browser 模板设置为 `auto`。 |
 | `browser_native_plugin` | 仅 Native | 镜像路径 | Runtime 拥有的 Browser-only Plugin 绝对路径；官方镜像不接受调用方指定。 |
@@ -89,7 +89,7 @@ Codex 使用 `$serve-openlinker-agent`，Claude Code 使用
   "capacity": 1,
   "timeout_seconds": 1800,
   "session_reuse": true,
-  "web_search": false,
+  "web_search": true,
   "execution_profile": "standard",
   "codex_base_url": "https://router.example/v1",
   "codex_sandbox": "read-only",
@@ -178,12 +178,18 @@ Runtime 中的环境变量优先于已存储的非敏感 Agent 配置。
 
 环境覆盖适合部署注入；交互使用不要把它变成第二套无人管理的配置系统。
 
-两种 Provider 的网页搜索开关统一使用 `true` 或 `false`，默认均为 `false`：
+两种 Provider 的网页搜索开关统一使用 `true` 或 `false`，默认均为 `true`；设为 `false` 关闭：
 
 ```dotenv
-OPENLINKER_CODEX_WEB_SEARCH=true
-OPENLINKER_CLAUDE_WEB_SEARCH=true
+OPENLINKER_CODEX_WEB_SEARCH=false
+OPENLINKER_CLAUDE_WEB_SEARCH=false
 ```
+
+搜索默认开启。已保存的 `agent.json` 总会写入 `web_search`，因此保存为 `false` 的文件
+（包括默认关闭时期写入的文件）升级后仍保持关闭；新配置、缺少该字段的文件，以及未设置
+该变量的容器取 `true`。Claude 以 `dontAsk` 运行，开启搜索时只追加 `WebSearch` 和
+`WebFetch` 两个放行工具；关闭时即使放行列表里有这两个，也会传入
+`--disallowedTools WebSearch,WebFetch`。
 
 继续兼容旧的 `enabled` / `disabled` 写法。容器预设了 Provider 专用默认值，其优先级
 高于 `OPENLINKER_AGENT_WEB_SEARCH`，因此应显式设置对应 Provider 的变量。
@@ -248,7 +254,7 @@ serve，计入 `OPENLINKER_PROVIDER`；MCP 配置则使用文件中的 Provider�
 持久化 Worker 快照，`get_agent_mode_status` 显示当前宿主实例的 Worker 快照，需结合
 原有生命周期和时间戳判断。更改调用方环境不会把旧 Worker 显示成已更新。
 旧 status 文件没有 `web_search` 字段时表示未知，不能当作已关闭。这些字段只说明配置，
-不证明模型/网关支持搜索；默认仍关闭。新字段需采用新宿主，marketplace 合并前仍需
+不证明模型/网关支持搜索。新字段需采用新宿主，marketplace 合并前仍需
 发布宿主并重新生成 host-lock。
 
 - 原生 CLI 安装流程报告 CLI 来源、版本、Surface 和 Capability。

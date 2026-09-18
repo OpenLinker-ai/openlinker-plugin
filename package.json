@@ -22,7 +22,7 @@
     "test:go": "GOWORK=off go test -race ./...",
     "check:go-boundaries": "node scripts/check-go-boundaries.mjs",
     "check:agent-runtime-integration": "node scripts/check-agent-runtime-integration.mjs",
-    "test:provider-cli": "node --test test/download-pinned-cli.test.mjs",
+    "test:provider-cli": "node --test test/download-pinned-cli.test.mjs test/web-search-defaults.test.mjs",
     "check:provider-cli": "node scripts/download-pinned-cli.mjs --platform linux-amd64 --out dist/release-check/openlinker",
     "test:browser-engine": "npm --prefix packages/browser-runtime/browser-engine run lint && npm --prefix packages/browser-runtime/browser-engine test",
     "test:native-chrome": "node --test packages/browser-runtime/native-chrome/test/*.test.mjs",

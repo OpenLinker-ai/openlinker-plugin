@@ -6,6 +6,16 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- **Behavior change:** provider web search is on by default for Codex and
+  Claude. A fresh `agent configure`, a config file without `web_search`, and
+  packaged containers/compose files that do not set
+  `OPENLINKER_CODEX_WEB_SEARCH` / `OPENLINKER_CLAUDE_WEB_SEARCH` now use `true`;
+  `agent configure --web-search` defaults to true. Saved files that record
+  `false` keep search off. Because Claude runs with `dontAsk`, enabling search
+  adds exactly `WebSearch` and `WebFetch` to its allowed tools; turning it off
+  still passes `--disallowedTools WebSearch,WebFetch`. Set the provider variable
+  to `false` before recreating a container to keep search off.
+
 - Adopt Node's macOS native Codex descendant cleanup (Node #46) and its bound
   fix (Node #47). Plugin's Codex provider now keeps observed tool children and
   grandchildren from surviving cancellation after they leave the original

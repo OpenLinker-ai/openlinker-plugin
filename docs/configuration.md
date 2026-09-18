@@ -62,7 +62,7 @@ configure`.
 | `capacity` | No | `1` | Concurrent Runs, from 1 through 1024. |
 | `timeout_seconds` | No | `1800` | Positive provider execution timeout. |
 | `session_reuse` | No | `true` | Reuse a private provider session per Core conversation. |
-| `web_search` | No | `false` | Allow provider web search. |
+| `web_search` | No | `true` | Allow provider web search. Claude also gets `WebSearch` and `WebFetch` added to its allowed tools. |
 | `execution_profile` | No | `standard` | `standard` or opt-in `browser`; Browser requires capacity 1 and session reuse. |
 | `browser_client_mode` | Browser only | `mcp` | `auto`, strict `native`, or strict `mcp`. Official packaged Browser templates set `auto`. |
 | `browser_native_plugin` | Native only | Image path | Absolute Runtime-owned Browser-only Plugin path; never caller supplied in official images. |
@@ -92,7 +92,7 @@ configure`.
   "capacity": 1,
   "timeout_seconds": 1800,
   "session_reuse": true,
-  "web_search": false,
+  "web_search": true,
   "execution_profile": "standard",
   "codex_base_url": "https://router.example/v1",
   "codex_sandbox": "read-only",
@@ -187,12 +187,21 @@ Environment values override stored non-secret Agent configuration at Runtime.
 Use environment overrides for deployment injection, not as a second unmanaged
 configuration system for interactive use.
 
-Use `true` or `false` for both providers' web-search switches (default: `false`):
+Use `true` or `false` for both providers' web-search switches (default: `true`).
+Set `false` to turn search off:
 
 ```dotenv
-OPENLINKER_CODEX_WEB_SEARCH=true
-OPENLINKER_CLAUDE_WEB_SEARCH=true
+OPENLINKER_CODEX_WEB_SEARCH=false
+OPENLINKER_CLAUDE_WEB_SEARCH=false
 ```
+
+Search is on by default. A saved `agent.json` always records `web_search`, so a
+file saved with `false` (including files written while the default was off)
+stays off after upgrading; a fresh configuration, a file without the field, or a
+container that does not set the variable gets `true`. Because Claude runs with
+`dontAsk`, enabling search adds exactly `WebSearch` and `WebFetch` to its allowed
+tools; turning it off passes `--disallowedTools WebSearch,WebFetch` even if the
+allowed list names them.
 
 The legacy `enabled` / `disabled` spellings remain accepted for compatibility.
 Packaged containers set a provider-specific default, which takes precedence over
@@ -222,7 +231,7 @@ Both include the existing lifecycle and timestamp and do not relabel an old
 Worker when the caller changes its environment.
 An older status file has no `web_search` object: the policy is unknown, not false.
 These are configuration diagnostics, not a live search test or proof of gateway
-support. Defaults remain off. Deploy a newly built host to obtain these fields;
+support. Deploy a newly built host to obtain these fields;
 marketplace adoption still requires a published host and regenerated host locks.
 
 ## Native Agent-control tools

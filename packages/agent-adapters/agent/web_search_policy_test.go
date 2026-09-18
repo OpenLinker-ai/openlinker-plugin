@@ -93,7 +93,10 @@ func TestStoredSearchPolicyIsLastWorkerSnapshot(t *testing.T) {
 	dir := t.TempDir()
 	env := map[string]string{"OPENLINKER_AGENT_CONFIG": filepath.Join(dir, "agent.json"), "OPENLINKER_AGENT_STATE_DIR": filepath.Join(dir, "state")}
 	get := func(k string) string { return env[k] }
-	config, _, err := ConfigureNonSecret(get, ConfigureOptions{Provider: "codex", Workspace: dir, AgentID: "11111111-1111-4111-8111-111111111111"})
+	// Search is on by default; store an explicit off snapshot so the later
+	// environment flip to true has something to (wrongly) relabel.
+	disabled := false
+	config, _, err := ConfigureNonSecret(get, ConfigureOptions{Provider: "codex", Workspace: dir, AgentID: "11111111-1111-4111-8111-111111111111", WebSearch: &disabled})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,5 +123,64 @@ func TestStoredSearchPolicyIsLastWorkerSnapshot(t *testing.T) {
 	raw, _ := json.Marshal(status)
 	if bytes.Contains(raw, []byte(`"web_search"`)) {
 		t.Fatal("unknown snapshot serialized as known policy")
+	}
+}
+
+// Search is on by default. A saved config always carries web_search, so a file
+// that recorded false (including one written under the old default) stays off;
+// only a missing field or a fresh configuration takes the new default.
+func TestWebSearchDefaultsOnWithoutRewritingSavedChoices(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "agent.json")
+	env := map[string]string{"OPENLINKER_AGENT_CONFIG": path, "OPENLINKER_AGENT_STATE_DIR": filepath.Join(dir, "state")}
+	get := func(k string) string { return env[k] }
+
+	fresh, _, err := ConfigureNonSecret(get, ConfigureOptions{Provider: "codex", Workspace: dir, AgentID: "11111111-1111-4111-8111-111111111111"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fresh.WebSearch || fresh.SearchPolicy() == nil || !fresh.SearchPolicy().Effective {
+		t.Fatal("a fresh configuration must turn search on")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || !bytes.Contains(raw, []byte(`"web_search": true`)) {
+		t.Fatalf("saved config must record the effective choice: %s %v", raw, err)
+	}
+
+	var saved map[string]any
+	if err := json.Unmarshal(raw, &saved); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name  string
+		value any
+		want  bool
+	}{
+		{name: "saved-false", value: false, want: false},
+		{name: "saved-true", value: true, want: true},
+		{name: "field-missing", want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			delete(saved, "web_search")
+			if test.value != nil {
+				saved["web_search"] = test.value
+			}
+			if err := writePrivateJSON(path, saved); err != nil {
+				t.Fatal(err)
+			}
+			config, _, err := loadConfig(get)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if config.WebSearch != test.want {
+				t.Fatalf("WebSearch = %t, want %t", config.WebSearch, test.want)
+			}
+		})
+	}
+
+	disabled := false
+	off, _, err := ConfigureNonSecret(get, ConfigureOptions{WebSearch: &disabled})
+	if err != nil || off.WebSearch {
+		t.Fatalf("explicit false must turn search off: %v", err)
 	}
 }

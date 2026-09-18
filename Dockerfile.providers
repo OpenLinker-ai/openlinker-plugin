@@ -153,7 +153,7 @@ ENV OPENLINKER_CODEX_BIN=/usr/local/bin/openlinker-provider-launcher \
     OPENLINKER_CODEX_RPC_LAUNCHER=1 \
     OPENLINKER_CODEX_SANDBOX=read-only \
     OPENLINKER_CODEX_APPROVAL=never \
-    OPENLINKER_CODEX_WEB_SEARCH=false
+    OPENLINKER_CODEX_WEB_SEARCH=true
 ENTRYPOINT ["/usr/local/bin/openlinker-runtime-entrypoint"]
 LABEL org.opencontainers.image.title="OpenLinker Runtime Codex" \
       org.opencontainers.image.description="OpenLinker Plugin Runtime Worker with a pinned Codex CLI provider" \
@@ -175,7 +175,7 @@ RUN chmod 0555 /opt/openlinker/agent-runtime-plugin/claude \
  && claude plugin validate --strict /opt/openlinker/agent-runtime-plugin/claude
 ENV OPENLINKER_CLAUDE_BIN=/usr/local/bin/openlinker-provider-launcher \
     OPENLINKER_CLAUDE_PERMISSION=dontAsk \
-    OPENLINKER_CLAUDE_WEB_SEARCH=false
+    OPENLINKER_CLAUDE_WEB_SEARCH=true
 ENTRYPOINT ["/usr/local/bin/openlinker-runtime-entrypoint"]
 LABEL org.opencontainers.image.title="OpenLinker Runtime Claude" \
       org.opencontainers.image.description="OpenLinker Plugin Runtime Worker with a pinned Claude Code CLI provider" \
