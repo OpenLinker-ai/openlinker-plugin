@@ -48,6 +48,25 @@ type browserObservation struct {
 	lease      *browserRunLease
 	extensions *openlinker.RuntimeExtensions
 
+	// Final-frame requests for the streaming goroutine. Unbuffered: the reply
+	// channel the sender passes is how teardown knows the capture either happened
+	// or was given up on, and a queued request would outlive the round it belongs
+	// to.
+	final chan chan struct{}
+	// How a captured frame is delivered. A field so the capture rules -- which
+	// frame is marked as the round's last, and when -- are testable without a
+	// Runtime extension channel; the production value is emitEvent.
+	publish func(
+		context.Context,
+		browserextension.ObserverBridgeCommand,
+		browserextension.ObserverBridgeEvent,
+	) bool
+	// How long a final capture retries, and how long teardown waits for it.
+	// Fields rather than the constants directly so a test can exercise the
+	// give-up paths without holding a teardown open for seconds.
+	finalCaptureWindow   time.Duration
+	finalCaptureDeadline time.Duration
+
 	mu        sync.Mutex
 	leaseID   string
 	commandID string
@@ -59,7 +78,15 @@ func newBrowserObservation(
 	lease *browserRunLease,
 	extensions *openlinker.RuntimeExtensions,
 ) *browserObservation {
-	return &browserObservation{lease: lease, extensions: extensions}
+	observation := &browserObservation{
+		lease:                lease,
+		extensions:           extensions,
+		final:                make(chan chan struct{}),
+		finalCaptureWindow:   observationFinalCaptureWindow,
+		finalCaptureDeadline: observationFinalCaptureDeadline,
+	}
+	observation.publish = observation.emitEvent
+	return observation
 }
 
 func (observation *browserObservation) handleCommand(
@@ -191,66 +218,209 @@ func (observation *browserObservation) stream(
 				Kind: browserextension.ObserverBridgeStopped,
 			})
 			return
+		case ack := <-observation.final:
+			// The round is ending and the attachment is about to close. Capturing
+			// here, from the goroutine that owns the stream, is what makes the last
+			// frame a deliberate delivery instead of whichever tick happened to
+			// win the race with teardown.
+			outcome := observation.captureFinal(ctx, command, stream)
+			close(ack)
+			if outcome == observationCaptureEnded {
+				return
+			}
 		case <-ticker.C:
-			identity, err := observation.lease.identitySnapshot()
-			if err != nil {
-				observation.emitError(command, browserprotocol.NewOpsObserverError(
-					browserprotocol.OpsObserverRunNotActive,
-					"the observed Run is no longer active",
-				))
-				return
-			}
-			if !commandNamesLocalAttempt(command, identity) {
-				observation.emitError(command, browserprotocol.NewOpsObserverError(
-					browserprotocol.OpsObserverRunNotActive,
-					"the Runtime moved to another Attempt",
-				))
-				return
-			}
-			response, observeErr := stream.Observe(
-				ctx,
-				browserprotocol.OpsObserverFrameOperation,
-			)
-			if observeErr != nil {
-				// Both answers are transient while the Worker's own Attempt
-				// identity above remains live. Busy means the Engine is occupied
-				// authorizing the observer. Run-not-active means the provider has
-				// not entered its first Browser action yet, or is between actions;
-				// a lease opened from the ready lifecycle must wait for that action
-				// rather than close on its first 500ms tick. Attempt termination and
-				// rotation still fail closed through identitySnapshot and
-				// commandNamesLocalAttempt before this call.
-				if observerEngineErrorIsTransient(observeErr) {
-					continue
-				}
-				observation.emitError(command, observeErr)
-				return
-			}
-			if response.Observation == nil || response.Observation.Frame == nil {
-				continue
-			}
-			// The Runtime backfilled its own identity, so compare that rather
-			// than the local snapshot: it is the identity the frame was actually
-			// captured under.
-			if capturedFrameIsForeign(identity, *response.Observation) {
-				observation.emitError(command, browserprotocol.NewOpsObserverError(
-					browserprotocol.OpsObserverRunNotActive,
-					"the captured frame belongs to another Attempt",
-				))
-				return
-			}
-			captured := response.Observation.CapturedAt.UTC()
-			if captured.IsZero() {
-				captured = time.Now().UTC()
-			}
-			if !observation.emitEvent(ctx, command, browserextension.ObserverBridgeEvent{
-				Kind:       browserextension.ObserverBridgeFrame,
-				CapturedAt: &captured,
-				Frame:      response.Observation.Frame,
-			}) {
+			if observation.capture(ctx, command, stream) == observationCaptureEnded {
 				return
 			}
 		}
+	}
+}
+
+// observationCapturer is the one Engine call a capture makes. Named as an
+// interface so the retry and identity rules here are testable without a real
+// Browser socket; the production value is always the Ops Observer stream.
+type observationCapturer interface {
+	Observe(
+		context.Context,
+		browserprotocol.OpsObserverOperation,
+	) (browserprotocol.OpsObserverResponse, *browserprotocol.OpsObserverError)
+}
+
+// observationCaptureOutcome is what one capture attempt settled.
+type observationCaptureOutcome int
+
+const (
+	// A frame was captured and acknowledged by Core.
+	observationCaptureDelivered observationCaptureOutcome = iota
+	// Nothing was captured and the stream stays open. The Engine is busy, or the
+	// provider has not entered a Browser action yet.
+	observationCaptureRetry
+	// The stream must end. The reason has already been emitted.
+	observationCaptureEnded
+)
+
+const (
+	// How long a final capture keeps retrying. The Engine answers a busy or
+	// not-yet-bound observer within its own 500ms window, so this is a few of
+	// those: long enough to get past one in-flight action, short enough that it
+	// cannot hold up the close of the attachment.
+	observationFinalCaptureWindow = 2 * time.Second
+	// Between final attempts. Fast relative to the window, because the frame is
+	// only worth having while the page is still the one the round ended on.
+	observationFinalCaptureRetryInterval = 100 * time.Millisecond
+	// The bound the run teardown waits for a final capture, including reaching the
+	// stream goroutine. Teardown must stay bounded whatever the Engine is doing.
+	observationFinalCaptureDeadline = observationFinalCaptureWindow + 2*time.Second
+)
+
+// captureFinal retries within a bounded window. A single attempt would be
+// answered "busy" whenever the Agent's last action is still settling, which is
+// exactly the moment a final frame is being asked for.
+func (observation *browserObservation) captureFinal(
+	ctx context.Context,
+	command browserextension.ObserverBridgeCommand,
+	stream observationCapturer,
+) observationCaptureOutcome {
+	deadline := time.Now().Add(observation.finalCaptureWindow)
+	// Marked only for a Core that said it accepts the marker. Without that the
+	// capture is still made and delivered -- it is the frame the round ended on
+	// either way -- but unmarked, because an older Core would reject the event and
+	// close the Runtime connection over it.
+	marked := command.AcceptsFinalFrame
+	for {
+		outcome := observation.captureMarked(ctx, command, stream, marked)
+		if outcome != observationCaptureRetry || !time.Now().Before(deadline) {
+			return outcome
+		}
+		select {
+		case <-ctx.Done():
+			return observationCaptureRetry
+		case <-time.After(observationFinalCaptureRetryInterval):
+		}
+	}
+}
+
+// capture takes one frame and publishes it. Identity is re-checked on every
+// attempt rather than once per stream: the Runtime can move to another Attempt
+// between two captures, and reporting that page here would attribute another
+// user's screen to this observation.
+func (observation *browserObservation) capture(
+	ctx context.Context,
+	command browserextension.ObserverBridgeCommand,
+	stream observationCapturer,
+) observationCaptureOutcome {
+	return observation.captureMarked(ctx, command, stream, false)
+}
+
+// captureMarked takes one frame and publishes it, marking it as the round's final
+// frame when the capture was made as the attachment closes. Core cannot derive
+// that from the order events reach it, so the side that made the capture says so.
+func (observation *browserObservation) captureMarked(
+	ctx context.Context,
+	command browserextension.ObserverBridgeCommand,
+	stream observationCapturer,
+	final bool,
+) observationCaptureOutcome {
+	identity, err := observation.lease.identitySnapshot()
+	if err != nil {
+		observation.emitError(command, browserprotocol.NewOpsObserverError(
+			browserprotocol.OpsObserverRunNotActive,
+			"the observed Run is no longer active",
+		))
+		return observationCaptureEnded
+	}
+	if !commandNamesLocalAttempt(command, identity) {
+		observation.emitError(command, browserprotocol.NewOpsObserverError(
+			browserprotocol.OpsObserverRunNotActive,
+			"the Runtime moved to another Attempt",
+		))
+		return observationCaptureEnded
+	}
+	response, observeErr := stream.Observe(
+		ctx,
+		browserprotocol.OpsObserverFrameOperation,
+	)
+	if observeErr != nil {
+		// Both answers are transient while the Worker's own Attempt
+		// identity above remains live. Busy means the Engine is occupied
+		// authorizing the observer. Run-not-active means the provider has
+		// not entered its first Browser action yet, or is between actions;
+		// a lease opened from the ready lifecycle must wait for that action
+		// rather than close on its first 500ms tick. Attempt termination and
+		// rotation still fail closed through identitySnapshot and
+		// commandNamesLocalAttempt before this call.
+		if observerEngineErrorIsTransient(observeErr) {
+			return observationCaptureRetry
+		}
+		observation.emitError(command, observeErr)
+		return observationCaptureEnded
+	}
+	if response.Observation == nil || response.Observation.Frame == nil {
+		return observationCaptureRetry
+	}
+	// The Runtime backfilled its own identity, so compare that rather
+	// than the local snapshot: it is the identity the frame was actually
+	// captured under.
+	if capturedFrameIsForeign(identity, *response.Observation) {
+		observation.emitError(command, browserprotocol.NewOpsObserverError(
+			browserprotocol.OpsObserverRunNotActive,
+			"the captured frame belongs to another Attempt",
+		))
+		return observationCaptureEnded
+	}
+	captured := response.Observation.CapturedAt.UTC()
+	if captured.IsZero() {
+		captured = time.Now().UTC()
+	}
+	if !observation.publish(ctx, command, browserextension.ObserverBridgeEvent{
+		Kind:       browserextension.ObserverBridgeFrame,
+		CapturedAt: &captured,
+		Frame:      response.Observation.Frame,
+		FinalFrame: final,
+	}) {
+		return observationCaptureEnded
+	}
+	return observationCaptureDelivered
+}
+
+// captureFinalFrame asks the running observation for one last frame before the
+// round's attachment is torn down.
+//
+// It is deliberately best-effort and bounded: an observation nobody opened, an
+// Engine that never bound a Session because the Agent made no Browser action, and
+// a stream that is already closing all answer "no final frame", which is a
+// truthful outcome rather than a failure to retry around. What it must never do
+// is delay the close or wait on an Engine that is not answering.
+func (observation *browserObservation) captureFinalFrame(ctx context.Context) {
+	if observation == nil {
+		return
+	}
+	// A canceled round cannot produce one. The stream's own context descends from
+	// this one, so the Engine call would fail anyway -- and asking would turn the
+	// clean stop the stream is already emitting into an error end reason.
+	if ctx != nil && ctx.Err() != nil {
+		return
+	}
+	observation.mu.Lock()
+	streaming := observation.leaseID != ""
+	final := observation.final
+	observation.mu.Unlock()
+	if !streaming || final == nil {
+		return
+	}
+	ack := make(chan struct{})
+	timer := time.NewTimer(observation.finalCaptureDeadline)
+	defer timer.Stop()
+	select {
+	case final <- ack:
+	case <-timer.C:
+		// The stream goroutine is not at its select: it is either mid-capture or
+		// already gone. Either way the close must not wait on it.
+		return
+	}
+	select {
+	case <-ack:
+	case <-timer.C:
 	}
 }
 

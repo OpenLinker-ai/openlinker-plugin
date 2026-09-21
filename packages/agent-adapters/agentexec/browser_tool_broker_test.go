@@ -274,11 +274,15 @@ func TestBrowserToolBrokerKeepsAuthorityOutOfProviderProcess(t *testing.T) {
 			t.Fatalf("Browser actions incomplete: got %v, want %v: %v", recorded, wanted, runContext.Err())
 		}
 	}
+	// One bounded marker, and it names the Browser. The kind alone is shared with
+	// every other MCP tool, so without the scope a reader cannot tell a round that
+	// used the Browser from one that called some other MCP server.
 	if len(progress) != 1 ||
 		progress[0]["status"] != "provider_tool_started" ||
 		progress[0]["provider"] != config.Provider ||
 		progress[0]["phase"] != "started" ||
-		progress[0]["tool_kind"] != "mcp_tool" {
+		progress[0]["tool_kind"] != "mcp_tool" ||
+		progress[0]["tool_scope"] != "browser_session" {
 		t.Fatalf("bounded Browser progress = %#v", progress)
 	}
 }
