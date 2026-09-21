@@ -80,6 +80,11 @@ type ObserverBridgeCommand struct {
 	LeaseExpiresAt       time.Time                         `json:"lease_expires_at"`
 	DeadlineAt           time.Time                         `json:"deadline_at"`
 	FrameIntervalMS      int                               `json:"frame_interval_ms"`
+	// Set by a Core that decodes final_frame on this observation's events. A Worker
+	// must not mark a frame unless the start it is answering carries this: an older
+	// Core rejects the unknown field as a validation failure, and on the Runtime
+	// WebSocket that closes the whole connection, not just the one event.
+	AcceptsFinalFrame bool `json:"accepts_final_frame,omitempty"`
 }
 
 type ObserverBridgeEvent struct {
@@ -93,6 +98,20 @@ type ObserverBridgeEvent struct {
 	Kind                 ObserverBridgeEventKind           `json:"kind"`
 	CapturedAt           *time.Time                        `json:"captured_at,omitempty"`
 	Frame                *browserprotocol.ViewerFrame      `json:"frame,omitempty"`
+	// Set on the capture the Worker makes as the round's attachment is closing.
+	//
+	// Only the producer knows this. Core sees an observation ending and a Run
+	// reaching its terminal state in an order that depends on teardown: the
+	// observation stream is cut by the same close it is watching, so the frame the
+	// round ended on can arrive under an error or a stop, before the Run is
+	// terminal, and be indistinguishable from a mid-round frame. This flag is that
+	// distinction, stated by the side that made the capture deliberately.
+	//
+	// Only sent when the start command declared AcceptsFinalFrame. A Core that
+	// predates the field rejects it as a validation failure, and a validation
+	// failure on the Runtime WebSocket closes the connection -- which would drop
+	// the Runtime session at the end of every observed round.
+	FinalFrame bool `json:"final_frame,omitempty"`
 	// Only the code crosses the wire. The message is free text that could carry
 	// local detail, and Core records the code as an end reason anyway.
 	ErrorCode string `json:"error_code,omitempty"`
@@ -158,6 +177,9 @@ func (event ObserverBridgeEvent) Validate() *browserprotocol.OpsObserverError {
 		!event.browserIdentity().validate() || !browserprotocol.IsValidUUID(event.CommandID) ||
 		!browserprotocol.IsValidUUID(event.LeaseID) || event.EventSeq == 0 {
 		return browserprotocol.NewOpsObserverError(browserprotocol.OpsObserverProtocolError, "Observer event identity is invalid")
+	}
+	if event.FinalFrame && event.Kind != ObserverBridgeFrame {
+		return browserprotocol.NewOpsObserverError(browserprotocol.OpsObserverProtocolError, "Observer final-frame marker requires a frame")
 	}
 	switch event.Kind {
 	case ObserverBridgeStarted, ObserverBridgeStopped:

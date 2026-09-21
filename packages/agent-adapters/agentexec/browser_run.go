@@ -193,6 +193,12 @@ func (provider *browserExecutionProvider) Run(
 	)
 	status := "failed"
 	defer func() {
+		// While the attachment is still live and still bound to this round's page:
+		// the close below checkpoints and tears the Engine down, and an observer
+		// watching at its own interval has no way to be sure it captured what the
+		// round finished on. A Run whose Agent never entered a Browser action has
+		// no bound page and retains nothing, which is the honest answer for it.
+		humanControl.observation.captureFinalFrame(ctx)
 		brokerErr := broker.Close()
 		runtimeErr := lease.closeBrowserRuntimeWithFailureFence()
 		leaseErr := lease.Close()

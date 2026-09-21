@@ -1,8 +1,10 @@
 package agentexec
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -254,5 +256,238 @@ func TestObservationWaitsForTheFirstBrowserAction(t *testing.T) {
 	}
 	if observerEngineErrorIsTransient(nil) {
 		t.Fatal("nil observer failure was treated as transient")
+	}
+}
+
+// observationCaptureStub answers the Engine calls a capture makes, in order. It
+// exists so the final-capture rules can be tested without a Browser socket.
+type observationCaptureStub struct {
+	mu        sync.Mutex
+	calls     int
+	responses []observationCaptureStubReply
+}
+
+type observationCaptureStubReply struct {
+	response browserprotocol.OpsObserverResponse
+	failure  *browserprotocol.OpsObserverError
+}
+
+func (stub *observationCaptureStub) Observe(
+	context.Context,
+	browserprotocol.OpsObserverOperation,
+) (browserprotocol.OpsObserverResponse, *browserprotocol.OpsObserverError) {
+	stub.mu.Lock()
+	defer stub.mu.Unlock()
+	stub.calls++
+	if len(stub.responses) == 0 {
+		return browserprotocol.OpsObserverResponse{}, browserprotocol.NewOpsObserverError(
+			browserprotocol.OpsObserverRunNotActive,
+			"not bound",
+		)
+	}
+	reply := stub.responses[0]
+	if len(stub.responses) > 1 {
+		stub.responses = stub.responses[1:]
+	}
+	return reply.response, reply.failure
+}
+
+func (stub *observationCaptureStub) observed() int {
+	stub.mu.Lock()
+	defer stub.mu.Unlock()
+	return stub.calls
+}
+
+// observationLocalAttempt is a lease whose identity the test command names.
+func observationLocalAttempt(
+	command *browserextension.ObserverBridgeCommand,
+) *browserRunLease {
+	identity := browserprotocol.Identity{
+		RunID:            command.AttemptIdentity.RunID,
+		SessionEpoch:     command.SessionEpoch,
+		BrowserSessionID: "browser-session-a",
+		AttachmentID:     "attachment-a",
+	}
+	command.BrowserSessionSHA256 = browserIdentityEvidenceSHA256(
+		browserSessionEvidenceDomain, identity.BrowserSessionID,
+	)
+	command.AttachmentSHA256 = browserIdentityEvidenceSHA256(
+		browserAttachmentEvidenceDomain, identity.AttachmentID,
+	)
+	return &browserRunLease{identity: identity}
+}
+
+// A single attempt is not enough for the last frame of a round: the Agent's final
+// action is usually still settling, and the Engine answers that with a transient
+// busy or not-yet-bound. The final capture has to keep asking inside its window,
+// and it must still give up rather than hold the attachment open.
+func TestObservationFinalCaptureRetriesWithinItsWindow(t *testing.T) {
+	t.Parallel()
+	command := observationCommand(browserextension.ObserverBridgeStart)
+	observation := newBrowserObservation(nil, nil)
+	observation.lease = observationLocalAttempt(&command)
+	observation.finalCaptureWindow = 120 * time.Millisecond
+	stub := &observationCaptureStub{}
+
+	if outcome := observation.captureFinal(t.Context(), command, stub); outcome != observationCaptureRetry {
+		t.Fatalf("outcome = %v, want a retry that gave up inside its window", outcome)
+	}
+	if stub.observed() < 2 {
+		t.Fatalf("the Engine was asked %d times; a single attempt is the bug this fixes", stub.observed())
+	}
+}
+
+// A failure that is not the Engine waiting has to end the observation on the
+// first answer, exactly as the interval capture does. Retrying an internal or
+// protocol failure would hold a broken stream open through teardown.
+func TestObservationFinalCaptureDoesNotRetryAHardFailure(t *testing.T) {
+	t.Parallel()
+	command := observationCommand(browserextension.ObserverBridgeStart)
+	observation := newBrowserObservation(nil, nil)
+	observation.lease = observationLocalAttempt(&command)
+	observation.finalCaptureWindow = time.Second
+	stub := &observationCaptureStub{responses: []observationCaptureStubReply{{
+		failure: browserprotocol.NewOpsObserverError(
+			browserprotocol.OpsObserverInternalError, "broken",
+		),
+	}}}
+
+	if outcome := observation.captureFinal(t.Context(), command, stub); outcome != observationCaptureEnded {
+		t.Fatalf("outcome = %v, want the stream to end", outcome)
+	}
+	if stub.observed() != 1 {
+		t.Fatalf("a hard failure was retried %d times", stub.observed())
+	}
+}
+
+// Teardown asks the streaming goroutine for the frame and waits for it, because
+// the attachment closes immediately afterwards. Every way that can fail has to
+// stay bounded: no observation, and a stream that is not at its select.
+func TestObservationFinalFrameRequestIsBoundedAndRendezvous(t *testing.T) {
+	t.Parallel()
+	command := observationCommand(browserextension.ObserverBridgeStart)
+
+	idle := newBrowserObservation(nil, nil)
+	idle.finalCaptureDeadline = time.Hour
+	done := make(chan struct{})
+	go func() {
+		idle.captureFinalFrame(t.Context())
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("a Run nobody observed waited for a final frame anyway")
+	}
+
+	unresponsive := newBrowserObservation(nil, nil)
+	unresponsive.finalCaptureDeadline = 50 * time.Millisecond
+	unresponsive.mu.Lock()
+	unresponsive.leaseID = command.LeaseID
+	unresponsive.mu.Unlock()
+	start := time.Now()
+	unresponsive.captureFinalFrame(t.Context())
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("teardown waited %s on a stream that was not listening", elapsed)
+	}
+
+	// And the rendezvous itself: the stream goroutine receives the request and
+	// teardown returns only once that capture has settled.
+	observation := newBrowserObservation(nil, nil)
+	observation.lease = observationLocalAttempt(&command)
+	observation.finalCaptureWindow = 50 * time.Millisecond
+	observation.mu.Lock()
+	observation.leaseID = command.LeaseID
+	observation.mu.Unlock()
+	stub := &observationCaptureStub{}
+	captured := make(chan observationCaptureOutcome, 1)
+	go func() {
+		ack := <-observation.final
+		captured <- observation.captureFinal(t.Context(), command, stub)
+		close(ack)
+	}()
+	observation.captureFinalFrame(t.Context())
+	select {
+	case outcome := <-captured:
+		if outcome != observationCaptureRetry {
+			t.Fatalf("outcome = %v", outcome)
+		}
+	default:
+		t.Fatal("teardown returned before the final capture settled")
+	}
+	if stub.observed() == 0 {
+		t.Fatal("teardown never reached the Engine")
+	}
+}
+
+// Core cannot tell the round's last frame from a mid-round one by the order events
+// reach it: teardown cuts this very stream, so the ending usually arrives as an
+// error or a stop before the Run is terminal. The teardown capture therefore says
+// so on the frame, and an interval capture must not.
+//
+// But only for a Core that declared it accepts the marker. An older Core rejects
+// the unknown field as a validation failure, which on the Runtime WebSocket closes
+// the whole connection -- at the end of every observed round, just before the
+// result is reported. For that Core the frame is still delivered, unmarked.
+func TestObservationMarksOnlyTheTeardownCaptureForACoreThatAcceptsIt(t *testing.T) {
+	t.Parallel()
+	for name, expect := range map[string]struct {
+		accepts bool
+		marked  []bool
+	}{
+		"Core declares the marker": {true, []bool{false, true}},
+		"Core predates the marker": {false, []bool{false, false}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			command := observationCommand(browserextension.ObserverBridgeStart)
+			command.AcceptsFinalFrame = expect.accepts
+			observation := newBrowserObservation(nil, nil)
+			observation.lease = observationLocalAttempt(&command)
+			observation.finalCaptureWindow = 50 * time.Millisecond
+
+			var marked []bool
+			observation.mu.Lock()
+			observation.leaseID = command.LeaseID
+			observation.mu.Unlock()
+			// Delivery is replaced so the marker can be read at the capture
+			// boundary without a Runtime extension channel.
+			observation.publish = func(
+				_ context.Context,
+				_ browserextension.ObserverBridgeCommand,
+				event browserextension.ObserverBridgeEvent,
+			) bool {
+				marked = append(marked, event.FinalFrame)
+				return true
+			}
+			frame := browserprotocol.OpsObserverResponse{
+				Observation: &browserprotocol.OpsObserverObservation{
+					RunID:            command.AttemptIdentity.RunID,
+					SessionEpoch:     command.SessionEpoch,
+					AttachmentSHA256: capturedAttachmentDigest(observation.lease.identity),
+					Frame: &browserprotocol.ViewerFrame{
+						MIMEType: "image/jpeg",
+						Data:     []byte{0xff, 0xd8, 0xff, 0xd9},
+						Width:    1280,
+						Height:   720,
+					},
+				},
+			}
+			stub := &observationCaptureStub{
+				responses: []observationCaptureStubReply{{response: frame}},
+			}
+
+			if outcome := observation.capture(t.Context(), command, stub); outcome != observationCaptureDelivered {
+				t.Fatalf("interval capture outcome = %v", outcome)
+			}
+			// The teardown capture is made and delivered either way: it is the
+			// frame the round ended on. Only the marker depends on the Core.
+			if outcome := observation.captureFinal(t.Context(), command, stub); outcome != observationCaptureDelivered {
+				t.Fatalf("final capture outcome = %v", outcome)
+			}
+			if len(marked) != len(expect.marked) ||
+				marked[0] != expect.marked[0] || marked[1] != expect.marked[1] {
+				t.Fatalf("final-frame markers = %v, want %v", marked, expect.marked)
+			}
+		})
 	}
 }
