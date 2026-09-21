@@ -154,11 +154,19 @@ func (provider *browserExecutionProvider) Run(
 			// volume O(1). Publish one bounded marker at the trusted broker when
 			// the Agent first obtains an executor, which proves real Browser work
 			// without persisting action inputs, outputs, URLs, or action counts.
+			//
+			// tool_scope is what makes that proof usable. The provider streams
+			// normalize every MCP call to tool_kind "mcp_tool", and more than one
+			// MCP server can be configured, so the kind alone cannot say whether a
+			// round used the Browser -- only that some MCP tool ran. The scope is
+			// added rather than replacing the kind, so existing consumers keep the
+			// row they already render.
 			_ = run.Emit("run.status.changed", map[string]any{
-				"status":    "provider_tool_started",
-				"provider":  provider.config.Provider,
-				"phase":     "started",
-				"tool_kind": "mcp_tool",
+				"status":     "provider_tool_started",
+				"provider":   provider.config.Provider,
+				"phase":      "started",
+				"tool_kind":  "mcp_tool",
+				"tool_scope": "browser_session",
 			})
 		},
 	)

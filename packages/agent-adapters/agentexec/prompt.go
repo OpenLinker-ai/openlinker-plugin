@@ -36,6 +36,15 @@ func buildPrompt(
 			"",
 			"The isolated Browser tool is available for tasks that require webpage interaction.",
 			"Use it when needed and follow its safety contract.",
+			// Without this the choice was left entirely to the model, and a request
+			// to open a page could be answered from search results instead. That
+			// reads as a success while the Browser was never used: no page was
+			// visited, and the observation the user is watching stays empty. The
+			// rule is deliberately narrow -- it binds a named page or URL, not every
+			// task that happens to involve the web.
+			"When the request names a page to open, visit or browse, or gives a URL to look at, navigate there with the Browser tool. Search results about a page are not a substitute for opening it.",
+			"Only report that a page was opened, or describe what it shows, on the basis of a Browser observation from this run.",
+			"If the Browser tool is unavailable or its navigation fails, say which page you could not reach and why, rather than answering from other sources as though the page had been opened.",
 		)
 	}
 	return strings.Join(lines, "\n")
