@@ -110,7 +110,9 @@ for (const field of ["plugin_commit", "plugin_host_version", "plugin_host_sha256
 }
 OPENLINKER_METADATA_READABILITY
 USER 0:0
-ENV OPENLINKER_AGENT_TRANSPORT=auto \
+# Split Runtime/Provider UIDs cannot share the private skill cache yet.
+ENV OPENLINKER_SKILL_PACKAGES_DISABLED=true \
+    OPENLINKER_AGENT_TRANSPORT=auto \
     OPENLINKER_AGENT_DELEGATION_BROKER_ROOT=/delegation-tool \
     OPENLINKER_AGENT_CAPACITY=1 \
     OPENLINKER_AGENT_TIMEOUT_SECONDS=1800 \

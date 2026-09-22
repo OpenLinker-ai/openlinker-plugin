@@ -6,6 +6,14 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- Add version-pinned private skill packages for native Codex/Claude hosts using
+  Core schema 093. Verify and materialize immutable files, check prerequisites,
+  inject instructions into new native sessions, and report durable load evidence.
+  Provider images and the official UID-switching launcher disable this feature
+  until a shared readable cache is implemented. Native workspace caches are
+  locally excluded from Git; automatic cleanup and compaction reinjection are
+  not implemented. Adoption requires a new Host release and updated install locks.
+
 - **Behavior change:** provider web search is on by default for Codex and
   Claude. A fresh `agent configure`, a config file without `web_search`, and
   packaged containers/compose files that do not set

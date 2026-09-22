@@ -12,6 +12,8 @@ import (
 )
 
 type ProviderConfig struct {
+	// DisableSkillPackages is set by hosts whose provider process cannot read the private cache.
+	DisableSkillPackages bool
 	DelegationTargets    []string
 	DelegationProxyBin   string
 	DelegationBrokerRoot string
@@ -78,22 +80,26 @@ type ConversationMessage struct {
 }
 
 type RunContext struct {
-	ReadDelegatedRun   func(context.Context, string) (*openlinker.RuntimeDelegatedRun, error)
-	DelegationSocket   string
-	DelegationProxyBin string
-	RunID              string
-	AgentID            string
-	AttemptDeadlineAt  time.Time
-	RunDeadlineAt      time.Time
-	Authority          *openlinker.RuntimeAuthorityContext
-	Input              any
-	Metadata           map[string]any
-	A2A                map[string]any
-	Conversation       *ConversationContext
-	Browser            *BrowserRunContext
-	RuntimeExtensions  *openlinker.RuntimeExtensions
-	Emit               func(string, any) error
-	CallAgent          func(context.Context, string, any, openlinker.RuntimeCallOptions) (any, error)
+	PackageSnapshot            any
+	SkillPackagesAlreadyLoaded bool
+	SkillPackagesDigest        string
+	LoadedSkillPackages        []loadedSkillPackage
+	ReadDelegatedRun           func(context.Context, string) (*openlinker.RuntimeDelegatedRun, error)
+	DelegationSocket           string
+	DelegationProxyBin         string
+	RunID                      string
+	AgentID                    string
+	AttemptDeadlineAt          time.Time
+	RunDeadlineAt              time.Time
+	Authority                  *openlinker.RuntimeAuthorityContext
+	Input                      any
+	Metadata                   map[string]any
+	A2A                        map[string]any
+	Conversation               *ConversationContext
+	Browser                    *BrowserRunContext
+	RuntimeExtensions          *openlinker.RuntimeExtensions
+	Emit                       func(string, any) error
+	CallAgent                  func(context.Context, string, any, openlinker.RuntimeCallOptions) (any, error)
 }
 
 type BrowserRunContext struct {
@@ -126,6 +132,7 @@ func NewHandler(config ProviderConfig) (Handler, error) {
 }
 
 func NewProvider(config ProviderConfig) (Provider, error) {
+	config.Provider = strings.ToLower(strings.TrimSpace(config.Provider))
 	var provider Provider
 	switch strings.ToLower(strings.TrimSpace(config.Provider)) {
 	case "codex":
@@ -137,7 +144,8 @@ func NewProvider(config ProviderConfig) (Provider, error) {
 	}
 	switch strings.ToLower(strings.TrimSpace(config.ExecutionProfile)) {
 	case "", "standard":
-		return withDelegation(provider, config)
+		delegated, err := withDelegation(provider, config)
+		return withSkillPackages(delegated, err, config)
 	case "browser":
 		if err := validateBrowserClientConfig(config); err != nil {
 			return nil, err
@@ -146,7 +154,8 @@ func NewProvider(config ProviderConfig) (Provider, error) {
 		if err != nil {
 			return nil, err
 		}
-		return withDelegation(browser, config)
+		delegated, err := withDelegation(browser, config)
+		return withSkillPackages(delegated, err, config)
 	default:
 		return nil, fmt.Errorf("execution profile must be standard or browser")
 	}
@@ -165,11 +174,12 @@ func (handler Handler) Handle(ctx context.Context, assignment openlinker.Runtime
 	assignmentMetadata := map[string]any(assignment.Metadata)
 	metadata := make(map[string]any, len(assignmentMetadata))
 	for key, value := range assignmentMetadata {
-		if key != "a2a" && key != "conversation" {
+		if key != "a2a" && key != "conversation" && key != skillPackagesMetadataKey {
 			metadata[key] = value
 		}
 	}
 	run := RunContext{
+		PackageSnapshot:   assignmentMetadata[skillPackagesMetadataKey],
 		RunID:             assignment.RunID,
 		AgentID:           assignment.AgentID,
 		AttemptDeadlineAt: assignment.AttemptDeadlineAt,

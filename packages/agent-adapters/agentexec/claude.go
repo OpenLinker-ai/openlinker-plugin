@@ -52,7 +52,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 	sessionKey := conversationSessionKey(run)
 	sessionPath := sessionStorePath(config.SessionStore, "claude", workspace)
 	sessionID := ""
-	clientMode := providerSessionClientMode(config)
+	clientMode := providerSessionClientMode(config) + skillPackageSessionMode(run)
 	clientModeGeneration := uint64(1)
 	if config.SessionReuse && sessionKey != "" {
 		unlock := lockSession("claude", workspace, sessionKey)

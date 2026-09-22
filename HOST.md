@@ -69,6 +69,58 @@ replacing its binary. Drain/stop it, preserve identity/session/spool/state, then
 start the Plugin host. Agent Node migration is a separate procedure with its own
 configuration defaults. Keep the previous binary/image for rollback.
 
+## Private skill packages
+
+The current source supports owner-associated, version-pinned skill packages from
+Core schema 093 on native Codex/Claude hosts where the host and provider share a
+UID and the workspace is writable. These hosts advertise `skill_packages.v1`
+and their provider-specific `skill_packages.codex.v1` or `skill_packages.claude.v1`
+feature through the existing SDK Worker. Existing published host locks have not
+been updated by this source change; a release and explicit host rollout are still
+required before installed users gain this feature.
+
+Provider images and the official `openlinker-provider-launcher` execution path
+currently disable skill packages. The Runtime UID 10001 cannot write the default
+read-only `/workspace`, and Provider UID 10002 cannot read the Runtime's private
+cache (directories 0700, files 0400). Images set
+`OPENLINKER_SKILL_PACKAGES_DISABLED=true`; hosts also recognize the official
+launcher, including symlink targets. Feature advertisement and execution share
+the same gate: disabled hosts advertise no package features and reject nonempty
+package snapshots before materialization or Provider execution. Custom wrappers
+that switch UID must set this flag too. A writable volume alone does not resolve
+the UID mismatch. Shared group/cache support remains unimplemented.
+
+The Agent owner imports SKILL.md and UTF-8 supporting files, then associates an
+exact version in the skill workbench. Core supplies an immutable per-Run snapshot
+in reserved assignment metadata. The host verifies its SHA-256, provider, paths
+and trusted execution context before materializing files under
+`<workspace>/.openlinker-skills/<agent-id>/<payload-sha256>/`. Existing files must
+be byte-identical; they are never overwritten. Package files have no executable
+bit, so scripts are used through the appropriate interpreter. For Git workspaces,
+the host adds `.openlinker-skills/` to Git's local `info/exclude`, preserving
+existing entries and tracked configuration, and verifies that Git ignores it.
+Already tracked cache files cause loading to fail instead of extending that leak.
+The cache stays within the existing provider sandbox's readable workspace.
+Declared commands
+are checked on the host PATH; import and loading do not install dependencies or
+expand tool, credential, network or Browser permissions.
+
+For a new native session, the host includes SKILL.md instructions and supporting
+file locations in the actual Codex/Claude request. Resumed sessions do not receive
+the full instructions again. Missing-session recovery injects them into the new
+replacement session. A changed association snapshot selects a fresh
+native session while retaining the platform conversation/history and existing
+session files. Unchanged versions can resume normally. SDK durable load receipts
+distinguish prepared instructions from a failed load or missing command; they do
+not certify model use, task success or benchmark performance. Cache versions stay
+available for older Runs and are not automatically garbage-collected in V1.
+
+Long native sessions may automatically compact their context and lose previously
+injected instructions or file locations. Files remain on disk, but that does not
+guarantee the model will read them again. This version has no compaction hook or
+automatic instruction reinjection; a load receipt does not prove that a resumed
+session still retains the instructions.
+
 ## Shared app storage
 
 The Agent application consumes the pinned Agent Node `pkg/adapters/appfiles`

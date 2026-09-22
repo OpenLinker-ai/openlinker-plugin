@@ -49,7 +49,7 @@ func (provider CodexProvider) Run(ctx context.Context, run RunContext) (openlink
 	sessionKey := conversationSessionKey(run)
 	sessionPath := sessionStorePath(config.SessionStore, "codex", workspace)
 	sessionID := ""
-	clientMode := "codex_rpc_v1:" + providerSessionClientMode(config)
+	clientMode := "codex_rpc_v1:" + providerSessionClientMode(config) + skillPackageSessionMode(run)
 	clientModeGeneration := uint64(1)
 	if config.SessionReuse && sessionKey != "" {
 		unlock := lockSession("codex", workspace, sessionKey)
