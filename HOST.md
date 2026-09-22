@@ -72,42 +72,50 @@ configuration defaults. Keep the previous binary/image for rollback.
 ## Private skill packages
 
 The current source supports owner-associated, version-pinned skill packages from
-Core schema 093 on native Codex/Claude hosts where the host and provider share a
-UID and the workspace is writable. These hosts advertise `skill_packages.v1`
-and their provider-specific `skill_packages.codex.v1` or `skill_packages.claude.v1`
-feature through the existing SDK Worker. Existing published host locks have not
-been updated by this source change; a release and explicit host rollout are still
-required before installed users gain this feature.
+Core schema 093 on native Codex/Claude hosts and correctly provisioned Provider
+images. Hosts advertise `skill_packages.v1` and their provider-specific
+`skill_packages.codex.v1` or `skill_packages.claude.v1` feature through the existing
+SDK Worker. Agent Node's native adapters consume the same contract. Source
+changes still require new releases and explicit rollout to existing installations.
 
-Provider images and the official `openlinker-provider-launcher` execution path
-currently disable skill packages. The Runtime UID 10001 cannot write the default
-read-only `/workspace`, and Provider UID 10002 cannot read the Runtime's private
-cache (directories 0700, files 0400). Images set
-`OPENLINKER_SKILL_PACKAGES_DISABLED=true`; hosts also recognize the official
-launcher, including symlink targets. Feature advertisement and execution share
-the same gate: disabled hosts advertise no package features and reject nonempty
-package snapshots before materialization or Provider execution. Custom wrappers
-that switch UID must set this flag too. A writable volume alone does not resolve
-the UID mismatch. Shared group/cache support remains unimplemented.
+Official images provision a separate `/skills` cache, owned by Runtime UID 10001
+and skill-readers GID 10003. The entrypoint and UID-switch launcher retain that
+supplementary group; Provider UID 10002 can read package directories (02750) and
+files (0440), but cannot modify them or read private `/runtime` state. The standard
+compose files mount a 64 MiB, noexec, nosuid, nodev tmpfs at `/skills`; `/workspace`
+can remain read-only. Restarted hosts reconstruct pinned packages from assignments.
+Skill selection changes do not require rebuilding the image. Custom Docker runs
+must supply the same writable cache mount when using `--read-only`.
+
+Images configure `OPENLINKER_SKILL_PACKAGES_CACHE_DIR=/skills` and
+`OPENLINKER_SKILL_PACKAGES_GROUP_ID=10003`. Advertisement and execution validate
+the shared cache's owner, group and permissions. Missing/unsafe caches and legacy
+launchers without this configuration remain unsupported, and the explicit
+`OPENLINKER_SKILL_PACKAGES_DISABLED=true` override remains available. Custom
+wrappers that change identity must provision equivalent access and validate it;
+merely mounting a writable workspace is insufficient.
 
 The Agent owner imports SKILL.md and UTF-8 supporting files, then associates an
 exact version in the skill workbench. Core supplies an immutable per-Run snapshot
 in reserved assignment metadata. The host verifies its SHA-256, provider, paths
 and trusted execution context before materializing files under
-`<workspace>/.openlinker-skills/<agent-id>/<payload-sha256>/`. Existing files must
+`<workspace>/.openlinker-skills/<agent-id>/<payload-sha256>/` for native hosts or
+`/skills/<agent-id>/<payload-sha256>/` in Provider images. Existing files must
 be byte-identical; they are never overwritten. Package files have no executable
 bit, so scripts are used through the appropriate interpreter. For Git workspaces,
 the host adds `.openlinker-skills/` to Git's local `info/exclude`, preserving
 existing entries and tracked configuration, and verifies that Git ignores it.
 Already tracked cache files cause loading to fail instead of extending that leak.
-The cache stays within the existing provider sandbox's readable workspace.
+Native caches stay within the provider sandbox's readable workspace. Image
+Claude invocations include only the selected package directories with `--add-dir`;
+OS permissions keep these directories read-only to the Provider.
 Declared commands
 are checked on the host PATH; import and loading do not install dependencies or
 expand tool, credential, network or Browser permissions.
 
 For a new native session, the host includes SKILL.md instructions and supporting
-file locations in the actual Codex/Claude request. Resumed sessions do not receive
-the full instructions again. Missing-session recovery injects them into the new
+file locations in the actual Codex/Claude request. Resumed sessions receive a small SKILL.md path index instead of the full
+instructions again. Missing-session recovery injects them into the new
 replacement session. A changed association snapshot selects a fresh
 native session while retaining the platform conversation/history and existing
 session files. Unchanged versions can resume normally. SDK durable load receipts
@@ -115,11 +123,14 @@ distinguish prepared instructions from a failed load or missing command; they do
 not certify model use, task success or benchmark performance. Cache versions stay
 available for older Runs and are not automatically garbage-collected in V1.
 
-Long native sessions may automatically compact their context and lose previously
-injected instructions or file locations. Files remain on disk, but that does not
-guarantee the model will read them again. This version has no compaction hook or
-automatic instruction reinjection; a load receipt does not prove that a resumed
-session still retains the instructions.
+Long native sessions may automatically compact their context. Every turn includes
+an index of the selected SKILL.md locations and instructs the model to reread lost
+instructions. This supports recovery without repeatedly injecting full files;
+a load receipt still does not prove that the model followed those instructions.
+
+Shared parsing, immutable file preparation, session digests and instruction
+fragments come from Node's `pkg/adapters/skillpackages` leaf. Plugin retains image
+permissions, Browser policy and its own Provider/session execution.
 
 ## Shared app storage
 

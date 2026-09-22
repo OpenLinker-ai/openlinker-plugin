@@ -81,7 +81,7 @@ func TestProviderPrivilegeDropBlocksAgentState(t *testing.T) {
 		t.Fatalf("privilege helper failed: %v: %s", err, output)
 	}
 	text := string(output)
-	for _, want := range []string{"uid=10002", "gid=10002", "caps=0000000000000000", "secret=blocked", "provider-user=verified"} {
+	for _, want := range []string{"uid=10002", "gid=10002", "caps=0000000000000000", "groups=[10003]", "secret=blocked", "provider-user=verified"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("privilege helper missing %q: %s", want, text)
 		}
@@ -158,5 +158,9 @@ func TestProviderPrivilegeDropHelper(t *testing.T) {
 	if raw, err := os.ReadFile(os.Getenv("OPENLINKER_PROVIDER_DROP_SECRET")); err == nil {
 		secretState = "leaked:" + string(raw)
 	}
-	fmt.Printf("uid=%d gid=%d caps=%s secret=%s provider-user=verified\n", os.Geteuid(), os.Getegid(), caps, secretState)
+	groups, err := os.Getgroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("uid=%d gid=%d caps=%s groups=%v secret=%s provider-user=verified\n", os.Geteuid(), os.Getegid(), caps, groups, secretState)
 }

@@ -79,6 +79,11 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 	var response claudeResponse
 	for attempt := 0; attempt < 2; attempt++ {
 		args := claudeArguments(config, permission, sessionID)
+		if config.SkillPackageCache.Directory != "" && len(run.LoadedSkillPackages) > 0 {
+			for _, bundle := range run.LoadedSkillPackages {
+				args = append(args, "--add-dir", bundle.Directory)
+			}
+		}
 		command := exec.CommandContext(requestCtx, bin, args...) // #nosec G204 -- operator-configured official provider binary, no shell.
 		configureProviderProcess(command)
 		command.Dir = workspace

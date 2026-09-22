@@ -46,6 +46,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777
       - /delegation-tool:rw,noexec,nosuid,nodev,size=4m,uid=10001,gid=10002,mode=2710
+      - /skills:rw,noexec,nosuid,nodev,size=64m,uid=10001,gid=10003,mode=2750
     networks:
       - agent-internal
     environment:

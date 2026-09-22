@@ -148,8 +148,8 @@ func dropProviderPrivilegesAndRefreshEnvironment(environment []string) ([]string
 }
 
 func dropProviderPrivileges() error {
-	if err := unix.Setgroups([]int{}); err != nil {
-		return errors.New("clear Provider supplementary groups")
+	if err := unix.Setgroups([]int{10003}); err != nil {
+		return errors.New("set Provider skill-reader group")
 	}
 	if err := unix.Setresgid(providerGID, providerGID, providerGID); err != nil {
 		return errors.New("drop Provider group identity")

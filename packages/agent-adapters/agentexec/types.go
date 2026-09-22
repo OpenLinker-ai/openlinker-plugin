@@ -8,12 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/skillpackages"
 	openlinker "github.com/OpenLinker-ai/openlinker-go"
 )
 
 type ProviderConfig struct {
 	// DisableSkillPackages is set by hosts whose provider process cannot read the private cache.
 	DisableSkillPackages bool
+	SkillPackageCache    skillpackages.Cache
 	DelegationTargets    []string
 	DelegationProxyBin   string
 	DelegationBrokerRoot string

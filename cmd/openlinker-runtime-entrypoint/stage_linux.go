@@ -47,8 +47,8 @@ func dropRuntimeStageIdentity() error {
 	if err := unix.Prctl(unix.PR_SET_KEEPCAPS, 1, 0, 0, 0); err != nil {
 		return errors.New("preserve Runtime capabilities while dropping identity")
 	}
-	if err := unix.Setgroups([]int{}); err != nil {
-		return errors.New("clear Runtime supplementary groups")
+	if err := unix.Setgroups([]int{10003}); err != nil {
+		return errors.New("set Runtime skill-reader group")
 	}
 	if err := unix.Setresgid(runtimeGID, runtimeGID, runtimeGID); err != nil {
 		return errors.New("drop Runtime group identity")

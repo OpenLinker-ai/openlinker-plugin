@@ -76,11 +76,13 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --gid "${OPENLINKER_GID}" openlinker \
  && groupadd --gid "${PROVIDER_GID}" provider \
+ && groupadd --gid 10003 skill-readers \
  && useradd --uid "${OPENLINKER_UID}" --gid "${OPENLINKER_GID}" --home-dir /runtime --no-create-home --shell /usr/sbin/nologin openlinker \
  && useradd --uid "${PROVIDER_UID}" --gid "${PROVIDER_GID}" --home-dir /provider --no-create-home --shell /usr/sbin/nologin provider \
  && install -d -o "${OPENLINKER_UID}" -g "${OPENLINKER_GID}" -m 0700 /runtime \
  && install -d -o "${PROVIDER_UID}" -g "${PROVIDER_GID}" -m 0700 /provider \
  && install -d -o "${OPENLINKER_UID}" -g "${OPENLINKER_GID}" -m 0555 /workspace \
+ && install -d -o "${OPENLINKER_UID}" -g 10003 -m 2750 /skills \
  && install -d -o root -g root -m 0555 /opt/openlinker
 COPY --from=plugin-host /out/openlinker-plugin-host /usr/local/bin/openlinker-plugin-host
 COPY --from=plugin-host --chown=root:root --chmod=0444 /out/host-build-info.json /opt/openlinker/host-build-info.json
@@ -110,8 +112,9 @@ for (const field of ["plugin_commit", "plugin_host_version", "plugin_host_sha256
 }
 OPENLINKER_METADATA_READABILITY
 USER 0:0
-# Split Runtime/Provider UIDs cannot share the private skill cache yet.
-ENV OPENLINKER_SKILL_PACKAGES_DISABLED=true \
+# Package content has a dedicated read-only Provider group; credentials stay private.
+ENV OPENLINKER_SKILL_PACKAGES_CACHE_DIR=/skills \
+    OPENLINKER_SKILL_PACKAGES_GROUP_ID=10003 \
     OPENLINKER_AGENT_TRANSPORT=auto \
     OPENLINKER_AGENT_DELEGATION_BROKER_ROOT=/delegation-tool \
     OPENLINKER_AGENT_CAPACITY=1 \
@@ -198,6 +201,19 @@ COPY --from=go-build /out/openlinker-browser-provider-live /usr/local/bin/openli
 ENV OPENLINKER_BROWSER_LIVE_PROVIDER=claude
 ENTRYPOINT ["/usr/local/bin/openlinker-browser-provider-live"]
 
+# Offline integration fixture: production loader + launchers, synthetic CLIs.
+FROM go-build AS skill-packages-test-build
+RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go test -c -o /out/skill-packages.test ./packages/agent-adapters/agentexec
+
+FROM provider-base AS skill-packages-test
+COPY --from=skill-packages-test-build /out/skill-packages.test /usr/local/bin/skill-packages.test
+COPY --from=go-build /out/openlinker-provider-launcher-codex /usr/local/bin/openlinker-provider-launcher-codex
+COPY --from=go-build /out/openlinker-provider-launcher-claude /usr/local/bin/openlinker-provider-launcher-claude
+COPY --chmod=0555 test/fixtures/skill-provider.mjs /usr/local/bin/codex
+COPY --chmod=0555 test/fixtures/skill-provider.mjs /usr/local/bin/claude
+ENV OPENLINKER_TEST_PROVIDER_IMAGE=1
+ENTRYPOINT ["/usr/local/bin/skill-packages.test", "-test.run=^TestSkillPackagesProviderImage$", "-test.v", "-test.timeout=60s"]
+
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35 AS egress
 COPY --from=egress-build /out/openlinker-egress-gateway /usr/local/bin/openlinker-egress-gateway
 EXPOSE 3128
@@ -206,3 +222,4 @@ LABEL org.opencontainers.image.title="OpenLinker Egress Gateway" \
       org.opencontainers.image.description="Restricted HTTP and HTTPS egress proxy for OpenLinker Runtime images" \
       org.opencontainers.image.source="https://github.com/OpenLinker-ai/openlinker-plugin" \
       org.opencontainers.image.licenses="Apache-2.0"
+

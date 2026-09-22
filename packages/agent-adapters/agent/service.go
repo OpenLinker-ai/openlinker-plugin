@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agenthost"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/skillpackages"
 	openlinker "github.com/OpenLinker-ai/openlinker-go"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentexec"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/browserclientmode"
@@ -539,8 +540,14 @@ func resolveRuntime(getenv func(string) string, providerOverride, version string
 	if err != nil {
 		return resolvedRuntime{}, errors.New("OPENLINKER_SKILL_PACKAGES_DISABLED must be a boolean")
 	}
+	skillCache := skillpackages.Cache{Directory: envValue(getenv, "OPENLINKER_SKILL_PACKAGES_CACHE_DIR")}
+	skillCache.GroupID, err = strconv.Atoi(firstNonEmpty(envValue(getenv, "OPENLINKER_SKILL_PACKAGES_GROUP_ID"), "0"))
+	if err != nil || skillCache.GroupID < 0 {
+		return resolvedRuntime{}, errors.New("OPENLINKER_SKILL_PACKAGES_GROUP_ID must be a nonnegative integer")
+	}
 	handler, err := agentexec.NewHandler(agentexec.ProviderConfig{
 		DisableSkillPackages: disableSkillPackages,
+		SkillPackageCache:    skillCache,
 		DelegationTargets:    append([]string(nil), config.DelegationTargets...),
 		DelegationProxyBin:   config.DelegationProxyBin, DelegationBrokerRoot: config.DelegationBrokerRoot,
 		Version:  version,
