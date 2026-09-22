@@ -167,3 +167,47 @@ func TestSkillPackagesUnsupportedEnvironmentRejectsBeforeWritingOrProviderExecut
 		}
 	}
 }
+
+func TestProviderSkillRecoveryStartsFreshSession(t *testing.T) {
+	for _, name := range []string{"codex", "claude"} {
+		t.Run(name, func(t *testing.T) {
+			workspace := t.TempDir()
+			var bin string
+			if name == "codex" {
+				bin = filepath.Join(t.TempDir(), "codex")
+				writeCodexRPCFixture(t, bin, "ephemeral")
+			} else {
+				bin, _ = reviewFakeCLI(t, `cat >/dev/null
+printf '%s\n' '{"type":"result","subtype":"success","result":"ok","session_id":"11111111-aaaa-4111-8111-111111111111"}'
+`)
+			}
+			config := ProviderConfig{Provider: name, Bin: bin, Workspace: workspace, SessionStore: filepath.Join(workspace, "sessions.json"), SessionReuse: true}
+			provider, err := NewProvider(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot := testPackageSnapshot(name, "PINNED-INSTRUCTION")
+			run := RunContext{AgentID: "55555555-5555-4555-8555-555555555555", Authority: &openlinker.RuntimeAuthorityContext{PrincipalScopeID: "scope"}, Conversation: &ConversationContext{SessionKey: "conversation"}, PackageSnapshot: snapshot, Emit: func(string, any) error { return nil }}
+			if _, err := provider.Run(context.Background(), run); err != nil {
+				t.Fatal(err)
+			}
+			original := filepath.Join(workspace, ".openlinker-skills", run.AgentID, snapshot.Bundles[0].Digest, "SKILL.md")
+			if err := os.Chmod(original, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(original, []byte("TAMPERED"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			for i, wantResume := range []bool{false, true} {
+				result, err := provider.Run(context.Background(), run)
+				if err != nil {
+					t.Fatal(err)
+				}
+				out := result.Output.(map[string]any)
+				if got := out[name+"_session_resumed"]; got != wantResume {
+					t.Fatalf("attempt %d resumed=%v want=%v", i, got, wantResume)
+				}
+			}
+		})
+	}
+}

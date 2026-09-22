@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/codexhome"
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/providerprocess"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/skillpackages"
 	"golang.org/x/sys/unix"
 )
 
@@ -42,6 +44,21 @@ func main() {
 	}
 	if os.Geteuid() != runtimeUID || os.Getegid() != runtimeGID {
 		fatal(errors.New("launcher must be invoked by the fixed Runtime UID/GID"))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "--openlinker-check-commands" {
+		runtime.LockOSThread()
+		environment, err := dropProviderPrivilegesAndRefreshEnvironment(os.Environ())
+		if err != nil {
+			fatal(err)
+		}
+		workspace, err := os.Getwd()
+		if err != nil {
+			fatal(err)
+		}
+		if err := skillpackages.CheckCommands(context.Background(), os.Args[2:], environment, workspace, nil); err != nil {
+			fatal(err)
+		}
+		return
 	}
 	argv := append([]string{target}, os.Args[1:]...)
 	environment := os.Environ()

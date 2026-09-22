@@ -7,6 +7,7 @@ import readline from 'node:readline';
 
 function probe(prompt) {
   assert.equal(process.getuid(), 10002);
+  if (!fs.existsSync('/provider/skill-provider-only')) fs.symlinkSync('/usr/bin/true', '/provider/skill-provider-only');
   assert.equal(process.getgid(), 10002);
   assert.ok(process.getgroups().includes(10003));
   assert.match(fs.readFileSync('/proc/self/status', 'utf8'), /CapEff:\s+0000000000000000/);

@@ -4,6 +4,10 @@ package agentexec
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -36,11 +40,29 @@ func TestSkillPackagesProviderImage(t *testing.T) {
 	if os.Geteuid() != 10001 {
 		t.Fatal("not running as Runtime UID")
 	}
+	if os.Getenv("OPENLINKER_TEST_READONLY_SKILL_CACHE") == "1" {
+		for _, name := range []string{"codex", "claude"} {
+			handler, err := NewHandler(ProviderConfig{Provider: name, Bin: "/usr/local/bin/openlinker-provider-launcher-" + name, SkillPackageCache: skillpackages.Cache{Directory: "/skills", GroupID: 10003}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(handler.SkillPackageFeatures()) != 0 {
+				t.Fatal("read-only image layer advertised writable skill cache")
+			}
+			if _, err := handler.Provider.Run(context.Background(), RunContext{PackageSnapshot: testPackageSnapshot(name, "test")}); !errors.Is(err, ErrSkillPackagesUnsupported) {
+				t.Fatal("read-only cache did not reject before launching Provider", err)
+			}
+		}
+		return
+	}
 	info, err := os.Stat("/workspace")
 	if err != nil || info.Mode().Perm() != 0555 {
 		t.Fatal("fixture workspace must be read-only")
 	}
 	if err := os.WriteFile("/runtime/skill-test-secret", []byte("PRIVATE-RUNTIME-STATE"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("/runtime/skill-host-only", []byte("not executed"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("OPENLINKER_CODEX_RPC_LAUNCHER", "1")
@@ -68,6 +90,36 @@ func TestSkillPackagesProviderImage(t *testing.T) {
 			out, ok := result.Output.(map[string]any)
 			if !ok || !loaded || !strings.Contains(out["summary"].(string), "skill-files-readable-state-private") {
 				t.Fatalf("image provider did not read files: %#v", result)
+			}
+			// The fixture prepared an executable symlink in the Provider's
+			// private HOME. Runtime cannot traverse it, while Provider can.
+			if _, err := os.Stat("/provider/skill-provider-only"); !errors.Is(err, os.ErrPermission) {
+				t.Fatal("Runtime unexpectedly sees Provider-only command", err)
+			}
+			config.Env = append(config.Env, "PATH=/runtime:/provider:/usr/local/bin:/usr/bin:/bin")
+			handler, err = NewHandler(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, command := range []string{"skill-provider-only", "skill-host-only"} {
+				snapshot := testPackageSnapshot(name, "IMAGE-PRIVATE-INSTRUCTION")
+				var contents packageContents
+				if err := json.Unmarshal([]byte(snapshot.Bundles[0].Payload), &contents); err != nil {
+					t.Fatal(err)
+				}
+				contents.RequiredCommands = []string{command}
+				raw, _ := json.Marshal(contents)
+				digest := sha256.Sum256(raw)
+				snapshot.Bundles[0].Payload = string(raw)
+				snapshot.Bundles[0].Digest = hex.EncodeToString(digest[:])
+				run.PackageSnapshot = snapshot
+				_, err := handler.Provider.Run(context.Background(), run)
+				if command == "skill-provider-only" && err != nil {
+					t.Fatal("Provider-visible command rejected", err)
+				}
+				if command == "skill-host-only" && err == nil {
+					t.Fatal("Runtime-only command accepted for Provider")
+				}
 			}
 		})
 	}

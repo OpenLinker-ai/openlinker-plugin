@@ -89,7 +89,9 @@ must supply the same writable cache mount when using `--read-only`.
 
 Images configure `OPENLINKER_SKILL_PACKAGES_CACHE_DIR=/skills` and
 `OPENLINKER_SKILL_PACKAGES_GROUP_ID=10003`. Advertisement and execution validate
-the shared cache's owner, group and permissions. Missing/unsafe caches and legacy
+the shared cache's owner, group and permissions, then create/write/remove a probe
+file on the actual mount. A read-only image layer therefore does not advertise
+package support even if its permission bits are correct. Missing/unsafe caches and legacy
 launchers without this configuration remain unsupported, and the explicit
 `OPENLINKER_SKILL_PACKAGES_DISABLED=true` override remains available. Custom
 wrappers that change identity must provision equivalent access and validate it;
@@ -101,17 +103,27 @@ in reserved assignment metadata. The host verifies its SHA-256, provider, paths
 and trusted execution context before materializing files under
 `<workspace>/.openlinker-skills/<agent-id>/<payload-sha256>/` for native hosts or
 `/skills/<agent-id>/<payload-sha256>/` in Provider images. Existing files must
-be byte-identical; they are never overwritten. Package files have no executable
+be byte-identical; they are never overwritten. For a damaged same-UID native
+cache, the loader materializes a new verified copy, reuses it on later Runs and
+starts a fresh session so stale file paths are not retained. A same-UID model
+process can still attack the shared workspace or Host state; this is recovery
+from prior cache damage, not a new isolation boundary. Package files have no executable
 bit, so scripts are used through the appropriate interpreter. For Git workspaces,
-the host adds `.openlinker-skills/` to Git's local `info/exclude`, preserving
-existing entries and tracked configuration, and verifies that Git ignores it.
+the host only updates `info/exclude` when the workspace itself is a repository
+and the gitdir/exclude remain inside it. Git runs with fsmonitor and system/global
+config disabled and no inherited GIT_* overrides. A cache-local .gitignore covers
+nested/external worktrees without modifying other repositories.
 Already tracked cache files cause loading to fail instead of extending that leak.
 Native caches stay within the provider sandbox's readable workspace. Image
 Claude invocations include only the selected package directories with `--add-dir`;
 OS permissions keep these directories read-only to the Provider.
-Declared commands
-are checked on the host PATH; import and loading do not install dependencies or
-expand tool, credential, network or Browser permissions.
+Declared commands are located in the configured Provider PATH; official image
+launchers check after dropping to the Provider UID and clearing capabilities.
+No prerequisite executable is run by this check. It verifies lookup/access, not
+shared libraries, credentials or every tool policy at execution time. Import and
+loading do not install dependencies or expand tool, credential, network or Browser
+permissions. Package files may be reproduced through model output: private API
+access is not a confidentiality boundary against Agent callers.
 
 For a new native session, the host includes SKILL.md instructions and supporting
 file locations in the actual Codex/Claude request. Resumed sessions receive a small SKILL.md path index instead of the full
