@@ -1,10 +1,18 @@
 package agentexec
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/skillpackages"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/skillfiles"
 )
 
 func skillFilesRun() RunContext {
@@ -33,7 +41,7 @@ func TestBrowserEntriesServePinnedPackageFilesReadOnly(t *testing.T) {
 		codexArgs := strings.Join(codexAppServerArguments(config, "/workspace", "read-only"), " ")
 		for _, expected := range []string{
 			`mcp_servers.openlinker_skills.command="/usr/local/bin/openlinker-plugin-host"`,
-			`mcp_servers.openlinker_skills.args=["plugin","skill-files","--host","codex","--root","/skills/agent/digest-a","--root","/skills/agent/digest-b"]`,
+			`mcp_servers.openlinker_skills.args=["plugin","skill-files","--host","codex","--root","/skills/agent/digest-a","--root","/skills/agent/digest-b","--file","/skills/agent/digest-a/SKILL.md","--file","/skills/agent/digest-a/references/proof.txt","--file","/skills/agent/digest-b/SKILL.md"]`,
 			`mcp_servers.openlinker_skills.enabled_tools=["read_skill_file"]`,
 			"mcp_servers.openlinker_skills.env_vars=[]",
 			"--disable shell_tool",
@@ -78,7 +86,7 @@ func TestBrowserEntriesServePinnedPackageFilesReadOnly(t *testing.T) {
 		}
 		server, ok := payload.MCPServers["openlinker_skills"]
 		if !ok || server.Command != "/usr/local/bin/openlinker-plugin-host" ||
-			!slices.Equal(server.Args, []string{"plugin", "skill-files", "--host", "claude", "--root", "/skills/agent/digest-a", "--root", "/skills/agent/digest-b"}) {
+			!slices.Equal(server.Args, []string{"plugin", "skill-files", "--host", "claude", "--root", "/skills/agent/digest-a", "--root", "/skills/agent/digest-b", "--file", "/skills/agent/digest-a/SKILL.md", "--file", "/skills/agent/digest-a/references/proof.txt", "--file", "/skills/agent/digest-b/SKILL.md"}) {
 			t.Fatalf("%s Claude package server: %#v", mode, payload.MCPServers)
 		}
 		if mode == "native" && (!strings.Contains(joined, "--plugin-dir") || strings.Contains(joined, "--strict-mcp-config")) {
@@ -104,8 +112,60 @@ func TestPackageFileServerOnlyForBrowserRunsWithPackages(t *testing.T) {
 	}
 	stale := browserSkillConfig("claude", "mcp")
 	stale.skillFileRoots = []string{"/skills/agent/old"}
+	stale.skillFiles = []string{"/skills/agent/old/SKILL.md"}
 	cleared, _ := providerConfigForSkillFiles(stale, RunContext{})
-	if len(cleared.skillFileRoots) != 0 {
+	if len(cleared.skillFileRoots) != 0 || len(cleared.skillFiles) != 0 {
 		t.Fatal("package directories from an earlier Run leaked into the next Run")
+	}
+}
+
+// The server must serve the loader's verified manifest, including legal names
+// that merely resemble temporary files, and nothing else found on disk.
+func TestBrowserPackageServerFollowsLoadedManifest(t *testing.T) {
+	workspace := t.TempDir()
+	if resolved, err := filepath.EvalSymlinks(workspace); err == nil {
+		workspace = resolved
+	}
+	payload, _ := json.Marshal(packageContents{Name: "deploy", Description: "Deploy", Providers: []string{"codex"}, Files: map[string]string{
+		"SKILL.md":                            "---\nname: deploy\ndescription: Deploy\n---\nread references/deploy.pending-review.md",
+		"references/deploy.pending-review.md": "REVIEW-9a2b",
+	}})
+	digest := sha256.Sum256(payload)
+	snapshot := packageSnapshot{Schema: 1, Bundles: []packageVersion{{BindingID: "11111111-1111-4111-8111-111111111111", PackageID: "22222222-2222-4222-8222-222222222222", VersionID: "33333333-3333-4333-8333-333333333333", Version: "1.0.0", Digest: hex.EncodeToString(digest[:]), Payload: string(payload)}}}
+	loaded, err := skillpackages.Load(context.Background(), skillpackages.Request{Snapshot: snapshot, AgentID: "55555555-5555-4555-8555-555555555555", Trusted: true, Emit: func(string, any) error { return nil }}, "codex", workspace, skillpackages.Cache{})
+	if err != nil || len(loaded.Packages) != 1 {
+		t.Fatalf("load: %#v %v", loaded, err)
+	}
+	directory := loaded.Packages[0].Directory
+	if err := os.Chmod(filepath.Join(directory, "references"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "references", "planted.md"), []byte("PLANTED"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	config, _ := providerConfigForSkillFiles(browserSkillConfig("codex", "native"), RunContext{LoadedSkillPackages: loaded.Packages})
+	args := skillFilesArguments(config, "codex")
+	var roots, files []string
+	for i := 0; i+1 < len(args); i++ {
+		switch args[i] {
+		case "--root":
+			roots = append(roots, args[i+1])
+		case "--file":
+			files = append(files, args[i+1])
+		}
+	}
+	server, err := skillfiles.New("codex", "test", roots, files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text, err := server.Read(filepath.Join(directory, "references", "deploy.pending-review.md")); err != nil || text != "REVIEW-9a2b" {
+		t.Fatalf("legal manifest file was not served: %q %v", text, err)
+	}
+	listing, err := server.Read(directory)
+	if err != nil || !strings.Contains(listing, "deploy.pending-review.md") || strings.Contains(listing, "planted") {
+		t.Fatalf("listing: %q %v", listing, err)
+	}
+	if text, err := server.Read(filepath.Join(directory, "references", "planted.md")); err == nil {
+		t.Fatalf("file outside the manifest was served: %q", text)
 	}
 }

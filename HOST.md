@@ -122,10 +122,13 @@ The Browser profile disables shell, image and file tools, so for Runs with loade
 packages the host adds one read-only MCP server, `openlinker_skills`, exposing only
 `read_skill_file`. Codex and Claude start it from the Browser plugin host binary
 (`plugin skill-files`) as the Provider identity; the host passes each pinned package
-directory with `--root`, and tool arguments cannot add directories. Reads use
-`os.Root`, so `..` and symlinks cannot leave a package; hidden entries such as the
-cache `.gitignore` and pending temporary files are never served, and files are
-limited to 64 KiB. Every Browser prompt, including resumed turns, names the tool.
+directory with `--root` and each file of the verified package manifest with
+`--file`. Tool arguments cannot add directories or files: only manifest files are
+read or listed, so any other file on disk (an interrupted temporary write, the cache
+`.gitignore`, or a file added to a shared workspace) is never served, while legal
+package names such as `deploy.pending-review.md` are. Reads use `os.Root`, so `..`
+and symlinks cannot leave a package, and files are limited to 64 KiB. Every Browser
+prompt, including resumed turns, names the tool.
 It adds no shell, write, network or Browser permission, and standard entries keep
 using their existing file tools.
 Declared commands are located in the configured Provider PATH; official image

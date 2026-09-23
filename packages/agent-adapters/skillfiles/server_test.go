@@ -11,7 +11,12 @@ import (
 	"testing"
 )
 
-func packageFixture(t *testing.T) (string, string) {
+// The manifest is what the Host materialized for the Run. Other files on disk
+// (an interrupted temporary write, or a file planted in a shared same-UID
+// workspace) must never be served, whatever their names look like.
+var manifest = []string{"SKILL.md", "references/proof.txt", "references/deploy.pending-review.md"}
+
+func packageFixture(t *testing.T) (string, []string, string) {
 	t.Helper()
 	base := t.TempDir()
 	if resolved, err := filepath.EvalSymlinks(base); err == nil {
@@ -19,10 +24,12 @@ func packageFixture(t *testing.T) (string, string) {
 	}
 	root := filepath.Join(base, "agent", "digest")
 	for name, content := range map[string]string{
-		"SKILL.md":                     "---\nname: proof\ndescription: proof\n---\nread references/proof.txt\n",
-		"references/proof.txt":         "PROOF-7c1e",
-		".gitignore":                   "*\n",
-		"references/x.md.pending-0123": "partial",
+		"SKILL.md":                             "---\nname: proof\ndescription: proof\n---\nread references/proof.txt\n",
+		"references/proof.txt":                 "PROOF-7c1e",
+		"references/deploy.pending-review.md":  "REVIEW-9a2b",
+		"references/proof.txt.pending-0123abc": "partial",
+		"references/planted.md":                "PLANTED",
+		".gitignore":                           "*\n",
 	} {
 		path := filepath.Join(root, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -36,28 +43,41 @@ func packageFixture(t *testing.T) (string, string) {
 	if err := os.WriteFile(secret, []byte("SECRET"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return root, secret
+	files := make([]string, 0, len(manifest))
+	for _, name := range manifest {
+		files = append(files, filepath.Join(root, filepath.FromSlash(name)))
+	}
+	return root, files, secret
 }
 
-func TestReadIsConfinedToPinnedPackageDirectories(t *testing.T) {
-	root, secret := packageFixture(t)
-	server, err := New("codex", "test", []string{root})
+func TestReadServesExactlyThePinnedManifest(t *testing.T) {
+	root, files, secret := packageFixture(t)
+	server, err := New("codex", "test", []string{root}, files)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if text, err := server.Read(filepath.Join(root, "references", "proof.txt")); err != nil || text != "PROOF-7c1e" {
-		t.Fatalf("pinned supporting file: %q %v", text, err)
+	for name, want := range map[string]string{
+		"references/proof.txt":                "PROOF-7c1e",
+		"references/deploy.pending-review.md": "REVIEW-9a2b",
+	} {
+		if text, err := server.Read(filepath.Join(root, filepath.FromSlash(name))); err != nil || text != want {
+			t.Fatalf("manifest file %s: %q %v", name, text, err)
+		}
 	}
 	listing, err := server.Read(root)
-	if err != nil || !strings.Contains(listing, "SKILL.md") || !strings.Contains(listing, "references/proof.txt") ||
-		strings.Contains(listing, ".gitignore") || strings.Contains(listing, "pending") {
+	if err != nil || !strings.Contains(listing, "SKILL.md") || !strings.Contains(listing, "references/deploy.pending-review.md") ||
+		strings.Contains(listing, "planted") || strings.Contains(listing, "0123abc") || strings.Contains(listing, ".gitignore") {
 		t.Fatalf("package listing: %q %v", listing, err)
+	}
+	if sub, err := server.Read(filepath.Join(root, "references")); err != nil || !strings.Contains(sub, "proof.txt") || strings.Contains(sub, "planted") {
+		t.Fatalf("subdirectory listing: %q %v", sub, err)
 	}
 	for _, name := range []string{
 		secret,
 		filepath.Join(root, "..", "..", "runtime-secret"),
 		filepath.Join(root, ".gitignore"),
-		filepath.Join(root, "references", "x.md.pending-0123"),
+		filepath.Join(root, "references", "proof.txt.pending-0123abc"),
+		filepath.Join(root, "references", "planted.md"),
 		"references/proof.txt",
 		filepath.Join(root, "missing.md"),
 	} {
@@ -66,33 +86,43 @@ func TestReadIsConfinedToPinnedPackageDirectories(t *testing.T) {
 		}
 	}
 	if runtime.GOOS != "windows" {
-		if err := os.Chmod(root, 0o700); err != nil {
+		// A manifest entry replaced by a symlink must not reach outside the package.
+		target := filepath.Join(root, "references", "proof.txt")
+		if err := os.Chmod(filepath.Dir(target), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.Symlink(secret, filepath.Join(root, "escape.md")); err != nil {
+		if err := os.Remove(target); err != nil {
 			t.Fatal(err)
 		}
-		if text, err := server.Read(filepath.Join(root, "escape.md")); err == nil {
+		if err := os.Symlink(secret, target); err != nil {
+			t.Fatal(err)
+		}
+		if text, err := server.Read(target); err == nil {
 			t.Fatalf("symlink escape was readable: %q", text)
 		}
 	}
 }
 
-func TestServerRequiresHostChosenRoots(t *testing.T) {
-	root, _ := packageFixture(t)
+func TestServerRequiresHostChosenRootsAndManifests(t *testing.T) {
+	root, files, secret := packageFixture(t)
 	for _, roots := range [][]string{nil, {"relative"}, {root + "/../digest"}, {filepath.Join(root, "missing")}} {
-		if _, err := New("codex", "test", roots); err == nil {
+		if _, err := New("codex", "test", roots, files); err == nil {
 			t.Fatalf("accepted roots %v", roots)
 		}
 	}
-	if _, err := New("browser", "test", []string{root}); err == nil {
+	for _, bad := range [][]string{nil, {secret}, {root}, {filepath.Join(root, ".gitignore")}, {"SKILL.md"}} {
+		if _, err := New("codex", "test", []string{root}, bad); err == nil {
+			t.Fatalf("accepted manifest %v", bad)
+		}
+	}
+	if _, err := New("browser", "test", []string{root}, files); err == nil {
 		t.Fatal("accepted an unknown host")
 	}
 }
 
 func TestServeExposesOnlyTheReadTool(t *testing.T) {
-	root, secret := packageFixture(t)
-	server, err := New("claude", "test", []string{root})
+	root, files, secret := packageFixture(t)
+	server, err := New("claude", "test", []string{root}, files)
 	if err != nil {
 		t.Fatal(err)
 	}
