@@ -60,7 +60,10 @@ func New(host, version string, roots, files []string) (*Server, error) {
 			server.roots = append(server.roots, root)
 		}
 	}
-	if len(files) == 0 || len(files) > 32*len(server.roots) {
+	// Packages with identical content share one digest directory, so the Host
+	// may repeat a root and its manifest. Bound the raw input by the five
+	// packages a Run can pin, and apply the per-package limit after deduplication.
+	if len(files) == 0 || len(files) > 32*len(roots) {
 		return nil, errors.New("skill files server requires the package file manifests")
 	}
 	for _, file := range files {
@@ -74,8 +77,8 @@ func New(host, version string, roots, files []string) (*Server, error) {
 		}
 	}
 	for _, root := range server.roots {
-		if len(server.files[root]) == 0 {
-			return nil, errors.New("every skill package directory requires a manifest")
+		if len(server.files[root]) == 0 || len(server.files[root]) > 32 {
+			return nil, errors.New("every skill package directory requires a manifest of at most 32 files")
 		}
 		slices.Sort(server.files[root])
 	}
