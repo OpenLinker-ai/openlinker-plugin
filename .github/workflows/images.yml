@@ -150,16 +150,22 @@ jobs:
   images:
     # Source PRs exercise Browser/Egress without requiring a downstream CLI
     # release. Building compatible Provider images is a separate explicit gate.
+    # Each architecture builds natively on its own runner (no emulation) and is
+    # pushed by digest; publish-images assembles the multi-architecture tags.
+    name: images (${{ matrix.target }}, ${{ matrix.arch }})
     needs: [browser-acceptance, live-provider-acceptance]
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && needs.browser-acceptance.result == 'success' && (needs.live-provider-acceptance.result == 'success' || !inputs.publish_images) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     env:
       # Browser and Egress are always built; a Provider image is built and
       # published only when that Provider was selected and live-validated.
       BUILD_IMAGE: ${{ (matrix.target != 'codex' && matrix.target != 'claude') || contains(format(' {0} ', inputs.providers || 'codex claude'), format(' {0} ', matrix.target)) }}
+      PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag' }}
     strategy:
       fail-fast: false
       matrix:
+        target: [codex, claude, egress, browser]
+        arch: [amd64, arm64]
         include:
           - target: codex
             image: openlinker-agent-codex
@@ -173,18 +179,104 @@ jobs:
           - target: browser
             image: openlinker-browser-runtime
             dockerfile: Dockerfile.browser
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
         if: env.BUILD_IMAGE == 'true'
-      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
         if: env.BUILD_IMAGE == 'true'
+      - name: Require a native runner for the target architecture
+        if: env.BUILD_IMAGE == 'true'
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          case "$(uname -m)" in
+            x86_64) native=amd64 ;;
+            aarch64|arm64) native=arm64 ;;
+            *) native=unknown ;;
+          esac
+          test "$native" = "$EXPECTED_ARCH" || { echo "runner is $native, not $EXPECTED_ARCH" >&2; exit 1; }
+      - name: Log in to GHCR
+        if: env.BUILD_IMAGE == 'true' && env.PUBLISH == 'true'
+        uses: docker/login-action@v4
         with:
-          image: docker.io/tonistiigi/binfmt:qemu-v10.2.3-68@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
-          platforms: arm64
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image metadata
+        if: env.BUILD_IMAGE == 'true'
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/openlinker-ai/${{ matrix.image }}
+      - name: Build natively and optionally push by digest
+        if: env.BUILD_IMAGE == 'true'
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          build-args: |
+            OPENLINKER_PLUGIN_COMMIT=${{ github.sha }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=ghcr.io/openlinker-ai/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=providers-${{ matrix.target }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=providers-${{ matrix.target }}-${{ matrix.arch }}
+          sbom: true
+          provenance: mode=max
+      - name: Record the pushed digest
+        if: env.BUILD_IMAGE == 'true' && env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          case "$DIGEST" in sha256:*) ;; *) echo "missing pushed digest" >&2; exit 1 ;; esac
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+      - name: Upload the pushed digest
+        if: env.BUILD_IMAGE == 'true' && env.PUBLISH == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.target }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-images:
+    name: Publish multi-architecture ${{ matrix.target }} image
+    needs: images
+    if: ${{ !cancelled() && needs.images.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag' }}
+    runs-on: ubuntu-24.04
+    env:
+      BUILD_IMAGE: ${{ (matrix.target != 'codex' && matrix.target != 'claude') || contains(format(' {0} ', inputs.providers || 'codex claude'), format(' {0} ', matrix.target)) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: codex
+            image: openlinker-agent-codex
+          - target: claude
+            image: openlinker-agent-claude
+          - target: egress
+            image: openlinker-egress-gateway
+          - target: browser
+            image: openlinker-browser-runtime
+    steps:
+      - name: Download both architecture digests
+        if: env.BUILD_IMAGE == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-${{ matrix.target }}-*
+          merge-multiple: true
       - uses: docker/setup-buildx-action@v4
         if: env.BUILD_IMAGE == 'true'
       - name: Log in to GHCR
-        if: env.BUILD_IMAGE == 'true' && github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag'
+        if: env.BUILD_IMAGE == 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -199,28 +291,25 @@ jobs:
           tags: |
             type=ref,event=tag
             type=sha,prefix=sha-
-      - name: Build and optionally publish
+      - name: Assemble the multi-architecture tags
         if: env.BUILD_IMAGE == 'true'
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.target }}
-          build-args: |
-            OPENLINKER_PLUGIN_COMMIT=${{ github.sha }}
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=providers-${{ matrix.target }}
-          cache-to: type=gha,mode=max,scope=providers-${{ matrix.target }}
-          sbom: true
-          provenance: mode=max
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ghcr.io/openlinker-ai/${{ matrix.image }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -eu
+          test "$(find . -type f | wc -l)" = 2 || { echo "expected one amd64 and one arm64 digest" >&2; exit 1; }
+          sources=$(for digest in *; do printf '%s@sha256:%s ' "$IMAGE" "$digest"; done)
+          tag_args=$(printf '%s\n' "$TAGS" | sed '/^$/d; s/^/-t /' | tr '\n' ' ')
+          # shellcheck disable=SC2086
+          docker buildx imagetools create $tag_args $sources
+          docker buildx imagetools inspect "$(printf '%s\n' "$TAGS" | head -n 1)"
 
   verify-release-evidence:
     name: Verify release platforms, SBOM, and provenance
     if: github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag'
-    needs: images
+    needs: publish-images
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
