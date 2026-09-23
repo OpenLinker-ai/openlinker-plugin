@@ -69,6 +69,92 @@ replacing its binary. Drain/stop it, preserve identity/session/spool/state, then
 start the Plugin host. Agent Node migration is a separate procedure with its own
 configuration defaults. Keep the previous binary/image for rollback.
 
+## Private skill packages
+
+The current source supports owner-associated, version-pinned skill packages from
+Core schema 093 on native Codex/Claude hosts and correctly provisioned Provider
+images. Hosts advertise `skill_packages.v1` and their provider-specific
+`skill_packages.codex.v1` or `skill_packages.claude.v1` feature through the existing
+SDK Worker. Agent Node's native adapters consume the same contract. Source
+changes still require new releases and explicit rollout to existing installations.
+
+Official images provision a separate `/skills` cache, owned by Runtime UID 10001
+and skill-readers GID 10003. The entrypoint and UID-switch launcher retain that
+supplementary group; Provider UID 10002 can read package directories (02750) and
+files (0440), but cannot modify them or read private `/runtime` state. The standard
+compose files mount a 64 MiB, noexec, nosuid, nodev tmpfs at `/skills`; `/workspace`
+can remain read-only. Restarted hosts reconstruct pinned packages from assignments.
+Skill selection changes do not require rebuilding the image. Custom Docker runs
+must supply the same writable cache mount when using `--read-only`.
+
+Images configure `OPENLINKER_SKILL_PACKAGES_CACHE_DIR=/skills` and
+`OPENLINKER_SKILL_PACKAGES_GROUP_ID=10003`. Advertisement and execution validate
+the shared cache's owner, group and permissions, then create/write/remove a probe
+file on the actual mount. A read-only image layer therefore does not advertise
+package support even if its permission bits are correct. Missing/unsafe caches and legacy
+launchers without this configuration remain unsupported, and the explicit
+`OPENLINKER_SKILL_PACKAGES_DISABLED=true` override remains available. Custom
+wrappers that change identity must provision equivalent access and validate it;
+merely mounting a writable workspace is insufficient.
+
+The Agent owner imports SKILL.md and UTF-8 supporting files, then associates an
+exact version in the skill workbench. Core supplies an immutable per-Run snapshot
+in reserved assignment metadata. The host verifies its SHA-256, provider, paths
+and trusted execution context before materializing files under
+`<workspace>/.openlinker-skills/<agent-id>/<payload-sha256>/` for native hosts or
+`/skills/<agent-id>/<payload-sha256>/` in Provider images. Existing files must
+be byte-identical; they are never overwritten. For a damaged same-UID native
+cache, the loader materializes a new verified copy, reuses it on later Runs and
+starts a fresh session so stale file paths are not retained. A same-UID model
+process can still attack the shared workspace or Host state; this is recovery
+from prior cache damage, not a new isolation boundary. Package files have no executable
+bit, so scripts are used through the appropriate interpreter. For Git workspaces,
+the host only updates `info/exclude` when the workspace itself is a repository
+and the gitdir/exclude remain inside it. Git runs with fsmonitor and system/global
+config disabled and no inherited GIT_* overrides. A cache-local .gitignore covers
+nested/external worktrees without modifying other repositories.
+Already tracked cache files cause loading to fail instead of extending that leak.
+Native caches stay within the provider sandbox's readable workspace. Image
+Claude invocations include only the selected package directories with `--add-dir`;
+OS permissions keep these directories read-only to the Provider.
+
+The Browser profile disables shell, image and file tools, so for Runs with loaded
+packages the host adds one read-only MCP server, `openlinker_skills`, exposing only
+`read_skill_file`. Codex and Claude start it from the Browser plugin host binary
+(`plugin skill-files`) as the Provider identity; the host passes each pinned package
+directory with `--root`, and tool arguments cannot add directories. Reads use
+`os.Root`, so `..` and symlinks cannot leave a package; hidden entries such as the
+cache `.gitignore` and pending temporary files are never served, and files are
+limited to 64 KiB. Every Browser prompt, including resumed turns, names the tool.
+It adds no shell, write, network or Browser permission, and standard entries keep
+using their existing file tools.
+Declared commands are located in the configured Provider PATH; official image
+launchers check after dropping to the Provider UID and clearing capabilities.
+No prerequisite executable is run by this check. It verifies lookup/access, not
+shared libraries, credentials or every tool policy at execution time. Import and
+loading do not install dependencies or expand tool, credential, network or Browser
+permissions. Package files may be reproduced through model output: private API
+access is not a confidentiality boundary against Agent callers.
+
+For a new native session, the host includes SKILL.md instructions and supporting
+file locations in the actual Codex/Claude request. Resumed sessions receive a small SKILL.md path index instead of the full
+instructions again. Missing-session recovery injects them into the new
+replacement session. A changed association snapshot selects a fresh
+native session while retaining the platform conversation/history and existing
+session files. Unchanged versions can resume normally. SDK durable load receipts
+distinguish prepared instructions from a failed load or missing command; they do
+not certify model use, task success or benchmark performance. Cache versions stay
+available for older Runs and are not automatically garbage-collected in V1.
+
+Long native sessions may automatically compact their context. Every turn includes
+an index of the selected SKILL.md locations and instructs the model to reread lost
+instructions. This supports recovery without repeatedly injecting full files;
+a load receipt still does not prove that the model followed those instructions.
+
+Shared parsing, immutable file preparation, session digests and instruction
+fragments come from Node's `pkg/adapters/skillpackages` leaf. Plugin retains image
+permissions, Browser policy and its own Provider/session execution.
+
 ## Shared app storage
 
 The Agent application consumes the pinned Agent Node `pkg/adapters/appfiles`
@@ -77,10 +163,11 @@ cross-process locking. It retains its config defaults and paths, `.agent-mode.lo
 name, directory creation and acquire/release lifetime. This is compile-time reuse;
 no Node executable is required. Existing platform-specific limitations are unchanged.
 
-The pinned Node module also contains opt-in native session isolation for the Node
-product. Its native mode reuses a trusted host client's authentication while
-isolating tools and conversation storage; it remains experimental and limited to
-trusted callers. Updating that dependency does not enable session sandboxes in Plugin,
+The pinned Node module defaults its own Codex/Claude product entries to native
+session isolation, with an explicit operator opt-out. Its native mode reuses a
+trusted host client's authentication while isolating tools and conversation storage;
+it remains experimental and limited to trusted callers. Updating that dependency
+does not enable session sandboxes in Plugin,
 move Browser into Node, or extend the Linux Codex launcher credential proxy to
 Node/Claude. Plugin retains its Provider/Browser process and container policies.
 

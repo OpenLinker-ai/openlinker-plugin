@@ -47,7 +47,7 @@ func buildPrompt(
 			"If the Browser tool is unavailable or its navigation fails, say which page you could not reach and why, rather than answering from other sources as though the page had been opened.",
 		)
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(lines, "\n") + skillPackageInstructions(run)
 }
 
 func buildCodexPrompt(

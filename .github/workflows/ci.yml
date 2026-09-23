@@ -76,6 +76,22 @@ jobs:
           docker compose --env-file deploy/.env.providers.example -f deploy/compose.codex.yml -f deploy/compose.codex.browser.yml config >/dev/null
           docker compose --env-file deploy/.env.providers.example -f deploy/compose.claude.yml -f deploy/compose.claude.browser.yml config >/dev/null
 
+      - name: Test skill packages through image UID isolation without model credentials
+        run: |
+          docker build --target skill-packages-test --build-arg OPENLINKER_PLUGIN_COMMIT="$(git rev-parse HEAD)" -f Dockerfile.providers -t skill-packages-test .
+          docker run --rm --network none --read-only --cap-drop ALL --cap-add SETUID --cap-add SETGID --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777 \
+            --tmpfs /runtime:rw,noexec,nosuid,nodev,size=16m,uid=10001,gid=10001,mode=0700 \
+            --tmpfs /provider:rw,noexec,nosuid,nodev,size=16m,uid=10002,gid=10002,mode=0700 \
+            --tmpfs /skills:rw,noexec,nosuid,nodev,size=64m,uid=10001,gid=10003,mode=2750 \
+            skill-packages-test
+          docker run --rm --network none --read-only --cap-drop ALL --cap-add SETUID --cap-add SETGID --security-opt no-new-privileges:true \
+            --env OPENLINKER_TEST_READONLY_SKILL_CACHE=1 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777 \
+            --tmpfs /runtime:rw,noexec,nosuid,nodev,size=16m,uid=10001,gid=10001,mode=0700 \
+            --tmpfs /provider:rw,noexec,nosuid,nodev,size=16m,uid=10002,gid=10002,mode=0700 \
+            skill-packages-test
+
   validate-powershell:
     runs-on: windows-2025
     steps:

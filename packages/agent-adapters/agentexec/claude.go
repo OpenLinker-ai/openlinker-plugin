@@ -2,6 +2,7 @@ package agentexec
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -30,6 +31,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 	config := provider.Config
 	config = providerConfigForBrowserRun(config, run.Browser)
 	config = providerConfigForDelegationRun(config, run)
+	config, run = providerConfigForSkillFiles(config, run)
 	bin := strings.TrimSpace(config.Bin)
 	if bin == "" {
 		bin = "claude"
@@ -52,7 +54,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 	sessionKey := conversationSessionKey(run)
 	sessionPath := sessionStorePath(config.SessionStore, "claude", workspace)
 	sessionID := ""
-	clientMode := providerSessionClientMode(config)
+	clientMode := providerSessionClientMode(config) + skillPackageSessionMode(run)
 	clientModeGeneration := uint64(1)
 	if config.SessionReuse && sessionKey != "" {
 		unlock := lockSession("claude", workspace, sessionKey)
@@ -79,6 +81,11 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 	var response claudeResponse
 	for attempt := 0; attempt < 2; attempt++ {
 		args := claudeArguments(config, permission, sessionID)
+		if config.SkillPackageCache.Directory != "" && len(run.LoadedSkillPackages) > 0 {
+			for _, bundle := range run.LoadedSkillPackages {
+				args = append(args, "--add-dir", bundle.Directory)
+			}
+		}
 		command := exec.CommandContext(requestCtx, bin, args...) // #nosec G204 -- operator-configured official provider binary, no shell.
 		configureProviderProcess(command)
 		command.Dir = workspace
@@ -183,6 +190,12 @@ func claudeArguments(config ProviderConfig, permission, sessionID string) []stri
 			"--plugin-dir",
 			config.BrowserNativePlugin,
 		}
+		if len(config.skillFileRoots) > 0 {
+			// Add only the read-only package server; the native Browser plugin
+			// keeps supplying its own MCP server through --plugin-dir.
+			raw, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{skillFilesServerName: claudeSkillFilesMCPServer(config)}})
+			args = append(args, "--mcp-config", string(raw))
+		}
 	}
 	args = append(args, "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--permission-mode", permission)
 	if config.Model != "" {
@@ -196,6 +209,9 @@ func claudeArguments(config ProviderConfig, permission, sessionID string) []stri
 	}
 	if browserProfileEnabled(config) {
 		allowed = appendUniqueString(allowed, "mcp__openlinker_browser__browser_session")
+	}
+	if len(config.skillFileRoots) > 0 {
+		allowed = appendUniqueString(allowed, claudeSkillFilesTool())
 	}
 	if config.WebSearch {
 		// dontAsk refuses every tool that is not allowed, so lifting the deny alone

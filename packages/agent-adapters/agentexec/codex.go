@@ -22,6 +22,7 @@ func (provider CodexProvider) Run(ctx context.Context, run RunContext) (openlink
 	config := provider.Config
 	config = providerConfigForBrowserRun(config, run.Browser)
 	config = providerConfigForDelegationRun(config, run)
+	config, run = providerConfigForSkillFiles(config, run)
 	bin := strings.TrimSpace(config.Bin)
 	if bin == "" {
 		bin = "codex"
@@ -49,7 +50,7 @@ func (provider CodexProvider) Run(ctx context.Context, run RunContext) (openlink
 	sessionKey := conversationSessionKey(run)
 	sessionPath := sessionStorePath(config.SessionStore, "codex", workspace)
 	sessionID := ""
-	clientMode := "codex_rpc_v1:" + providerSessionClientMode(config)
+	clientMode := "codex_rpc_v1:" + providerSessionClientMode(config) + skillPackageSessionMode(run)
 	clientModeGeneration := uint64(1)
 	if config.SessionReuse && sessionKey != "" {
 		unlock := lockSession("codex", workspace, sessionKey)
@@ -155,6 +156,7 @@ func codexLaunchConfiguration(config ProviderConfig, sandbox string) []string {
 	args := []string{}
 	args = append(args, codexBrowserMCPArguments(config)...)
 	args = append(args, codexDelegationMCPArguments(config)...)
+	args = append(args, codexSkillFilesMCPArguments(config)...)
 	if value := strings.TrimSpace(config.CodexApproval); value != "" {
 		args = append(args, "-c", fmt.Sprintf("approval_policy=%q", value))
 	}

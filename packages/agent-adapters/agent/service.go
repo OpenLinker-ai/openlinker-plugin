@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agenthost"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/skillpackages"
 	openlinker "github.com/OpenLinker-ai/openlinker-go"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agentexec"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/browserclientmode"
@@ -153,6 +154,15 @@ type resolvedRuntime struct {
 	workerLock         *agentModeLock
 }
 
+func (resolved resolvedRuntime) optionalFeatures(humanControlEnabled, observationEnabled bool) []string {
+	features := runtimeOptionalFeatures(resolved.config.ExecutionProfile, resolved.config.BrowserInteractionPolicy, humanControlEnabled, observationEnabled)
+	features = append(features, resolved.handler.SkillPackageFeatures()...)
+	if len(resolved.config.DelegationTargets) > 0 {
+		features = append(features, openlinker.RuntimeDelegatedRunReadFeature)
+	}
+	return features
+}
+
 type Service struct {
 	getenv  func(string) string
 	logger  *log.Logger
@@ -234,10 +244,7 @@ func (service *Service) Enable(parent context.Context, providerOverride string) 
 	workerLock := resolved.workerLock
 	ready := make(chan struct{})
 	readyOnce := sync.Once{}
-	optionalFeatures := runtimeOptionalFeatures(resolved.config.ExecutionProfile, resolved.config.BrowserInteractionPolicy, humanControlEnabled, observationEnabled)
-	if len(resolved.config.DelegationTargets) > 0 {
-		optionalFeatures = append(optionalFeatures, openlinker.RuntimeDelegatedRunReadFeature)
-	}
+	optionalFeatures := resolved.optionalFeatures(humanControlEnabled, observationEnabled)
 	worker, err := openlinker.NewRuntimeWorker(openlinker.RuntimeWorkerConfig{
 		PlatformURL: resolved.url, RuntimeURL: resolved.runtimeURL,
 		Transport: openlinker.RuntimeTransportMode(resolved.config.Transport),
@@ -529,9 +536,20 @@ func resolveRuntime(getenv func(string) string, providerOverride, version string
 	if providerKey != "" {
 		environment = append(environment, providerKeyName+"="+providerKey)
 	}
+	disableSkillPackages, err := strconv.ParseBool(firstNonEmpty(envValue(getenv, "OPENLINKER_SKILL_PACKAGES_DISABLED"), "false"))
+	if err != nil {
+		return resolvedRuntime{}, errors.New("OPENLINKER_SKILL_PACKAGES_DISABLED must be a boolean")
+	}
+	skillCache := skillpackages.Cache{Directory: envValue(getenv, "OPENLINKER_SKILL_PACKAGES_CACHE_DIR")}
+	skillCache.GroupID, err = strconv.Atoi(firstNonEmpty(envValue(getenv, "OPENLINKER_SKILL_PACKAGES_GROUP_ID"), "0"))
+	if err != nil || skillCache.GroupID < 0 {
+		return resolvedRuntime{}, errors.New("OPENLINKER_SKILL_PACKAGES_GROUP_ID must be a nonnegative integer")
+	}
 	handler, err := agentexec.NewHandler(agentexec.ProviderConfig{
-		DelegationTargets:  append([]string(nil), config.DelegationTargets...),
-		DelegationProxyBin: config.DelegationProxyBin, DelegationBrokerRoot: config.DelegationBrokerRoot,
+		DisableSkillPackages: disableSkillPackages,
+		SkillPackageCache:    skillCache,
+		DelegationTargets:    append([]string(nil), config.DelegationTargets...),
+		DelegationProxyBin:   config.DelegationProxyBin, DelegationBrokerRoot: config.DelegationBrokerRoot,
 		Version:  version,
 		Provider: config.Provider, Bin: providerBin, Workspace: workspace, Model: config.Model,
 		Sandbox: config.CodexSandbox, CodexApproval: config.CodexApproval, CodexBaseURL: config.CodexBaseURL,

@@ -183,3 +183,44 @@ func authPreflightFixture(t *testing.T, provider, browserMode string, delegation
 	}
 	return func(key string) string { return environment[key] }, environment
 }
+
+func TestSkillPackageFeaturesFollowExecutionEnvironment(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX provider probes")
+	}
+	for _, provider := range []string{"codex", "claude"} {
+		for _, mode := range []string{"native", "image", "launcher", "launcher-symlink"} {
+			t.Run(provider+"/"+mode, func(t *testing.T) {
+				getenv, env := authPreflightFixture(t, provider, "", false)
+				if mode == "image" {
+					env["OPENLINKER_SKILL_PACKAGES_DISABLED"] = "true"
+				}
+				if strings.HasPrefix(mode, "launcher") {
+					directory := filepath.Dir(env["OPENLINKER_AGENT_CONFIG"])
+					launcher := filepath.Join(directory, "openlinker-provider-launcher")
+					if err := os.Rename(filepath.Join(directory, provider), launcher); err != nil {
+						t.Fatal(err)
+					}
+					bin := launcher
+					if mode == "launcher-symlink" {
+						bin = filepath.Join(directory, provider)
+						if err := os.Symlink(launcher, bin); err != nil {
+							t.Fatal(err)
+						}
+					}
+					env["OPENLINKER_"+strings.ToUpper(provider)+"_BIN"] = bin
+				}
+				resolved, err := resolveRuntime(getenv, provider, "test")
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer resolved.workerLock.release()
+				features := resolved.optionalFeatures(false, false)
+				wants := mode == "native"
+				if strings.Contains(strings.Join(features, ","), "skill_packages.") != wants {
+					t.Fatalf("unexpected Worker features: %v", features)
+				}
+			})
+		}
+	}
+}

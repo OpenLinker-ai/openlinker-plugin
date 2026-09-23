@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	openlinker "github.com/OpenLinker-ai/openlinker-go"
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agentdelegation"
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agenthost"
+	openlinker "github.com/OpenLinker-ai/openlinker-go"
 )
 
 type delegationProvider struct {
@@ -113,6 +113,9 @@ func claudeRunMCPConfig(config ProviderConfig) string {
 			"args": agenthost.DelegationProxyArguments("claude"),
 			"env":  map[string]string{agentdelegation.SocketEnvironment: config.DelegationSocket},
 		}
+	}
+	if len(config.skillFileRoots) > 0 {
+		payload["mcpServers"].(map[string]any)[skillFilesServerName] = claudeSkillFilesMCPServer(config)
 	}
 	raw, _ := json.Marshal(payload)
 	return string(raw)
