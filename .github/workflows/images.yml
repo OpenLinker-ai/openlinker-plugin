@@ -38,6 +38,15 @@ on:
         required: true
         default: false
         type: boolean
+      providers:
+        description: Provider images to validate and publish; Browser and Egress images are always included
+        required: true
+        default: codex claude
+        type: choice
+        options:
+          - codex claude
+          - codex
+          - claude
 
 permissions:
   contents: read
@@ -97,18 +106,30 @@ jobs:
         env:
           LIVE_CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           LIVE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LIVE_PROVIDERS: ${{ inputs.providers }}
         run: |
           set -eu
-          test -n "$LIVE_CODEX_API_KEY" || { echo "CODEX_API_KEY secret is required" >&2; exit 1; }
-          test -n "$LIVE_ANTHROPIC_API_KEY" || { echo "ANTHROPIC_API_KEY secret is required" >&2; exit 1; }
           umask 077
-          printf '%s\n' "$LIVE_CODEX_API_KEY" >"$RUNNER_TEMP/openlinker-codex-api-key"
-          printf '%s\n' "$LIVE_ANTHROPIC_API_KEY" >"$RUNNER_TEMP/openlinker-anthropic-api-key"
+          # Each selected Provider needs its own credential and both Browser modes.
+          for provider in $LIVE_PROVIDERS; do
+            case "$provider" in
+              codex)
+                test -n "$LIVE_CODEX_API_KEY" || { echo "CODEX_API_KEY secret is required" >&2; exit 1; }
+                printf '%s\n' "$LIVE_CODEX_API_KEY" >"$RUNNER_TEMP/openlinker-codex-api-key"
+                ;;
+              claude)
+                test -n "$LIVE_ANTHROPIC_API_KEY" || { echo "ANTHROPIC_API_KEY secret is required" >&2; exit 1; }
+                printf '%s\n' "$LIVE_ANTHROPIC_API_KEY" >"$RUNNER_TEMP/openlinker-anthropic-api-key"
+                ;;
+              *) echo "unsupported Provider $provider" >&2; exit 1 ;;
+            esac
+          done
       - name: Run credential-backed Codex and Claude Browser matrix
         env:
           OPENLINKER_BROWSER_LIVE_CODEX_API_KEY_FILE: ${{ runner.temp }}/openlinker-codex-api-key
           OPENLINKER_BROWSER_LIVE_ANTHROPIC_API_KEY_FILE: ${{ runner.temp }}/openlinker-anthropic-api-key
           OPENLINKER_BROWSER_LIVE_EVIDENCE_FILE: ${{ runner.temp }}/browser-provider-live-evidence.jsonl
+          OPENLINKER_BROWSER_LIVE_PROVIDERS: ${{ inputs.providers }}
           OPENLINKER_CODEX_BASE_URL: ${{ vars.OPENLINKER_CODEX_BASE_URL }}
           OPENLINKER_CODEX_MODEL: ${{ vars.OPENLINKER_CODEX_MODEL }}
           OPENLINKER_CLAUDE_MODEL: ${{ vars.OPENLINKER_CLAUDE_MODEL }}
@@ -132,6 +153,10 @@ jobs:
     needs: [browser-acceptance, live-provider-acceptance]
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && needs.browser-acceptance.result == 'success' && (needs.live-provider-acceptance.result == 'success' || !inputs.publish_images) }}
     runs-on: ubuntu-24.04
+    env:
+      # Browser and Egress are always built; a Provider image is built and
+      # published only when that Provider was selected and live-validated.
+      BUILD_IMAGE: ${{ (matrix.target != 'codex' && matrix.target != 'claude') || contains(format(' {0} ', inputs.providers || 'codex claude'), format(' {0} ', matrix.target)) }}
     strategy:
       fail-fast: false
       matrix:
@@ -150,19 +175,23 @@ jobs:
             dockerfile: Dockerfile.browser
     steps:
       - uses: actions/checkout@v7
+        if: env.BUILD_IMAGE == 'true'
       - uses: docker/setup-qemu-action@v4
+        if: env.BUILD_IMAGE == 'true'
         with:
           image: docker.io/tonistiigi/binfmt:qemu-v10.2.3-68@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
           platforms: arm64
       - uses: docker/setup-buildx-action@v4
+        if: env.BUILD_IMAGE == 'true'
       - name: Log in to GHCR
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag'
+        if: env.BUILD_IMAGE == 'true' && github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Image metadata
+        if: env.BUILD_IMAGE == 'true'
         id: meta
         uses: docker/metadata-action@v6
         with:
@@ -171,6 +200,7 @@ jobs:
             type=ref,event=tag
             type=sha,prefix=sha-
       - name: Build and optionally publish
+        if: env.BUILD_IMAGE == 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -204,6 +234,7 @@ jobs:
       - name: Verify the published release evidence
         env:
           OPENLINKER_RELEASE_EVIDENCE_DIR: release-evidence
+          OPENLINKER_RELEASE_PROVIDERS: ${{ inputs.providers }}
         run: |
           ./test/release-images/verify.sh \
             ghcr.io/openlinker-ai \

@@ -32,14 +32,24 @@ case "$release_tag" in
     ;;
 esac
 
+providers=${OPENLINKER_RELEASE_PROVIDERS:-codex claude}
+case "$providers" in
+  "codex claude") provider_images="openlinker-agent-codex openlinker-agent-claude" ;;
+  "codex") provider_images="openlinker-agent-codex" ;;
+  "claude") provider_images="openlinker-agent-claude" ;;
+  *)
+    echo "OPENLINKER_RELEASE_PROVIDERS must be codex, claude or \"codex claude\"" >&2
+    exit 2
+    ;;
+esac
+
 evidence_directory=${OPENLINKER_RELEASE_EVIDENCE_DIR:-}
 if [ -n "$evidence_directory" ]; then
   mkdir -p "$evidence_directory"
 fi
 
 for image_name in \
-  openlinker-agent-codex \
-  openlinker-agent-claude \
+  $provider_images \
   openlinker-egress-gateway \
   openlinker-browser-runtime; do
   image_reference="${registry_owner}/${image_name}:${release_tag}"
