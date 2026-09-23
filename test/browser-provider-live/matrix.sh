@@ -11,9 +11,22 @@ require_value() {
   fi
 }
 
+providers=${OPENLINKER_BROWSER_LIVE_PROVIDERS:-codex claude}
+case "$providers" in
+  "codex claude" | "codex" | "claude") ;;
+  *)
+    echo "OPENLINKER_BROWSER_LIVE_PROVIDERS must be codex, claude or \"codex claude\"" >&2
+    exit 1
+    ;;
+esac
+for provider in $providers; do
+  case "$provider" in
+    codex) require_value OPENLINKER_BROWSER_LIVE_CODEX_API_KEY_FILE ;;
+    claude) require_value OPENLINKER_BROWSER_LIVE_ANTHROPIC_API_KEY_FILE ;;
+  esac
+done
+
 for name in \
-  OPENLINKER_BROWSER_LIVE_CODEX_API_KEY_FILE \
-  OPENLINKER_BROWSER_LIVE_ANTHROPIC_API_KEY_FILE \
   OPENLINKER_BROWSER_LIVE_FIXTURE_URL \
   OPENLINKER_BROWSER_LIVE_FIXTURE_MARKER \
   OPENLINKER_BROWSER_LIVE_INTERNAL_NETWORK \
@@ -42,18 +55,14 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-docker build \
-  --build-arg "OPENLINKER_PLUGIN_COMMIT=$plugin_commit" \
-  --target codex-live \
-  -f "$repository_root/Dockerfile.providers" \
-  -t "$codex_image" \
-  "$repository_root"
-docker build \
-  --build-arg "OPENLINKER_PLUGIN_COMMIT=$plugin_commit" \
-  --target claude-live \
-  -f "$repository_root/Dockerfile.providers" \
-  -t "$claude_image" \
-  "$repository_root"
+for provider in $providers; do
+  docker build \
+    --build-arg "OPENLINKER_PLUGIN_COMMIT=$plugin_commit" \
+    --target "${provider}-live" \
+    -f "$repository_root/Dockerfile.providers" \
+    -t "openlinker-agent-${provider}:${OPENLINKER_BROWSER_LIVE_PREFIX}" \
+    "$repository_root"
+done
 
 run_quadrant() {
   provider=$1
@@ -99,28 +108,29 @@ run_quadrant() {
   printf '%s\n' "${provider}/${mode}: ${output}"
 }
 
-run_quadrant \
-  codex native "$codex_image" \
-  "$OPENLINKER_BROWSER_LIVE_CODEX_API_KEY_FILE"
-run_quadrant \
-  codex mcp "$codex_image" \
-  "$OPENLINKER_BROWSER_LIVE_CODEX_API_KEY_FILE"
-run_quadrant \
-  claude native "$claude_image" \
-  "$OPENLINKER_BROWSER_LIVE_ANTHROPIC_API_KEY_FILE"
-run_quadrant \
-  claude mcp "$claude_image" \
-  "$OPENLINKER_BROWSER_LIVE_ANTHROPIC_API_KEY_FILE"
+quadrants=0
+for provider in $providers; do
+  case "$provider" in
+    codex) image=$codex_image credential=$OPENLINKER_BROWSER_LIVE_CODEX_API_KEY_FILE ;;
+    claude) image=$claude_image credential=$OPENLINKER_BROWSER_LIVE_ANTHROPIC_API_KEY_FILE ;;
+  esac
+  for mode in native mcp; do
+    run_quadrant "$provider" "$mode" "$image" "$credential"
+    quadrants=$((quadrants + 1))
+  done
+done
 
 node "$repository_root/test/browser-provider-live/verify-results.mjs" \
   "$result_file" \
-  "$OPENLINKER_BROWSER_LIVE_FIXTURE_MARKER"
+  "$OPENLINKER_BROWSER_LIVE_FIXTURE_MARKER" \
+  "$providers"
 
 metrics=$(curl -fsS --max-time 10 "${OPENLINKER_BROWSER_LIVE_FIXTURE_URL%/}/metrics")
-METRICS="$metrics" node -e '
+METRICS="$metrics" QUADRANTS="$quadrants" node -e '
   const metrics = JSON.parse(process.env.METRICS);
-  if (!Number.isInteger(metrics.provider_live_browsers) || metrics.provider_live_browsers < 4) {
-    throw new Error(`expected at least four real Chromium fixture documents, got ${metrics.provider_live_browsers}`);
+  const expected = Number(process.env.QUADRANTS);
+  if (!Number.isInteger(metrics.provider_live_browsers) || metrics.provider_live_browsers < expected) {
+    throw new Error(`expected at least ${expected} real Chromium fixture documents, got ${metrics.provider_live_browsers}`);
   }
 '
 
@@ -134,4 +144,4 @@ if [ -n "${OPENLINKER_BROWSER_LIVE_EVIDENCE_FILE:-}" ]; then
   chmod 0600 "$OPENLINKER_BROWSER_LIVE_EVIDENCE_FILE"
 fi
 
-echo "Credential-backed Codex/Claude native-Plugin/direct-MCP Browser matrix passed"
+echo "Credential-backed ${providers} native-Plugin/direct-MCP Browser matrix passed"

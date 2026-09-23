@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 
-import { verifyResults } from "./verify-results.mjs";
+import { parseProviders, verifyResults } from "./verify-results.mjs";
 
 const marker = "provider-live-0123456789abcdef";
 const markerSHA256 = createHash("sha256").update(marker).digest("hex");
@@ -55,4 +55,20 @@ test("rejects missing, duplicate, mismatched, and incomplete evidence", () => {
   const incomplete = matrix();
   incomplete[0].closed_lifecycle_observed = false;
   assert.throws(() => verifyResults(incomplete, marker));
+});
+
+test("a Codex-only gate still requires both Codex Browser modes", () => {
+  const codex = matrix().filter((result) => result.provider === "codex");
+  assert.doesNotThrow(() => verifyResults(codex, marker, ["codex"]));
+  assert.throws(() => verifyResults(codex.slice(0, 1), marker, ["codex"]));
+  assert.throws(() => verifyResults(matrix(), marker, ["codex"]));
+  assert.throws(() => verifyResults(codex, marker));
+});
+
+test("Provider selection accepts only non-empty sets of known Providers", () => {
+  assert.deepEqual(parseProviders(), ["codex", "claude"]);
+  assert.deepEqual(parseProviders("codex"), ["codex"]);
+  for (const invalid of ["", "gemini", "codex codex", "codex,browser"]) {
+    assert.throws(() => parseProviders(invalid));
+  }
 });

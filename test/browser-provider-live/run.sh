@@ -41,8 +41,23 @@ validate_credential_file() {
   fi
 }
 
-validate_credential_file OPENLINKER_BROWSER_LIVE_CODEX_API_KEY_FILE
-validate_credential_file OPENLINKER_BROWSER_LIVE_ANTHROPIC_API_KEY_FILE
+providers=${OPENLINKER_BROWSER_LIVE_PROVIDERS:-codex claude}
+case "$providers" in
+  "codex claude" | "codex" | "claude") ;;
+  *)
+    echo "OPENLINKER_BROWSER_LIVE_PROVIDERS must be codex, claude or \"codex claude\"" >&2
+    exit 1
+    ;;
+esac
+# Only a selected Provider's credential is required; each selected Provider
+# still has to pass both Browser client modes before its image is published.
+for provider in $providers; do
+  case "$provider" in
+    codex) validate_credential_file OPENLINKER_BROWSER_LIVE_CODEX_API_KEY_FILE ;;
+    claude) validate_credential_file OPENLINKER_BROWSER_LIVE_ANTHROPIC_API_KEY_FILE ;;
+  esac
+done
+export OPENLINKER_BROWSER_LIVE_PROVIDERS="$providers"
 
 repository_root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 OPENLINKER_BROWSER_ACCEPTANCE_LIVE_PROVIDER_MATRIX=1 \

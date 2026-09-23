@@ -4,16 +4,30 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 
-export function verifyResults(results, expectedMarker) {
-  if (results.length !== 4) {
-    throw new Error(`expected four Provider quadrants, got ${results.length}`);
+export function parseProviders(value = "codex claude") {
+  const providers = value.trim().split(/[\s,]+/).filter(Boolean);
+  if (
+    providers.length === 0 ||
+    new Set(providers).size !== providers.length ||
+    providers.some((provider) => provider !== "codex" && provider !== "claude")
+  ) {
+    throw new Error("live Providers must be a non-empty set of codex and claude");
   }
-  const expectedQuadrants = new Set([
-    "codex/native/plugin_native",
-    "codex/mcp/direct_mcp",
-    "claude/native/plugin_native",
-    "claude/mcp/direct_mcp",
-  ]);
+  return providers;
+}
+
+// Every selected Provider must pass both Browser client modes; a narrower
+// Provider set narrows what is published, never what each Provider must prove.
+export function verifyResults(results, expectedMarker, providers = ["codex", "claude"]) {
+  const expectedQuadrants = new Set(
+    providers.flatMap((provider) => [
+      `${provider}/native/plugin_native`,
+      `${provider}/mcp/direct_mcp`,
+    ]),
+  );
+  if (results.length !== expectedQuadrants.size) {
+    throw new Error(`expected ${expectedQuadrants.size} Provider quadrants, got ${results.length}`);
+  }
   const invariantKeys = [
     "browser_tool",
     "browser_tool_surface_count",
@@ -62,14 +76,14 @@ export function verifyResults(results, expectedMarker) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const [resultPath, expectedMarker] = process.argv.slice(2);
+  const [resultPath, expectedMarker, providerList] = process.argv.slice(2);
   if (!resultPath || !expectedMarker) {
-    throw new Error("usage: verify-results.mjs <jsonl> <expected-marker>");
+    throw new Error("usage: verify-results.mjs <jsonl> <expected-marker> [providers]");
   }
   const results = readFileSync(resultPath, "utf8")
     .trim()
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line));
-  verifyResults(results, expectedMarker);
+  verifyResults(results, expectedMarker, parseProviders(providerList));
 }
