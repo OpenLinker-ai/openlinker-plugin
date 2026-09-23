@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -164,5 +165,42 @@ func TestServeExposesOnlyTheReadTool(t *testing.T) {
 	}
 	if !strings.Contains(lines[4], "-32602") {
 		t.Fatalf("unknown tool response: %s", lines[4])
+	}
+}
+
+// Two packages with identical content share one digest directory. The Host
+// passes the same root and manifest twice; the server must deduplicate before
+// applying the per-package file limit.
+func TestServerAcceptsIdenticalPackagesSharingOneDirectory(t *testing.T) {
+	base := t.TempDir()
+	if resolved, err := filepath.EvalSymlinks(base); err == nil {
+		base = resolved
+	}
+	root := filepath.Join(base, "agent", "digest")
+	var files []string
+	for i := 0; i < 32; i++ {
+		name := "SKILL.md"
+		if i > 0 {
+			name = filepath.Join("references", fmt.Sprintf("file-%02d.md", i))
+		}
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(name), 0o400); err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, path)
+	}
+	server, err := New("codex", "test", []string{root, root}, append(append([]string{}, files...), files...))
+	if err != nil {
+		t.Fatalf("identical packages sharing a directory were rejected: %v", err)
+	}
+	if text, err := server.Read(files[31]); err != nil || !strings.Contains(text, "file-31") {
+		t.Fatalf("shared package file: %q %v", text, err)
+	}
+	extra := filepath.Join(root, "references", "file-32.md")
+	if _, err := New("codex", "test", []string{root}, append(append([]string{}, files...), extra)); err == nil {
+		t.Fatal("a package directory with 33 distinct files was accepted")
 	}
 }

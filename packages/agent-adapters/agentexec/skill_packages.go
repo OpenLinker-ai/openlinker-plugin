@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/providerprocess"
@@ -138,7 +139,11 @@ func providerConfigForSkillFiles(config ProviderConfig, run RunContext) (Provide
 		return config, run
 	}
 	// Serve exactly the manifest the loader verified, never other files on disk.
+	// Packages with identical content share a digest directory; pass it once.
 	for _, loaded := range run.LoadedSkillPackages {
+		if slices.Contains(config.skillFileRoots, loaded.Directory) {
+			continue
+		}
 		config.skillFileRoots = append(config.skillFileRoots, loaded.Directory)
 		for _, name := range loaded.Files {
 			config.skillFiles = append(config.skillFiles, filepath.Join(loaded.Directory, filepath.FromSlash(name)))

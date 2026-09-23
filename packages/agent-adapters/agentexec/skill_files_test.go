@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -167,5 +168,39 @@ func TestBrowserPackageServerFollowsLoadedManifest(t *testing.T) {
 	}
 	if text, err := server.Read(filepath.Join(directory, "references", "planted.md")); err == nil {
 		t.Fatalf("file outside the manifest was served: %q", text)
+	}
+}
+
+// Two pinned packages with identical content (32 files each) share one digest
+// directory. Core and the loader accept them; the Browser file server must too.
+func TestBrowserPackageServerAcceptsIdenticalPackages(t *testing.T) {
+	workspace := t.TempDir()
+	if resolved, err := filepath.EvalSymlinks(workspace); err == nil {
+		workspace = resolved
+	}
+	files := map[string]string{"SKILL.md": "---\nname: same\ndescription: Same\n---\nread references"}
+	for i := 1; i < 32; i++ {
+		files[fmt.Sprintf("references/file-%02d.md", i)] = fmt.Sprintf("FILE-%02d", i)
+	}
+	payload, _ := json.Marshal(packageContents{Name: "same", Description: "Same", Providers: []string{"codex"}, Files: files})
+	digest := sha256.Sum256(payload)
+	version := func(n string) packageVersion {
+		return packageVersion{BindingID: "1111111" + n + "-1111-4111-8111-111111111111", PackageID: "2222222" + n + "-2222-4222-8222-222222222222", VersionID: "3333333" + n + "-3333-4333-8333-333333333333", Version: "1.0.0", Digest: hex.EncodeToString(digest[:]), Payload: string(payload)}
+	}
+	snapshot := packageSnapshot{Schema: 1, Bundles: []packageVersion{version("1"), version("2")}}
+	loaded, err := skillpackages.Load(context.Background(), skillpackages.Request{Snapshot: snapshot, AgentID: "55555555-5555-4555-8555-555555555555", Trusted: true, Emit: func(string, any) error { return nil }}, "codex", workspace, skillpackages.Cache{})
+	if err != nil || len(loaded.Packages) != 2 || loaded.Packages[0].Directory != loaded.Packages[1].Directory {
+		t.Fatalf("identical packages should share one directory: %#v %v", loaded, err)
+	}
+	config, run := providerConfigForSkillFiles(browserSkillConfig("codex", "native"), RunContext{LoadedSkillPackages: loaded.Packages})
+	if !run.SkillFilesTool || len(config.skillFileRoots) != 1 || len(config.skillFiles) != 32 {
+		t.Fatalf("Host should pass the shared directory once: %d roots, %d files", len(config.skillFileRoots), len(config.skillFiles))
+	}
+	server, err := skillfiles.New("codex", "test", config.skillFileRoots, config.skillFiles)
+	if err != nil {
+		t.Fatalf("server rejected identical packages: %v", err)
+	}
+	if text, err := server.Read(filepath.Join(loaded.Packages[0].Directory, "references", "file-31.md")); err != nil || text != "FILE-31" {
+		t.Fatalf("shared file: %q %v", text, err)
 	}
 }
