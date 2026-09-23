@@ -37,9 +37,10 @@ reject_workflow_value() {
 
 require_workflow_value "platform: linux/amd64" 1
 require_workflow_value "platform: linux/arm64" 1
-require_workflow_value '    runs-on: ${{ matrix.runner }}' 1
-require_workflow_line "            runner: ubuntu-24.04" 1
-require_workflow_line "            runner: ubuntu-24.04-arm" 1
+# Browser acceptance and image builds both run natively per architecture.
+require_workflow_value '    runs-on: ${{ matrix.runner }}' 2
+require_workflow_line "            runner: ubuntu-24.04" 2
+require_workflow_line "            runner: ubuntu-24.04-arm" 2
 require_workflow_value '      - "Dockerfile.browser.chrome"' 1
 require_workflow_value '      - "Dockerfile.browser.native-chrome"' 1
 require_workflow_value '      - "packages/browser-runtime/native-chrome/**"' 1
@@ -50,16 +51,21 @@ require_workflow_value '      - "scripts/resolve-agent-node-module.mjs"' 1
 require_workflow_value '      - "internal/pluginhost/**"' 1
 require_workflow_value '            OPENLINKER_PLUGIN_COMMIT=${{ github.sha }}' 1
 require_workflow_value '          DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}' 1
-require_workflow_value "docker/setup-qemu-action@v4" 1
-require_workflow_value "docker.io/tonistiigi/binfmt:qemu-v10.2.3-68@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0" 1
-require_workflow_value "platforms: arm64" 1
+reject_workflow_value "setup-qemu-action"
+reject_workflow_value "binfmt"
+reject_workflow_value "platforms: linux/amd64,linux/arm64"
+require_workflow_value "platforms: linux/\${{ matrix.arch }}" 1
+require_workflow_value 'test "$native" = "$EXPECTED_ARCH"' 1
+require_workflow_value "push-by-digest=true,name-canonical=true,push=\${{ env.PUBLISH }}" 1
+require_workflow_value "docker buildx imagetools create" 1
+require_workflow_value "needs: publish-images" 1
 require_workflow_value "run_live_provider:" 1
 require_workflow_value "live-provider-acceptance:" 1
 require_workflow_value "if: github.event_name == 'workflow_dispatch' && inputs.run_live_provider" 1
 require_workflow_value "needs: browser-acceptance" 1
 require_workflow_value "needs: [browser-acceptance, live-provider-acceptance]" 1
 require_workflow_value "publish_images:" 1
-require_workflow_value "push: \${{ github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag' }}" 1
+require_workflow_value "PUBLISH: \${{ github.event_name == 'workflow_dispatch' && inputs.publish_images && github.ref_type == 'tag' }}" 1
 require_workflow_value "needs.live-provider-acceptance.result == 'success'" 1
 reject_workflow_value "matrix.live_provider"
 reject_workflow_value "github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'"
