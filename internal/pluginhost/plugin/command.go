@@ -70,7 +70,7 @@ func newBrowserProxyCommand(ioStreams shared.IO) *cobra.Command {
 // without a local file tool. The Host chooses every readable directory.
 func newSkillFilesCommand(ioStreams shared.IO) *cobra.Command {
 	var host string
-	var roots []string
+	var roots, files []string
 	command := &cobra.Command{
 		Use:    "skill-files",
 		Short:  "Serve pinned skill package files read-only over stdio",
@@ -85,7 +85,7 @@ func newSkillFilesCommand(ioStreams shared.IO) *cobra.Command {
 			} {
 				_ = os.Unsetenv(name)
 			}
-			server, err := skillfiles.New(strings.ToLower(strings.TrimSpace(host)), buildinfo.Version, roots)
+			server, err := skillfiles.New(strings.ToLower(strings.TrimSpace(host)), buildinfo.Version, roots, files)
 			if err != nil {
 				return err
 			}
@@ -96,6 +96,7 @@ func newSkillFilesCommand(ioStreams shared.IO) *cobra.Command {
 	}
 	command.Flags().StringVar(&host, "host", "", "native host: codex or claude")
 	command.Flags().StringArrayVar(&roots, "root", nil, "absolute package directory; repeat for each pinned package")
+	command.Flags().StringArrayVar(&files, "file", nil, "absolute path of a verified package file; repeat for each manifest entry")
 	return command
 }
 

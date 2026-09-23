@@ -143,7 +143,16 @@ func checkSkillFilesServerAsProvider(t *testing.T, provider, agentID string) {
 		raw, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": "tools/call", "params": map[string]any{"name": "read_skill_file", "arguments": map[string]any{"path": path}}})
 		return string(raw)
 	}
-	command := exec.Command("/usr/local/bin/openlinker-plugin-host", "plugin", "skill-files", "--host", provider, "--root", root)
+	args := []string{"plugin", "skill-files", "--host", provider, "--root", root}
+	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err == nil && entry.Type().IsRegular() {
+			args = append(args, "--file", path)
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.Command("/usr/local/bin/openlinker-plugin-host", args...)
 	command.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin", "HOME=/provider"}
 	command.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: 10002, Gid: 10002, Groups: []uint32{10003}}}
 	command.Stdin = strings.NewReader(strings.Join([]string{

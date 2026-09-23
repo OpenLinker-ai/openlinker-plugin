@@ -61,6 +61,8 @@ type ProviderConfig struct {
 	// skillFileRoots are the pinned package directories served read-only to
 	// entries without a local file tool. Set per Run, never from assignment data.
 	skillFileRoots []string
+	// skillFiles is the verified manifest inside skillFileRoots.
+	skillFiles []string
 }
 
 type ConversationContext struct {

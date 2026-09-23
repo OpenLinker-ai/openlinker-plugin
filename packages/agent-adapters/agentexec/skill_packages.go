@@ -132,13 +132,17 @@ const skillFilesServerName = "openlinker_skills"
 // The Browser profile disables shell and file tools, so without this server
 // the model could see SKILL.md in the prompt but never read supporting files.
 func providerConfigForSkillFiles(config ProviderConfig, run RunContext) (ProviderConfig, RunContext) {
-	config.skillFileRoots = nil
+	config.skillFileRoots, config.skillFiles = nil, nil
 	run.SkillFilesTool = false
 	if !browserProfileEnabled(config) || strings.TrimSpace(config.BrowserPluginBin) == "" || len(run.LoadedSkillPackages) == 0 {
 		return config, run
 	}
+	// Serve exactly the manifest the loader verified, never other files on disk.
 	for _, loaded := range run.LoadedSkillPackages {
 		config.skillFileRoots = append(config.skillFileRoots, loaded.Directory)
+		for _, name := range loaded.Files {
+			config.skillFiles = append(config.skillFiles, filepath.Join(loaded.Directory, filepath.FromSlash(name)))
+		}
 	}
 	run.SkillFilesTool = true
 	return config, run
@@ -148,6 +152,9 @@ func skillFilesArguments(config ProviderConfig, host string) []string {
 	args := []string{"plugin", "skill-files", "--host", host}
 	for _, root := range config.skillFileRoots {
 		args = append(args, "--root", root)
+	}
+	for _, file := range config.skillFiles {
+		args = append(args, "--file", file)
 	}
 	return args
 }

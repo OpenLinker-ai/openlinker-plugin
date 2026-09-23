@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,30 +22,32 @@ const (
 	ToolName        = "read_skill_file"
 	// Package payloads are at most 64 KiB, so no single file can be larger.
 	maxFileBytes   = 64 * 1024
-	maxListEntries = 64
 	maxRequestSize = 64 * 1024
 )
 
-// Same relative path grammar as package validation: no hidden segments, so the
-// generated cache marker and pending temporary files are never served.
+// Same relative path grammar as package validation in Core and the loader.
 var relativePattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
 
 type Server struct {
 	Host    string
 	Version string
 	roots   []string
+	// files holds each root's package manifest: exactly the files the Host
+	// materialized for this Run, never whatever else is on disk.
+	files map[string][]string
 }
 
-// New validates the Host-supplied package directories. Tool arguments can only
-// select files inside one of them; the model cannot add a root.
-func New(host, version string, roots []string) (*Server, error) {
+// New validates the Host-supplied package directories and manifests. Each file
+// is an absolute path inside one root. Tool arguments can only select manifest
+// files; the model cannot add a root or a file.
+func New(host, version string, roots, files []string) (*Server, error) {
 	if host != "codex" && host != "claude" {
 		return nil, errors.New("skill files server requires --host codex or --host claude")
 	}
 	if len(roots) == 0 || len(roots) > 5 {
 		return nil, errors.New("skill files server requires one to five package directories")
 	}
-	clean := make([]string, 0, len(roots))
+	server := &Server{Host: host, Version: version, files: map[string][]string{}}
 	for _, root := range roots {
 		if !filepath.IsAbs(root) || filepath.Clean(root) != root {
 			return nil, errors.New("skill package directories must be clean absolute paths")
@@ -55,11 +56,45 @@ func New(host, version string, roots []string) (*Server, error) {
 		if err != nil || !info.IsDir() {
 			return nil, errors.New("skill package directory is unavailable")
 		}
-		if !slices.Contains(clean, root) {
-			clean = append(clean, root)
+		if !slices.Contains(server.roots, root) {
+			server.roots = append(server.roots, root)
 		}
 	}
-	return &Server{Host: host, Version: version, roots: clean}, nil
+	if len(files) == 0 || len(files) > 32*len(server.roots) {
+		return nil, errors.New("skill files server requires the package file manifests")
+	}
+	for _, file := range files {
+		root, relative, ok := server.locate(file)
+		if !ok || relative == "." || !safeRelative(filepath.ToSlash(relative)) {
+			return nil, errors.New("skill package manifest entries must be package files")
+		}
+		relative = filepath.ToSlash(relative)
+		if !slices.Contains(server.files[root], relative) {
+			server.files[root] = append(server.files[root], relative)
+		}
+	}
+	for _, root := range server.roots {
+		if len(server.files[root]) == 0 {
+			return nil, errors.New("every skill package directory requires a manifest")
+		}
+		slices.Sort(server.files[root])
+	}
+	return server, nil
+}
+
+// locate returns the configured root that contains name and the path inside it.
+func (server *Server) locate(name string) (string, string, bool) {
+	if !filepath.IsAbs(name) {
+		return "", "", false
+	}
+	name = filepath.Clean(name)
+	for _, root := range server.roots {
+		relative, err := filepath.Rel(root, name)
+		if err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative) {
+			return root, relative, true
+		}
+	}
+	return "", "", false
 }
 
 type request struct {
@@ -164,48 +199,50 @@ func toolDefinition() map[string]any {
 	}
 }
 
-// Read resolves name inside exactly one configured root. os.Root rejects any
-// symlink or ".." that would leave the package directory.
+// Read serves one manifest file, or lists the manifest files below a directory.
+// os.Root rejects any symlink or ".." that would leave the package directory.
 func (server *Server) Read(name string) (string, error) {
-	if !filepath.IsAbs(name) {
-		return "", errors.New("path must be absolute and inside a skill package directory")
+	root, relative, ok := server.locate(name)
+	if !ok {
+		return "", errors.New("path is outside the skill packages pinned for this Run")
 	}
-	name = filepath.Clean(name)
-	for _, rootPath := range server.roots {
-		relative, err := filepath.Rel(rootPath, name)
-		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			continue
+	relative = filepath.ToSlash(relative)
+	manifest := server.files[root]
+	if !slices.Contains(manifest, relative) {
+		prefix := ""
+		if relative != "." {
+			prefix = relative + "/"
 		}
-		if relative != "." && !safeRelative(filepath.ToSlash(relative)) {
-			return "", errors.New("path is not a readable skill package file")
+		listed := []string{}
+		for _, file := range manifest {
+			if strings.HasPrefix(file, prefix) {
+				listed = append(listed, strings.TrimPrefix(file, prefix))
+			}
 		}
-		root, err := os.OpenRoot(rootPath)
-		if err != nil {
-			return "", errors.New("skill package directory is unavailable")
+		if len(listed) == 0 {
+			return "", errors.New("path is not a file of the skill packages pinned for this Run")
 		}
-		defer root.Close()
-		info, err := root.Stat(relative)
-		if err != nil {
-			return "", errors.New("skill package file not found")
-		}
-		if info.IsDir() {
-			return listDirectory(root, relative, name)
-		}
-		if !info.Mode().IsRegular() || info.Size() > maxFileBytes {
-			return "", errors.New("path is not a readable skill package file")
-		}
-		file, err := root.Open(relative)
-		if err != nil {
-			return "", errors.New("skill package file is unreadable")
-		}
-		defer file.Close()
-		content, err := io.ReadAll(io.LimitReader(file, maxFileBytes+1))
-		if err != nil || len(content) > maxFileBytes {
-			return "", errors.New("skill package file is unreadable")
-		}
-		return string(content), nil
+		return fmt.Sprintf("Files in %s:\n%s", filepath.Clean(name), strings.Join(listed, "\n")), nil
 	}
-	return "", errors.New("path is outside the skill packages pinned for this Run")
+	opened, err := os.OpenRoot(root)
+	if err != nil {
+		return "", errors.New("skill package directory is unavailable")
+	}
+	defer opened.Close()
+	file, err := opened.Open(filepath.FromSlash(relative))
+	if err != nil {
+		return "", errors.New("skill package file is unreadable")
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Size() > maxFileBytes {
+		return "", errors.New("skill package file is unreadable")
+	}
+	content, err := io.ReadAll(io.LimitReader(file, maxFileBytes+1))
+	if err != nil || len(content) > maxFileBytes {
+		return "", errors.New("skill package file is unreadable")
+	}
+	return string(content), nil
 }
 
 func safeRelative(relative string) bool {
@@ -213,40 +250,9 @@ func safeRelative(relative string) bool {
 		return false
 	}
 	for _, part := range strings.Split(relative, "/") {
-		if part == "" || strings.HasPrefix(part, ".") || strings.Contains(part, ".pending-") {
+		if part == "" || strings.HasPrefix(part, ".") {
 			return false
 		}
 	}
 	return true
-}
-
-func listDirectory(root *os.Root, relative, display string) (string, error) {
-	names := []string{}
-	err := fs.WalkDir(root.FS(), filepath.ToSlash(relative), func(entry string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		inner := strings.TrimPrefix(strings.TrimPrefix(entry, filepath.ToSlash(relative)), "/")
-		if inner == "" {
-			return nil
-		}
-		if strings.HasPrefix(d.Name(), ".") || strings.Contains(d.Name(), ".pending-") {
-			if d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if d.Type().IsRegular() {
-			if len(names) >= maxListEntries {
-				return fs.SkipAll
-			}
-			names = append(names, inner)
-		}
-		return nil
-	})
-	if err != nil {
-		return "", errors.New("skill package directory is unreadable")
-	}
-	slices.Sort(names)
-	return fmt.Sprintf("Files in %s:\n%s", display, strings.Join(names, "\n")), nil
 }
