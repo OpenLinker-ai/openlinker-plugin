@@ -13,6 +13,7 @@ import (
 	"github.com/OpenLinker-ai/openlinker-plugin/internal/pluginhost/pluginbridge"
 	"github.com/OpenLinker-ai/openlinker-plugin/internal/pluginhost/shared"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/agent"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/skillfiles"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserclient"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserplugin"
 	"github.com/OpenLinker-ai/openlinker-plugin/packages/browser-runtime/browserprotocol"
@@ -25,6 +26,7 @@ func New(ioStreams shared.IO, options *shared.GlobalOptions, agentService *agent
 	command.AddCommand(newBrowserServeCommand(ioStreams))
 	command.AddCommand(newBrowserProxyCommand(ioStreams))
 	command.AddCommand(newDelegationProxyCommand(ioStreams))
+	command.AddCommand(newSkillFilesCommand(ioStreams))
 	command.AddCommand(&cobra.Command{Use: "capabilities", Hidden: true, Args: cobra.NoArgs, RunE: func(command *cobra.Command, args []string) error {
 		return shared.WriteJSON(ioStreams.Stdout, agenthost.SupportedCapabilities())
 	}})
@@ -61,6 +63,39 @@ func newBrowserProxyCommand(ioStreams shared.IO) *cobra.Command {
 		},
 	}
 	command.Flags().StringVar(&host, "host", "", "native host: codex or claude")
+	return command
+}
+
+// newSkillFilesCommand serves pinned skill package files to Provider entries
+// without a local file tool. The Host chooses every readable directory.
+func newSkillFilesCommand(ioStreams shared.IO) *cobra.Command {
+	var host string
+	var roots []string
+	command := &cobra.Command{
+		Use:    "skill-files",
+		Short:  "Serve pinned skill package files read-only over stdio",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		RunE: func(command *cobra.Command, args []string) error {
+			for _, name := range []string{
+				"CODEX_API_KEY",
+				"ANTHROPIC_API_KEY",
+				"OPENLINKER_AGENT_TOKEN",
+				"OPENLINKER_USER_TOKEN",
+			} {
+				_ = os.Unsetenv(name)
+			}
+			server, err := skillfiles.New(strings.ToLower(strings.TrimSpace(host)), buildinfo.Version, roots)
+			if err != nil {
+				return err
+			}
+			ctx, stop := signal.NotifyContext(command.Context(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			return server.Serve(ctx, ioStreams.Stdin, ioStreams.Stdout)
+		},
+	}
+	command.Flags().StringVar(&host, "host", "", "native host: codex or claude")
+	command.Flags().StringArrayVar(&roots, "root", nil, "absolute package directory; repeat for each pinned package")
 	return command
 }
 

@@ -2,6 +2,7 @@ package agentexec
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/providerprocess"
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/skillpackages"
 	openlinker "github.com/OpenLinker-ai/openlinker-go"
+	"github.com/OpenLinker-ai/openlinker-plugin/packages/agent-adapters/skillfiles"
 )
 
 const SkillPackagesFeature = skillpackages.Feature
@@ -115,5 +117,66 @@ func skillPackageSessionMode(run RunContext) string {
 	return skillpackages.SessionMode(run.SkillPackagesDigest)
 }
 func skillPackageInstructions(run RunContext) string {
-	return skillpackages.Instructions(run.LoadedSkillPackages, run.SkillPackagesAlreadyLoaded)
+	instructions := skillpackages.Instructions(run.LoadedSkillPackages, run.SkillPackagesAlreadyLoaded)
+	if instructions == "" || !run.SkillFilesTool {
+		return instructions
+	}
+	// Browser entries have no shell or file tool; every turn names the one
+	// read-only path so a resumed or compacted session can still reread files.
+	return instructions + "\nThis entry has no local file tool. Read package files only with the " +
+		skillFilesServerName + " " + skillfiles.ToolName + " tool, passing an absolute path inside a package directory above; call it on a package directory to list its files."
+}
+
+const skillFilesServerName = "openlinker_skills"
+
+// The Browser profile disables shell and file tools, so without this server
+// the model could see SKILL.md in the prompt but never read supporting files.
+func providerConfigForSkillFiles(config ProviderConfig, run RunContext) (ProviderConfig, RunContext) {
+	config.skillFileRoots = nil
+	run.SkillFilesTool = false
+	if !browserProfileEnabled(config) || strings.TrimSpace(config.BrowserPluginBin) == "" || len(run.LoadedSkillPackages) == 0 {
+		return config, run
+	}
+	for _, loaded := range run.LoadedSkillPackages {
+		config.skillFileRoots = append(config.skillFileRoots, loaded.Directory)
+	}
+	run.SkillFilesTool = true
+	return config, run
+}
+
+func skillFilesArguments(config ProviderConfig, host string) []string {
+	args := []string{"plugin", "skill-files", "--host", host}
+	for _, root := range config.skillFileRoots {
+		args = append(args, "--root", root)
+	}
+	return args
+}
+
+func codexSkillFilesMCPArguments(config ProviderConfig) []string {
+	if len(config.skillFileRoots) == 0 {
+		return nil
+	}
+	command, _ := json.Marshal(config.BrowserPluginBin)
+	arguments, _ := json.Marshal(skillFilesArguments(config, "codex"))
+	tools, _ := json.Marshal([]string{skillfiles.ToolName})
+	prefix := "mcp_servers." + skillFilesServerName + "."
+	return []string{
+		"-c", prefix + "command=" + string(command),
+		"-c", prefix + "args=" + string(arguments),
+		"-c", prefix + "env_vars=[]",
+		"-c", prefix + "required=true",
+		"-c", prefix + "enabled_tools=" + string(tools),
+		"-c", prefix + `default_tools_approval_mode="approve"`,
+	}
+}
+
+func claudeSkillFilesMCPServer(config ProviderConfig) map[string]any {
+	return map[string]any{
+		"type": "stdio", "command": config.BrowserPluginBin,
+		"args": skillFilesArguments(config, "claude"), "env": map[string]string{},
+	}
+}
+
+func claudeSkillFilesTool() string {
+	return "mcp__" + skillFilesServerName + "__" + skillfiles.ToolName
 }

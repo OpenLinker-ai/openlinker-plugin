@@ -22,6 +22,7 @@ func (provider CodexProvider) Run(ctx context.Context, run RunContext) (openlink
 	config := provider.Config
 	config = providerConfigForBrowserRun(config, run.Browser)
 	config = providerConfigForDelegationRun(config, run)
+	config, run = providerConfigForSkillFiles(config, run)
 	bin := strings.TrimSpace(config.Bin)
 	if bin == "" {
 		bin = "codex"
@@ -155,6 +156,7 @@ func codexLaunchConfiguration(config ProviderConfig, sandbox string) []string {
 	args := []string{}
 	args = append(args, codexBrowserMCPArguments(config)...)
 	args = append(args, codexDelegationMCPArguments(config)...)
+	args = append(args, codexSkillFilesMCPArguments(config)...)
 	if value := strings.TrimSpace(config.CodexApproval); value != "" {
 		args = append(args, "-c", fmt.Sprintf("approval_policy=%q", value))
 	}

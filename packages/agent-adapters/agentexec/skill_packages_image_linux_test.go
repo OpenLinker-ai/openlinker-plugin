@@ -10,6 +10,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -91,6 +92,7 @@ func TestSkillPackagesProviderImage(t *testing.T) {
 			if !ok || !loaded || !strings.Contains(out["summary"].(string), "skill-files-readable-state-private") {
 				t.Fatalf("image provider did not read files: %#v", result)
 			}
+			checkSkillFilesServerAsProvider(t, name, run.AgentID)
 			// The fixture prepared an executable symlink in the Provider's
 			// private HOME. Runtime cannot traverse it, while Provider can.
 			if _, err := os.Stat("/provider/skill-provider-only"); !errors.Is(err, os.ErrPermission) {
@@ -125,5 +127,41 @@ func TestSkillPackagesProviderImage(t *testing.T) {
 	}
 	if _, err := os.Stat("/workspace/.openlinker-skills"); !os.IsNotExist(err) {
 		t.Fatal("image polluted user workspace")
+	}
+}
+
+// Browser entries have no shell, so Codex/Claude spawn the Host's read-only
+// package server as the Provider identity. Exercise that exact identity.
+func checkSkillFilesServerAsProvider(t *testing.T, provider, agentID string) {
+	t.Helper()
+	roots, err := filepath.Glob(filepath.Join("/skills", agentID, "*"))
+	if err != nil || len(roots) == 0 {
+		t.Fatalf("no materialized package directory: %v %v", roots, err)
+	}
+	root := roots[0]
+	request := func(id int, path string) string {
+		raw, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": "tools/call", "params": map[string]any{"name": "read_skill_file", "arguments": map[string]any{"path": path}}})
+		return string(raw)
+	}
+	command := exec.Command("/usr/local/bin/openlinker-plugin-host", "plugin", "skill-files", "--host", provider, "--root", root)
+	command.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin", "HOME=/provider"}
+	command.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: 10002, Gid: 10002, Groups: []uint32{10003}}}
+	command.Stdin = strings.NewReader(strings.Join([]string{
+		request(1, filepath.Join(root, "references", "example.txt")),
+		request(2, "/runtime/skill-test-secret"),
+		request(3, filepath.Join(root, "..", "..", "..", "runtime", "skill-test-secret")),
+	}, "\n") + "\n")
+	out, err := command.Output()
+	if err != nil {
+		t.Fatalf("package file server as Provider: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 3 || !strings.Contains(lines[0], "versioned reference") || strings.Contains(lines[0], `"isError":true`) {
+		t.Fatalf("Provider could not read the pinned supporting file: %s", out)
+	}
+	for _, line := range lines[1:] {
+		if strings.Contains(line, "PRIVATE-RUNTIME-STATE") || !strings.Contains(line, `"isError":true`) {
+			t.Fatalf("package file server exposed Runtime state: %s", line)
+		}
 	}
 }

@@ -117,6 +117,17 @@ Already tracked cache files cause loading to fail instead of extending that leak
 Native caches stay within the provider sandbox's readable workspace. Image
 Claude invocations include only the selected package directories with `--add-dir`;
 OS permissions keep these directories read-only to the Provider.
+
+The Browser profile disables shell, image and file tools, so for Runs with loaded
+packages the host adds one read-only MCP server, `openlinker_skills`, exposing only
+`read_skill_file`. Codex and Claude start it from the Browser plugin host binary
+(`plugin skill-files`) as the Provider identity; the host passes each pinned package
+directory with `--root`, and tool arguments cannot add directories. Reads use
+`os.Root`, so `..` and symlinks cannot leave a package; hidden entries such as the
+cache `.gitignore` and pending temporary files are never served, and files are
+limited to 64 KiB. Every Browser prompt, including resumed turns, names the tool.
+It adds no shell, write, network or Browser permission, and standard entries keep
+using their existing file tools.
 Declared commands are located in the configured Provider PATH; official image
 launchers check after dropping to the Provider UID and clearing capabilities.
 No prerequisite executable is run by this check. It verifies lookup/access, not

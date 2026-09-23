@@ -58,6 +58,9 @@ type ProviderConfig struct {
 	BrowserCredentialFile        string
 	BrowserLeaseRoot             string
 	BrowserBrokerRoot            string
+	// skillFileRoots are the pinned package directories served read-only to
+	// entries without a local file tool. Set per Run, never from assignment data.
+	skillFileRoots []string
 }
 
 type ConversationContext struct {
@@ -86,6 +89,7 @@ type RunContext struct {
 	SkillPackagesAlreadyLoaded bool
 	SkillPackagesDigest        string
 	LoadedSkillPackages        []loadedSkillPackage
+	SkillFilesTool             bool
 	ReadDelegatedRun           func(context.Context, string) (*openlinker.RuntimeDelegatedRun, error)
 	DelegationSocket           string
 	DelegationProxyBin         string
