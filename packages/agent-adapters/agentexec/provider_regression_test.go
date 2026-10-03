@@ -121,14 +121,14 @@ printf '%%s\n' '%s'
 				old = fixtureThread
 			}
 			store := filepath.Join(dir, "sessions.json")
-			if err := saveSessionForClientMode(store, name, dir, "conversation", old, mode, 1); err != nil {
+			if err := seedOwnedTestSession(store, name, dir, "conversation", old, mode); err != nil {
 				t.Fatal(err)
 			}
 			provider, err := NewProvider(ProviderConfig{Provider: name, Bin: bin, Workspace: dir, EnvAllowlist: []string{"TEST_LOG"}, Timeout: 5 * time.Second, SessionReuse: true, SessionStore: store})
 			if err != nil {
 				t.Fatal(err)
 			}
-			result, err := provider.Run(context.Background(), RunContext{RunID: "now", Conversation: &ConversationContext{SessionKey: "conversation", HistoryBeforeCurrent: []ConversationMessage{{Content: "rehydrated history"}}}})
+			result, err := provider.Run(context.Background(), sessionTestRun(RunContext{RunID: "now", Conversation: &ConversationContext{SessionKey: "conversation", HistoryBeforeCurrent: []ConversationMessage{{Content: "rehydrated history"}}}}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -174,14 +174,14 @@ func TestResumedProvidersReceiveInterveningCoreHistory(t *testing.T) {
 			}
 			prior := ConversationMessage{RunID: "prior", Role: "user", Content: "already supplied"}
 			run := RunContext{RunID: "own", Conversation: &ConversationContext{SessionKey: "conversation", HistoryBeforeCurrent: []ConversationMessage{prior}}}
-			if _, err := provider.Run(context.Background(), run); err != nil {
+			if _, err := provider.Run(context.Background(), sessionTestRun(run)); err != nil {
 				t.Fatal(err)
 			}
 			run.RunID = "next"
 			run.Conversation.HistoryBeforeCurrent = append(run.Conversation.HistoryBeforeCurrent,
 				ConversationMessage{RunID: "own", Role: "agent", Content: "own completed answer"},
 				ConversationMessage{RunID: "other-provider", Role: "agent", Content: "new cross-provider result"})
-			if _, err := provider.Run(context.Background(), run); err != nil {
+			if _, err := provider.Run(context.Background(), sessionTestRun(run)); err != nil {
 				t.Fatal(err)
 			}
 			promptPath := filepath.Join(dir, "prompt")
@@ -195,7 +195,7 @@ func TestResumedProvidersReceiveInterveningCoreHistory(t *testing.T) {
 			// After restart the persisted cursor still works.
 			provider, _ = NewProvider(ProviderConfig{Provider: name, Bin: bin, Workspace: dir, EnvAllowlist: []string{"TEST_LOG"}, Timeout: 5 * time.Second, SessionReuse: true, SessionStore: filepath.Join(dir, "sessions.json")})
 			run.RunID = "third"
-			if _, err := provider.Run(context.Background(), run); err != nil {
+			if _, err := provider.Run(context.Background(), sessionTestRun(run)); err != nil {
 				t.Fatal(err)
 			}
 			prompt, _ = os.ReadFile(promptPath)

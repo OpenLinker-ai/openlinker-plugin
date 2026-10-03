@@ -210,6 +210,12 @@ Codex app-server 执行复用固定 Node 模块的 `codexturn` 叶子，统一�
 完整轮次协议、取消与退出清理。Plugin 提供 Browser 安装回调、启动参数及进度观察，
 不启动 Agent Node 进程；Provider 会话策略与结果字段仍由 Plugin 自己维护。
 
+Claude/Codex 私有会话复用除 provider 与 workspace 外，还绑定 Core 提供的调用者、
+Agent 和当前 Core conversation。缺少这些可信上下文时仍执行调用，但不读写复用映射。
+旧的无归属映射保留但不再续接：新作用域首次调用从 Core 历史建立会话。复用默认值、
+存储路径、历史同步、失败恢复及 Browser attachment/Profile 身份均不变。Node 叶子
+仅提供作用域编码与哈希，复用策略继续由 Plugin 自己维护。
+
 ```bash
 npm test
 npm run test:go
