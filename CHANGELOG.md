@@ -6,6 +6,22 @@ CLI release and cross-platform installation matrix pass.
 
 ## 0.1.2 - Unreleased
 
+- **Behavior change:** Codex/Claude private session reuse now requires the
+  SDK-provided trusted principal, Agent and current Core conversation. Legacy
+  unbound mappings remain on disk but are not resumed; the first call under the
+  new scope starts a fresh private session using available Core history, and
+  later calls can resume it normally. Calls without trusted context still
+  execute without reading or writing reuse mappings. Defaults, credentials,
+  persistent paths and Plugin-owned Browser policy are unchanged.
+- Adopt Node's bounded message-limit EOF shutdown: after interrupting Codex,
+  close stdin and allow up to 500 ms for shutdown and pending rollout writes
+  before bounded cleanup. The Run still fails without automatic replay or
+  partial success. Provider child environments now also derive `LOGNAME`
+  (alongside `USER`) from the effective OS identity, replacing supplied values;
+  the UID-switching launcher derives both after the drop. Codex tool environments
+  remain separately configured. New Host publication and regenerated marketplace
+  locks are required before merging.
+
 - Add version-pinned private skill packages for native Codex/Claude hosts using
   Core schema 093. Verify and materialize immutable files, check prerequisites,
   inject instructions into new native sessions, and report durable load evidence.
