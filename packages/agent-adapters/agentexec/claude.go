@@ -49,18 +49,18 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 	requestCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	sessionKey := conversationSessionKey(run)
+	sessionNamespace, sessionKey := providerSessionScope("claude", config, run)
 	sessionPath := sessionStorePath(config.SessionStore, "claude", workspace)
 	sessionID := ""
 	clientMode := providerSessionClientMode(config)
 	clientModeGeneration := uint64(1)
 	if config.SessionReuse && sessionKey != "" {
-		unlock := lockSession("claude", workspace, sessionKey)
+		unlock := lockSession(sessionNamespace, workspace, sessionKey)
 		defer unlock()
 		var modeChanged bool
 		sessionID, clientModeGeneration, modeChanged = loadSessionForClientMode(
 			sessionPath,
-			"claude",
+			sessionNamespace,
 			workspace,
 			sessionKey,
 			clientMode,
@@ -91,7 +91,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 		command.Stdin = strings.NewReader(
 			buildPrompt(
 				"Claude Code",
-				runWithSessionHistory(run, sessionPath, "claude", workspace, sessionKey, sessionID),
+				runWithSessionHistory(run, sessionPath, sessionNamespace, workspace, sessionKey, sessionID),
 				browserProfileEnabled(config),
 			),
 		)
@@ -119,7 +119,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 		}
 		if err != nil {
 			if sessionID != "" && attempt == 0 && missingProviderSession(response.failureMessage()+"\n"+stderr.String()) {
-				if deleteErr := deleteSessionID(sessionPath, "claude", workspace, sessionKey); deleteErr != nil {
+				if deleteErr := deleteSessionID(sessionPath, sessionNamespace, workspace, sessionKey); deleteErr != nil {
 					return openlinker.RuntimeResult{}, fmt.Errorf("Claude session recovery failed: %w", deleteErr)
 				}
 				if run.Browser != nil && run.Browser.Rotate != nil {
@@ -142,7 +142,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 	if config.SessionReuse && sessionKey != "" && strings.TrimSpace(response.SessionID) != "" {
 		if err := saveSessionForClientMode(
 			sessionPath,
-			"claude",
+			sessionNamespace,
 			workspace,
 			sessionKey,
 			response.SessionID,
@@ -159,7 +159,7 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 	}
 	if config.SessionReuse && sessionKey != "" {
 		result["claude_session_reuse"] = true
-		result["claude_session_key_hash"] = sessionKeyHash("claude", workspace, sessionKey)
+		result["claude_session_key_hash"] = sessionKeyHash(sessionNamespace, workspace, sessionKey)
 		result["claude_session_resumed"] = resumed
 		result["claude_session_recovered"] = recovered
 	}

@@ -41,7 +41,7 @@ func TestCodexProviderStreamsSafeProgressBeforeExit(t *testing.T) {
 	}
 	completed := make(chan providerResult, 1)
 	go func() {
-		result, err := provider.Run(context.Background(), run)
+		result, err := provider.Run(context.Background(), sessionTestRun(run))
 		completed <- providerResult{result: result, err: err}
 	}()
 
@@ -138,7 +138,7 @@ func TestCodexProviderReusesTrustedConversationSession(t *testing.T) {
 			HistoryBeforeCurrent: []ConversationMessage{{Role: "user", Content: "earlier request"}},
 		},
 	}
-	first, err := provider.Run(context.Background(), run)
+	first, err := provider.Run(context.Background(), sessionTestRun(run))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestCodexProviderReusesTrustedConversationSession(t *testing.T) {
 	}
 	run.RunID = "run-2"
 	run.Conversation.CurrentRunID = "run-2"
-	second, err := provider.Run(context.Background(), run)
+	second, err := provider.Run(context.Background(), sessionTestRun(run))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,11 +233,11 @@ printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"result":"c
 	run := RunContext{RunID: "run-1", Input: map[string]any{"text": "hello"}, Metadata: map[string]any{}, Conversation: &ConversationContext{
 		ID: "conversation-2", SessionKey: "conversation-2", CurrentRunID: "run-1", Source: "core",
 	}}
-	if _, err := provider.Run(context.Background(), run); err != nil {
+	if _, err := provider.Run(context.Background(), sessionTestRun(run)); err != nil {
 		t.Fatal(err)
 	}
 	run.RunID, run.Conversation.CurrentRunID = "run-2", "run-2"
-	if _, err := provider.Run(context.Background(), run); err != nil {
+	if _, err := provider.Run(context.Background(), sessionTestRun(run)); err != nil {
 		t.Fatal(err)
 	}
 	args, _ := os.ReadFile(logPath)
