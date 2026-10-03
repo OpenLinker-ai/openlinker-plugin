@@ -234,6 +234,15 @@ and shutdown. Plugin supplies its Browser installation hook, launch arguments
 and progress observer; it does not run an Agent Node process. Provider session
 policy and result metadata remain owned by Plugin.
 
+Claude/Codex private session reuse is scoped to the Core-provided principal,
+Agent and current Core conversation, in addition to provider and workspace.
+Without that trusted context, calls still execute but do not read or write reuse
+maps. Existing unscoped maps are retained, but are not resumed: the first call
+under the new scope starts a session from Core history. Reuse defaults, store
+paths, history synchronization, failure recovery, and Browser attachment/Profile
+identity are unchanged. The Node leaf supplies only scope framing and hashing;
+Plugin continues to own this reuse policy.
+
 ```bash
 npm test
 npm run test:go

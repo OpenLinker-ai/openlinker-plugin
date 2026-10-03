@@ -202,7 +202,7 @@ text("isolated browser discovered");`
 	}
 	for n := 1; n <= turns; n++ {
 		run.RunID = fmt.Sprintf("run-%d", n)
-		result, err := provider.Run(context.Background(), run)
+		result, err := provider.Run(context.Background(), sessionTestRun(run))
 		if messageLimit && n == 1 {
 			if !errors.Is(err, codexturn.ErrResponseMessageLimit) || calls.Load() != 2 || !incomplete.Load() || limitStops != 1 || retries != 0 {
 				t.Fatalf("real client retried or lost message-limit diagnosis: err=%v calls=%d stops=%d retries=%d", err, calls.Load(), limitStops, retries)

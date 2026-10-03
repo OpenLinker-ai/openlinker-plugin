@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/providersession"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/sessionsandbox"
 )
 
 // These adapters preserve each product's existing callers and public evidence.
@@ -113,6 +114,26 @@ func saveSessionForClientMode(
 
 func providerSessionClientMode(config ProviderConfig) string {
 	return delegationSessionMode(config, providerBaseSessionClientMode(config))
+}
+
+// Plugin owns this reuse policy; the Node leaf only frames/hashes its scope.
+// A Core conversation key is caller-chosen and cannot identify its owner alone.
+// Missing trusted authority leaves one-shot execution available without touching
+// a private-session mapping. Browser attachment/Profile identity stays separate.
+func providerSessionScope(provider string, config ProviderConfig, run RunContext) (namespace, key string) {
+	namespace = provider
+	// A separate provider hash domain cannot alias any legacy caller-chosen
+	// conversation key. The physical store path and legacy records stay intact.
+	namespace += "/principal-v1"
+	if run.Authority == nil || strings.TrimSpace(run.Authority.PrincipalScopeID) == "" ||
+		strings.TrimSpace(run.AgentID) == "" || run.RunID == "" || run.Conversation == nil ||
+		run.Conversation.Source != "core" || run.Conversation.CurrentRunID != run.RunID ||
+		strings.TrimSpace(run.Conversation.SessionKey) == "" {
+		return namespace, ""
+	}
+	key = sessionsandbox.Scope("provider-principal-v1", run.AgentID,
+		run.Authority.PrincipalScopeID, conversationSessionKey(run))
+	return namespace, key
 }
 
 func providerBaseSessionClientMode(config ProviderConfig) string {
