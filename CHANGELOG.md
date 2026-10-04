@@ -4,7 +4,18 @@ All notable changes to the OpenLinker Skills and native plugins are documented
 here. This package is pre-1.0 and remains Developer Preview until its pinned
 CLI release and cross-platform installation matrix pass.
 
-## 0.1.2 - Unreleased
+## v0.2.0 — 2026-10-04
+
+- Pin the formal CLI `v0.2.0` caller archives and their public SHA-256 digests
+  in all three CLI locks. With no API override, this caller CLI now uses
+  `https://openlinker.ai`; local/self-hosted callers must set `--api` or the
+  existing API environment variables explicitly. Browser login credentials
+  remain bound to their API instance.
+- Plugin host defaults, Runtime identity, Provider sessions, Browser Profiles,
+  host installation locks and persistent paths are unchanged by this lock update.
+  Publishing a new host does not switch an installed host or running Agent.
+- The behavior and compatibility entries below are included in this source
+  release; Provider/Browser image publication is a separate workflow.
 
 - **Behavior change:** Codex/Claude private session reuse now requires the
   SDK-provided trusted principal, Agent and current Core conversation. Legacy
