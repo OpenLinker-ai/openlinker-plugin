@@ -83,6 +83,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      - name: Test committed Host locks used by native packages
+        run: node scripts/verify-marketplace-host.mjs
       - name: Verify public artifacts and populate candidate locks
         shell: bash
         run: node scripts/generate-host-lock.mjs "$GITHUB_REF_NAME" --write
@@ -119,6 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+          node --input-type=module -e 'import fs from "node:fs"; if (process.env.GITHUB_REF_NAME !== `v${JSON.parse(fs.readFileSync("package.json", "utf8")).version}`) throw new Error("Release tag must match package.json version")'
           npm run release:check
           for host in codex claude; do
             sh -n "platforms/${host}/openlinker/bin/openlinker-plugin"

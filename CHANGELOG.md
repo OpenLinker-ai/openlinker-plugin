@@ -4,6 +4,19 @@ All notable changes to the OpenLinker Skills and native plugins are documented
 here. This package is pre-1.0 and remains Developer Preview until its pinned
 CLI release and cross-platform installation matrix pass.
 
+## v0.2.1 — 2026-10-05
+
+- Publish Codex/Claude native plugin and standalone Skill packages with stable
+  `0.2.1` manifest metadata. All three Host locks use the verified six-platform
+  Host `v0.2.0` archives; caller CLI locks remain `v0.2.0`.
+- This is a delivery update. Host execution sources, Runtime identities and
+  Runtime state paths are unchanged. After updating, run `$setup-plugin-host`
+  (Codex) or `/openlinker:install-plugin-host` (Claude) to install Host `v0.2.0`
+  into its versioned cache. Installing a package does not switch a running Agent.
+- Release CI checks both the committed Host locks used by native packages and
+  the new tag's Host artifacts. Native publication requires the selected tag to
+  match the package version. Package `v0.2.1` continues to install Host `v0.2.0`.
+
 ## v0.2.0 — 2026-10-04
 
 - Pin the formal CLI `v0.2.0` caller archives and their public SHA-256 digests
