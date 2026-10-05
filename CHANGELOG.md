@@ -4,6 +4,29 @@ All notable changes to the OpenLinker Skills and native plugins are documented
 here. This package is pre-1.0 and remains Developer Preview until its pinned
 CLI release and cross-platform installation matrix pass.
 
+## v0.2.3 — 2026-10-05 (Native delivery)
+
+- Publish Codex/Claude native packages and standalone Skills with `0.2.3`
+  metadata and three identical locks for the actual Host `v0.2.2` archives.
+  Caller CLI locks remain `v0.2.0` and the exact SDK pin remains unchanged.
+- Host `v0.2.2` consumes the formal Node `v0.2.0` public protocol leaves. The
+  consumed Go code, embedded resources, contract and generator are unchanged
+  from the previous Node pin. This updates artifact provenance, not execution
+  policy, session scope, identities or persistent paths.
+- Install the locked host explicitly after updating the native package; package
+  publication does not replace a running Worker or provide automatic rollback.
+
+## v0.2.2 — 2026-10-05 (Host source release)
+
+- Pin the public Node protocol leaves to formal `v0.2.0` (source `6a232b21`).
+  Their Go sources and module dependencies are unchanged from the previous pin.
+  Keep the exact SDK pin, Provider execution, session scopes, identities and
+  persistent paths unchanged.
+- Publish new Host archives for the changed dependency lock. Native package
+  metadata remains `0.2.1` in this source tag; a subsequent delivery tag must
+  adopt the real Host archive checksums before publishing new native packages.
+  Publishing or installing an archive does not switch a running Agent.
+
 ## v0.2.1 — 2026-10-05
 
 - Publish Codex/Claude native plugin and standalone Skill packages with stable
