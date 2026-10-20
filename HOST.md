@@ -179,3 +179,22 @@ package. Embedding hosts should own their signal lifecycle with `signal.NotifyCo
 Browser key-rewrap and lease inspection helpers live only in tests; they are not
 new runtime capabilities. Execution-source changes still require a new published
 host and regenerated marketplace locks before merging, as described above.
+
+## Owner-selected MCP tools
+
+Select registered MCP service tools on the Agent's Skill / MCP settings page.
+A compatible Host advertises `mcp_bindings.v1` after checking its local proxy and
+writable broker root. Core supplies a trusted selection snapshot on the next Run;
+the Host configures the installed Codex/Claude client with only those tools.
+No service credential is sent to the client. The same selection resumes the
+existing scoped conversation; changing or removing tools starts a fresh model
+session so stale tool configuration is not reused. Existing scope and native
+isolation defaults remain unchanged. Tool discovery and successful calls report
+separate receipts. A configured tool proxy that never loads fails the Run with
+`MCP_TOOLS_UNAVAILABLE`, rather than silently claiming tools are available.
+
+Calls use Core-authorized child Runs and may continue for up to 30 seconds per
+MCP request. A pending result includes a request key that can be repeated without
+executing the operation again. Removal revokes subsequent calls even from an
+already running parent. Owner-private associations are not public listings;
+callers may still discover tool names/results and exercise granted side effects.

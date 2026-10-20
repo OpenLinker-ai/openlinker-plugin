@@ -106,9 +106,13 @@ func TestPluginFactoryStillRejectsClaudeNativeBrowserDelegation(t *testing.T) {
 			if !ok {
 				t.Fatalf("Plugin lost its skill package loader: %T", provider)
 			}
-			browser, ok := packages.provider.(*browserExecutionProvider)
+			delegation, ok := packages.provider.(delegationProvider)
 			if !ok {
-				t.Fatalf("Plugin lost its independent Browser provider: %T", packages.provider)
+				t.Fatalf("Plugin lost its own MCP wrapper: %T", packages.provider)
+			}
+			browser, ok := delegation.provider.(*browserExecutionProvider)
+			if !ok {
+				t.Fatalf("Plugin lost its independent Browser provider: %T", delegation.provider)
 			}
 			if _, ok := browser.base.(ClaudeProvider); !ok {
 				t.Fatalf("Plugin delegated its deep Provider.Run to another product: %T", browser.base)

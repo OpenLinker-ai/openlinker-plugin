@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agentdelegation"
 	"strings"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 )
 
 type ProviderConfig struct {
+	boundMCPTools  []agentdelegation.BoundTool
+	boundMCPDigest string
 	// DisableSkillPackages is set by hosts whose provider process cannot read the private cache.
 	DisableSkillPackages bool
 	SkillPackageCache    skillpackages.Cache
@@ -87,6 +90,9 @@ type ConversationMessage struct {
 }
 
 type RunContext struct {
+	MCPSnapshot                any
+	BoundMCPTools              []agentdelegation.BoundTool
+	BoundMCPDigest             string
 	PackageSnapshot            any
 	SkillPackagesAlreadyLoaded bool
 	SkillPackagesDigest        string
@@ -182,12 +188,13 @@ func (handler Handler) Handle(ctx context.Context, assignment openlinker.Runtime
 	assignmentMetadata := map[string]any(assignment.Metadata)
 	metadata := make(map[string]any, len(assignmentMetadata))
 	for key, value := range assignmentMetadata {
-		if key != "a2a" && key != "conversation" && key != skillPackagesMetadataKey {
+		if key != "a2a" && key != "conversation" && key != skillPackagesMetadataKey && key != agentdelegation.MetadataKey && key != agentdelegation.CallMetadataKey {
 			metadata[key] = value
 		}
 	}
 	run := RunContext{
 		PackageSnapshot:   assignmentMetadata[skillPackagesMetadataKey],
+		MCPSnapshot:       assignmentMetadata[agentdelegation.MetadataKey],
 		RunID:             assignment.RunID,
 		AgentID:           assignment.AgentID,
 		AttemptDeadlineAt: assignment.AttemptDeadlineAt,

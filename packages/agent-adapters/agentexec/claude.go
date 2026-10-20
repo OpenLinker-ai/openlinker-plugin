@@ -2,9 +2,9 @@ package agentexec
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agentdelegation"
 	"os"
 	"os/exec"
 	"strings"
@@ -181,29 +181,22 @@ func (provider ClaudeProvider) Run(ctx context.Context, run RunContext) (openlin
 
 func claudeArguments(config ProviderConfig, permission, sessionID string) []string {
 	args := []string{"--safe-mode", "--no-chrome", "--disable-slash-commands"}
-	if directMCPBrowserClientEnabled(config) || config.DelegationSocket != "" {
+	if nativeBrowserClientEnabled(config) {
+		args = []string{"--bare", "--no-chrome", "--plugin-dir", config.BrowserNativePlugin}
+		if len(config.skillFileRoots) > 0 || config.DelegationSocket != "" {
+			args = append(args, "--mcp-config", claudeRunMCPConfig(config))
+		}
+	} else if directMCPBrowserClientEnabled(config) || config.DelegationSocket != "" {
 		args = []string{"--bare", "--no-chrome", "--disable-slash-commands", "--strict-mcp-config", "--mcp-config", claudeRunMCPConfig(config)}
-	} else if nativeBrowserClientEnabled(config) {
-		args = []string{
-			"--bare",
-			"--no-chrome",
-			"--plugin-dir",
-			config.BrowserNativePlugin,
-		}
-		if len(config.skillFileRoots) > 0 {
-			// Add only the read-only package server; the native Browser plugin
-			// keeps supplying its own MCP server through --plugin-dir.
-			raw, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{skillFilesServerName: claudeSkillFilesMCPServer(config)}})
-			args = append(args, "--mcp-config", string(raw))
-		}
 	}
+
 	args = append(args, "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--permission-mode", permission)
 	if config.Model != "" {
 		args = append(args, "--model", config.Model)
 	}
 	allowed := append([]string(nil), config.AllowedTools...)
 	if config.DelegationSocket != "" {
-		for _, tool := range []string{"delegate_agent", "get_delegated_run", "wait_delegated_run"} {
+		for _, tool := range agentdelegation.BoundToolNames(config.DelegationTargets, config.boundMCPTools) {
 			allowed = appendUniqueString(allowed, "mcp__openlinker_delegation__"+tool)
 		}
 	}

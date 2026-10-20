@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agentdelegation"
 	"log"
 	"os"
 	"os/exec"
@@ -157,7 +158,9 @@ type resolvedRuntime struct {
 func (resolved resolvedRuntime) optionalFeatures(humanControlEnabled, observationEnabled bool) []string {
 	features := runtimeOptionalFeatures(resolved.config.ExecutionProfile, resolved.config.BrowserInteractionPolicy, humanControlEnabled, observationEnabled)
 	features = append(features, resolved.handler.SkillPackageFeatures()...)
-	if len(resolved.config.DelegationTargets) > 0 {
+	if _, err := agenthost.Resolve(context.Background(), resolved.config.DelegationProxyBin, "delegation_proxy"); err == nil && agentdelegation.CheckBrokerRoot(resolved.config.DelegationBrokerRoot) == nil {
+		features = append(features, agentdelegation.Feature, openlinker.RuntimeDelegatedRunReadFeature)
+	} else if len(resolved.config.DelegationTargets) > 0 {
 		features = append(features, openlinker.RuntimeDelegatedRunReadFeature)
 	}
 	return features
