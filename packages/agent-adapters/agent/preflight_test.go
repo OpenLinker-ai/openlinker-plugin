@@ -141,7 +141,7 @@ func authPreflightFixture(t *testing.T, provider, browserMode string, delegation
 	if provider == "claude" {
 		version = "2.1.259 (Claude Code)"
 	}
-	help := "app-server generate-json-schema --listen --config --disable --safe-mode --bare --no-chrome --disable-slash-commands --permission-mode --resume stream-json --verbose --include-partial-messages --strict-mcp-config"
+	help := "app-server generate-json-schema --listen --config --disable --restricted --settings --permission-prompts --tools --safe-mode --bare --no-chrome --disable-slash-commands --permission-mode --resume stream-json --verbose --include-partial-messages --strict-mcp-config"
 	capabilities, err := json.Marshal(agenthost.SupportedCapabilities())
 	if err != nil {
 		t.Fatal(err)
@@ -152,6 +152,7 @@ func authPreflightFixture(t *testing.T, provider, browserMode string, delegation
 	}
 	config := defaultConfig()
 	config.Provider, config.ProviderBin = provider, bin
+	config.DelegationProxyBin = bin
 	config.AgentID = "11111111-1111-4111-8111-111111111111"
 	config.OpenLinkerURL, config.Workspace = "https://runtime.example.test", directory
 	config.StateDir = filepath.Join(directory, "state")
@@ -209,6 +210,7 @@ func TestSkillPackageFeaturesFollowExecutionEnvironment(t *testing.T) {
 						}
 					}
 					env["OPENLINKER_"+strings.ToUpper(provider)+"_BIN"] = bin
+					env["OPENLINKER_AGENT_DELEGATION_PROXY_BIN"] = bin
 				}
 				resolved, err := resolveRuntime(getenv, provider, "test")
 				if err != nil {

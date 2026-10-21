@@ -190,11 +190,33 @@ No service credential is sent to the client. The same selection resumes the
 existing scoped conversation; changing or removing tools starts a fresh model
 session so stale tool configuration is not reused. Existing scope and native
 isolation defaults remain unchanged. Tool discovery and successful calls report
-separate receipts. A configured tool proxy that never loads fails the Run with
-`MCP_TOOLS_UNAVAILABLE`, rather than silently claiming tools are available.
+separate receipts. Proxy/materialization failures or an otherwise successful
+Provider that never discovers its selected tools produce `MCP_TOOLS_UNAVAILABLE`.
+If the Provider itself fails before discovery, its original error is preserved;
+the failed receipt records `provider_ended_before_discovery`. This can indicate
+authentication or model startup failure and does not establish an MCP root cause.
+After discovery, an unrelated Provider error does not invalidate the ready receipt.
+
+Standard Claude with page-selected MCP keeps the client's normal authentication
+home. It uses restricted settings, explicit MCP/tool lists, disabled hooks/skills,
+and excluded ambient instructions instead of `--bare`. Cached OAuth/Keychain and
+configured API keys remain client-owned. Static delegation and Browser profiles
+retain their existing API-key requirement and independent execution policies.
+Startup fails with a local proxy/broker diagnostic if MCP delivery cannot be
+initialized; it never silently removes features from an enrolled Node identity.
 
 Calls use Core-authorized child Runs and may continue for up to 30 seconds per
 MCP request. A pending result includes a request key that can be repeated without
 executing the operation again. Removal revokes subsequent calls even from an
 already running parent. Owner-private associations are not public listings;
 callers may still discover tool names/results and exercise granted side effects.
+
+For mTLS deployments, upgrade Core with the certificate-renewal compatibility
+fix before switching this Node/Host. Schema 099 alone is insufficient; the
+release notes pin the minimum Core commit. Preserve the existing identity,
+private key, DataDir and spool. Do not clear local state after a Core database
+reset; recover the matching server identity through an administrative plan.
+
+The minimum Core source for this renewal-compatible release is
+[`a855ba45b0ec14dc45dc2b0f29899a2f915c8d5a`](https://github.com/OpenLinker-ai/openlinker-core/commit/a855ba45b0ec14dc45dc2b0f29899a2f915c8d5a)
+(or a descendant containing that fix). Deploy it before upgrading an mTLS Node/Host.
