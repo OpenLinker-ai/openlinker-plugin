@@ -28,7 +28,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(s
 	command.PersistentFlags().StringVar(&opts.UserToken, "token", opts.UserToken, "OpenLinker User Token for caller tools only")
 	command.PersistentFlags().DurationVar(&opts.Timeout, "timeout", opts.Timeout, "caller request timeout")
 	service := agentapp.NewService(getenv, nil, buildinfo.Version)
-	command.AddCommand(agent.New(streams, service), plugin.New(streams, &opts, service))
+	command.AddCommand(agent.New(streams, service), plugin.New(streams, &opts, service), newRuntimeCredentialCommand(stdout, getenv))
 	command.AddCommand(&cobra.Command{Use: "context", Args: cobra.NoArgs, RunE: func(_ *cobra.Command, _ []string) error {
 		return shared.WriteJSON(stdout, map[string]any{"host_version": buildinfo.Version, "plugin_commit": buildinfo.Revision, "surface_version": buildinfo.SurfaceVersion, "capabilities": buildinfo.Capabilities()})
 	}})

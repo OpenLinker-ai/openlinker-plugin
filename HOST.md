@@ -220,3 +220,24 @@ reset; recover the matching server identity through an administrative plan.
 The minimum Core source for this renewal-compatible release is
 [`a855ba45b0ec14dc45dc2b0f29899a2f915c8d5a`](https://github.com/OpenLinker-ai/openlinker-core/commit/a855ba45b0ec14dc45dc2b0f29899a2f915c8d5a)
 (or a descendant containing that fix). Deploy it before upgrading an mTLS Node/Host.
+
+## Controlled mTLS migration
+
+A Host containing this change follows Core's authenticated Runtime policy through
+the SDK; diagnostics report `runtime_security=core_policy`, not a hard-coded
+transport. Unmigrated installations retain token-only HTTPS. A Core-authorized
+migration pins mTLS; failed issuance never falls back to token-only.
+
+Stop the Host and run `openlinker-plugin-host runtime-credential prepare --data-dir PATH --node-id ID --agent-id ID --worker-id ID`
+as the existing Runtime UID. For Plugin, PATH is the existing state directory's
+`runtime` subdirectory. In Provider containers this is the Host UID, not the
+launcher or Provider UID. The command reads the existing `node-id` beside the
+`runtime` directory and cross-checks `--node-id` and any configured Node ID before
+writing credentials. It also checks the effective Agent ID and state directory
+using the same persisted configuration and environment precedence as Agent mode.
+The SDK owns locking, empty-spool checks and key
+persistence. The output contains only public CSR/key fingerprint and existing
+identity. Core controls authorization and zero-capacity successor activation.
+The Runtime volume and private key must remain unreadable by the Provider UID.
+This source description is not evidence that a particular Host archive/image has
+been published or deployed; record artifact versions and actual acceptance.
