@@ -1,5 +1,5 @@
-github.com/OpenLinker-ai/openlinker-agent-node v0.2.1-rc.2.0.20261021082755-787039243786 h1:uKXfwa0N2DQ+/erjuxVANUGE88h0v1Xmes2RiKUqgB4=
-github.com/OpenLinker-ai/openlinker-agent-node v0.2.1-rc.2.0.20261021082755-787039243786/go.mod h1:Fd4fC1vyexT8C9hD/wu45T/Cwy7J9GQP7i1sZ8vpX0c=
+github.com/OpenLinker-ai/openlinker-agent-node v0.2.1-rc.3 h1:Ri47HpMgTGMOsocPWxgznOZIy3AyxZHrrZwl3SS9Qls=
+github.com/OpenLinker-ai/openlinker-agent-node v0.2.1-rc.3/go.mod h1:Fd4fC1vyexT8C9hD/wu45T/Cwy7J9GQP7i1sZ8vpX0c=
 github.com/OpenLinker-ai/openlinker-go v0.2.1-0.20261021082043-b8104b799de8 h1:HhM7dhpRO4GV90pVYYfvSKbxudU/o4VzfpjpurZI81g=
 github.com/OpenLinker-ai/openlinker-go v0.2.1-0.20261021082043-b8104b799de8/go.mod h1:quh//vU/adqmssnZc9vOnlrXPquzSqXfVEW3z6Vswp4=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
