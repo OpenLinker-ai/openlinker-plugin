@@ -249,8 +249,7 @@ func (service *Service) Enable(parent context.Context, providerOverride string) 
 		Transport: openlinker.RuntimeTransportMode(resolved.config.Transport),
 		NodeID:    resolved.nodeID, NodeVersion: "openlinker-plugin-host/" + service.version,
 		AgentID: resolved.config.AgentID, AgentToken: resolved.agentToken,
-		RequireTokenOnly: true,
-		DataDir:          filepath.Join(resolved.stateDir, "runtime"), Capacity: resolved.config.Capacity,
+		DataDir: filepath.Join(resolved.stateDir, "runtime"), Capacity: resolved.config.Capacity,
 		Handler: resolved.handler, Logger: service.logger,
 		OptionalFeatures: optionalFeatures,
 		ExtensionRoutes: runtimeExtensionRoutes(

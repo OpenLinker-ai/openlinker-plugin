@@ -111,7 +111,7 @@ func Diagnose(getenv func(string) string, providerOverride string) Diagnostic {
 		_, hostErr := agenthost.Resolve(context.Background(), config.DelegationProxyBin, "delegation_proxy")
 		check("delegation_host", hostErr == nil, "compatible", "incompatible_or_missing")
 	}
-	result.Checks["runtime_security"] = "token_only"
+	result.Checks["runtime_security"] = "core_policy"
 	return result
 }
 
