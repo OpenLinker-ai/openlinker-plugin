@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/agentdelegation"
+	"github.com/OpenLinker-ai/openlinker-agent-node/pkg/adapters/claudepolicy"
 	"os"
 	"os/exec"
 	"strings"
@@ -186,6 +187,8 @@ func claudeArguments(config ProviderConfig, permission, sessionID string) []stri
 		if len(config.skillFileRoots) > 0 || config.DelegationSocket != "" {
 			args = append(args, "--mcp-config", claudeRunMCPConfig(config))
 		}
+	} else if !browserProfileEnabled(config) && len(config.boundMCPTools) > 0 && len(config.DelegationTargets) == 0 {
+		args = claudepolicy.MCPArgs(claudeRunMCPConfig(config), "", claudepolicy.BuiltinTools(config.AllowedTools, config.WebSearch))
 	} else if directMCPBrowserClientEnabled(config) || config.DelegationSocket != "" {
 		args = []string{"--bare", "--no-chrome", "--disable-slash-commands", "--strict-mcp-config", "--mcp-config", claudeRunMCPConfig(config)}
 	}

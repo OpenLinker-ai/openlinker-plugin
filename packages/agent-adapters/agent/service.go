@@ -158,11 +158,7 @@ type resolvedRuntime struct {
 func (resolved resolvedRuntime) optionalFeatures(humanControlEnabled, observationEnabled bool) []string {
 	features := runtimeOptionalFeatures(resolved.config.ExecutionProfile, resolved.config.BrowserInteractionPolicy, humanControlEnabled, observationEnabled)
 	features = append(features, resolved.handler.SkillPackageFeatures()...)
-	if _, err := agenthost.Resolve(context.Background(), resolved.config.DelegationProxyBin, "delegation_proxy"); err == nil && agentdelegation.CheckBrokerRoot(resolved.config.DelegationBrokerRoot) == nil {
-		features = append(features, agentdelegation.Feature, openlinker.RuntimeDelegatedRunReadFeature)
-	} else if len(resolved.config.DelegationTargets) > 0 {
-		features = append(features, openlinker.RuntimeDelegatedRunReadFeature)
-	}
+	features = append(features, agentdelegation.Feature, openlinker.RuntimeDelegatedRunReadFeature)
 	return features
 }
 
@@ -488,6 +484,13 @@ func resolveRuntime(getenv func(string) string, providerOverride, version string
 	providerBin := firstNonEmpty(envValue(getenv, providerBinEnv), config.ProviderBin, config.Provider)
 	if _, err := agentexec.CheckProviderCLI(context.Background(), agentexec.ProviderConfig{Provider: config.Provider, Bin: providerBin}); err != nil {
 		return resolvedRuntime{}, err
+	}
+	// Fail with the local cause instead of silently changing the enrolled feature set.
+	if _, err := agenthost.Resolve(context.Background(), config.DelegationProxyBin, "delegation_proxy"); err != nil {
+		return resolvedRuntime{}, fmt.Errorf("MCP delivery preflight: delegation proxy unavailable: %w", err)
+	}
+	if err := agentdelegation.CheckBrokerRoot(config.DelegationBrokerRoot); err != nil {
+		return resolvedRuntime{}, fmt.Errorf("MCP delivery preflight: private broker unavailable: %w", err)
 	}
 	if config.ExecutionProfile == "browser" &&
 		config.browserSelectedMode == "" &&
