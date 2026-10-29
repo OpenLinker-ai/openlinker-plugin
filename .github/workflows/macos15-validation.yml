@@ -1,0 +1,50 @@
+name: macOS 15 install validation (no publication)
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ci.yml
+      - .github/workflows/release.yml
+      - .github/workflows/macos15-validation.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-macos:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Record and require the expected runner and Node target
+        shell: bash
+        run: |
+          set -euo pipefail
+          sw_vers
+          uname -m
+          node --version
+          test "$(sw_vers -productVersion | cut -d. -f1)" = 15
+          test "$(uname -m)" = arm64
+          node -e 'const a = require("node:assert/strict"); a.equal(process.platform, "darwin"); a.equal(process.arch, "arm64"); a.equal(process.versions.node.split(".")[0], "22")'
+      - name: Verify committed locks and installer regression tests
+        run: |
+          node scripts/check-host-lock.mjs
+          npm run test:host
+      - name: Exercise committed public host and native MCP
+        run: node scripts/verify-marketplace-host.mjs
+      - name: Reproduce release-side lock verification using only the already published pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          locked_tag=$(node -p 'JSON.parse(require("node:fs").readFileSync("shared/host-lock.json", "utf8")).version')
+          node scripts/generate-host-lock.mjs "$locked_tag" --write
+          git diff --exit-code -- shared/host-lock.json platforms/codex/openlinker/host-lock.json platforms/claude/openlinker/host-lock.json
+          node scripts/check-host-lock.mjs
+          node scripts/verify-marketplace-host.mjs
