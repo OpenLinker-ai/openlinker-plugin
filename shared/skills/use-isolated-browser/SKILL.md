@@ -126,6 +126,11 @@ If the tool reports that Browser Runtime configuration is unavailable, explain
 which non-secret path or container component is missing. Do not fall back to
 direct CDP, WebDriver, VNC, a host browser, or unrestricted HTTP navigation.
 
+If `browser_session` is not registered in this client at all, the isolated
+Browser is not connected. Report that and stop. A browser extension, an app's
+built-in browser, or any other tool that can open pages is not a substitute,
+and its results must not be reported as isolated Browser results.
+
 Browser frames and actions are transient. Only coarse Run lifecycle evidence
 and the final result belong in OpenLinker durable Run history.
 
