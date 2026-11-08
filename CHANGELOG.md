@@ -4,6 +4,16 @@ All notable changes to the OpenLinker Skills and native plugins are documented
 here. This package is pre-1.0 and remains Developer Preview until its pinned
 CLI release and cross-platform installation matrix pass.
 
+## Unreleased
+
+- Pin Go SDK `v0.2.1-0.20261108071305-2c5fa0b19319` (openlinker-go main
+  `2c5fa0b1`) and Agent Node protocol leaves
+  `v0.2.1-rc.4.0.20261108073824-a70f1cbf75a7` (agent-node main `a70f1cbf`), and
+  the Provider image SDK pin to match. The host gains the SDK's registration
+  journal durability/replay fixes and Runtime Worker hardening. The Host
+  release and caller CLI locks still need the matching `v0.2.4-rc.4` host
+  archives and CLI `v0.2.0-rc.20`.
+
 ## v0.2.3 — 2026-10-05 (Native delivery)
 
 - Publish Codex/Claude native packages and standalone Skills with `0.2.3`
