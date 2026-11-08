@@ -10,9 +10,9 @@ CLI release and cross-platform installation matrix pass.
   `2c5fa0b1`) and Agent Node protocol leaves
   `v0.2.1-rc.4.0.20261108073824-a70f1cbf75a7` (agent-node main `a70f1cbf`), and
   the Provider image SDK pin to match. The host gains the SDK's registration
-  journal durability/replay fixes and Runtime Worker hardening. The Host
-  release and caller CLI locks still need the matching `v0.2.4-rc.4` host
-  archives and CLI `v0.2.0-rc.20`.
+  journal durability/replay fixes and Runtime Worker hardening.
+- Lock the caller CLI to the public `v0.2.0-rc.20` test release (built on the
+  same SDK pin) and the native host to the public `v0.2.4-rc.4` test release.
 
 ## v0.2.3 — 2026-10-05 (Native delivery)
 
