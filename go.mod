@@ -3,7 +3,7 @@ module github.com/OpenLinker-ai/openlinker-plugin
 go 1.26.4
 
 require (
-	github.com/OpenLinker-ai/openlinker-agent-node v0.2.1-rc.4.0.20261118035940-62e47fb5d367
+	github.com/OpenLinker-ai/openlinker-agent-node v0.2.1-rc.6
 	github.com/OpenLinker-ai/openlinker-go v0.2.1-0.20261108071305-2c5fa0b19319
 	golang.org/x/sys v0.47.0
 )
